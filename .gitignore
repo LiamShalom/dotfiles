@@ -1,0 +1,3 @@
+# Repo hygiene — NOT the global git excludes (that lives in home/.gitignore)
+.DS_Store
+*.bak
