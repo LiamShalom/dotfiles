@@ -108,7 +108,6 @@ source $ZSH/oh-my-zsh.sh
 
 # extra
 source ~/.extra
-source ~/.work
 
 eval "$(direnv hook zsh)"
 eval "$(direnv hook zsh)"

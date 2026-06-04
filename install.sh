@@ -38,11 +38,4 @@ for f in "$SRC_DIR"/*; do
 done
 shopt -u dotglob nullglob
 
-# .zshrc sources ~/.work for machine/work-specific secrets (gitignored, not in repo).
-# Create an empty placeholder so a fresh shell doesn't error on a new machine.
-if [ ! -e "$HOME/.work" ]; then
-	touch "$HOME/.work"
-	echo "created  .work (empty placeholder for machine-local secrets)"
-fi
-
 echo "Done. Open a new shell or run: exec \$SHELL -l"

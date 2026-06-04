@@ -51,8 +51,7 @@ cd ~/dotfiles
 
 This symlinks everything in `home/` into `$HOME`. Any existing real file is
 moved to `<file>.bak` first, and the script is safe to re-run (correct symlinks
-are left untouched). It also creates an empty `~/.work` placeholder for
-machine-local secrets (see Step 6).
+are left untouched).
 
 ## Step 5 — Reload the shell
 
@@ -63,19 +62,7 @@ exec $SHELL -l
 You should now have the `gnzh` theme, all aliases from `.extra`, and `direnv`
 hooked in.
 
-## Step 6 — Add machine-local secrets
-
-`.zshrc` sources `~/.work`, which is **not** in this repo (so no secrets are
-ever committed). Put per-machine tokens and exports there:
-
-```bash
-cat >> ~/.work <<'EOF'
-export SONAR_TOKEN="…"
-# export OTHER_TOKEN="…"
-EOF
-```
-
-## Step 7 — Restore GPG commit signing (optional)
+## Step 6 — Restore GPG commit signing (optional)
 
 `.gitconfig` has `gpgsign = true` with `signingkey A61540BF4938459B`. Until that
 key is on the new machine, commits will fail to sign. Either import the key:
@@ -110,5 +97,5 @@ git config --global commit.gpgsign false
 ## What's intentionally NOT tracked
 
 Secrets and machine-specific state stay off GitHub: shell/SQL/python histories,
-`.pgpass`, `.ssh`, `.gnupg`, `.docker`, app state (`.claude.json`), generated
-caches (`.DS_Store`, `.zcompdump*`), and `~/.work` (machine-local secrets).
+`.pgpass`, `.ssh`, `.gnupg`, `.docker`, app state (`.claude.json`), and
+generated caches (`.DS_Store`, `.zcompdump*`).
