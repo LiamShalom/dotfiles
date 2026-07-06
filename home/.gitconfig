@@ -183,6 +183,6 @@
 	defaultBranch = main
 [user]
 	name = Liam Shalom
-	email = liam.int@trase.ai
-	signingkey = A61540BF4938459B
+	email = liam@sideshift.app
+	signingkey = CB319C16C9EEC620
 	
