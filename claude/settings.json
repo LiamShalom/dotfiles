@@ -1,0 +1,97 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "API_TIMEOUT_MS": "600000"
+  },
+  "permissions": {
+    "allow": [],
+    "defaultMode": "auto"
+  },
+  "model": "fable",
+  "skillOverrides": {
+    "codebase-design": "off",
+    "domain-modeling": "off",
+    "git-guardrails-claude-code": "off",
+    "mcp-builder": "off",
+    "systematic-debugging": "off",
+    "test-driven-development": "off",
+    "to-tickets": "off",
+    "wayfinder": "off"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/worktree-claude-md.sh",
+            "timeout": 10,
+            "statusMessage": "Linking worktree CLAUDE.md"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/worktree-env-local.sh",
+            "timeout": 10,
+            "statusMessage": "Linking worktree .env.local"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/usage-cap.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/usage-cap.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/liam-sideshift/.claude/statusline.sh"
+  },
+  "enabledPlugins": {
+    "ecc@ecc": false,
+    "vercel@claude-plugins-official": true,
+    "comprehensive-review@tag1consulting": true,
+    "security-guidance@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": false
+  },
+  "extraKnownMarketplaces": {
+    "ecc": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/affaan-m/ECC.git"
+      }
+    },
+    "tag1consulting": {
+      "source": {
+        "source": "github",
+        "repo": "tag1consulting/claude-plugins"
+      }
+    }
+  },
+  "effortLevel": "xhigh",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-ansi",
+  "preferredNotifChannel": "terminal_bell",
+  "agentPushNotifEnabled": true,
+  "hasCompletedOnboarding": true
+}

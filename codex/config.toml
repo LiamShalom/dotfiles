@@ -1,0 +1,87 @@
+model_auto_compact_token_limit = 200000
+model_context_window = 272000
+openai_base_url = "https://api.theclawbay.com/backend-api/codex"
+model = "gpt-5.6-sol"
+model_provider = "theclawbay"
+model_reasoning_effort = "medium"
+service_tier = "default"
+[features]
+apps = true
+
+apps_mcp_gateway = true
+
+# theclawbay-managed:start
+[model_providers.theclawbay]
+name = "OpenAI"
+base_url = "https://api.theclawbay.com/backend-api/codex"
+wire_api = "responses"
+requires_openai_auth = false
+supports_websockets = false
+experimental_bearer_token = "REPLACE_ME"  # real token lives only in ~/.codex/config.toml — never commit it
+
+[projects."/Users/liam-sideshift/sideshift-monorepo"]
+trust_level = "trusted"
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+"gpt-5.6-sol" = 4
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["chrome-devtools-mcp@latest"]
+
+[mcp_servers.sideshift-firestore]
+command = "bash"
+args = ["/Users/liam-sideshift/sideshift-monorepo/mcp/sideshift-firestore/start.sh"]
+
+[mcp_servers.sideshift-typesense]
+command = "bash"
+args = ["/Users/liam-sideshift/sideshift-monorepo/mcp/sideshift-typesense/start.sh"]
+
+[mcp_servers.sideshift-whop-messaging]
+command = "bash"
+args = ["/Users/liam-sideshift/sideshift-monorepo/mcp/sideshift-whop-messaging/start.sh"]
+
+[mcp_servers.cloud-sql-postgres]
+command = "bash"
+args = ["-c", "unset GOOGLE_APPLICATION_CREDENTIALS && exec /opt/homebrew/bin/toolbox --prebuilt cloud-sql-postgres --stdio"]
+
+[mcp_servers.cloud-sql-postgres.env]
+CLOUD_SQL_POSTGRES_DATABASE = "sideshift"
+CLOUD_SQL_POSTGRES_INSTANCE = "sideshift-sql"
+CLOUD_SQL_POSTGRES_PROJECT = "sideshift-d84ee"
+CLOUD_SQL_POSTGRES_REGION = "us-central1"
+
+[mcp_servers.cloud-sql-postgres-read-replica]
+command = "bash"
+args = ["-c", "unset GOOGLE_APPLICATION_CREDENTIALS && exec /opt/homebrew/bin/toolbox --prebuilt cloud-sql-postgres --stdio"]
+
+[mcp_servers.cloud-sql-postgres-read-replica.env]
+CLOUD_SQL_POSTGRES_DATABASE = "sideshift"
+CLOUD_SQL_POSTGRES_INSTANCE = "sideshift-sql-ro"
+CLOUD_SQL_POSTGRES_PROJECT = "sideshift-d84ee"
+CLOUD_SQL_POSTGRES_REGION = "us-central1"
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+[mcp_servers.firebase]
+command = "npx"
+args = ["-y", "firebase-tools@latest", "experimental:mcp"]
+
+[mcp_servers.notion]
+url = "https://mcp.notion.com/mcp"
+
+[mcp_servers.linear]
+url = "https://mcp.linear.app/mcp"
+
+[mcp_servers.Jam]
+url = "https://mcp.jam.dev/mcp"
+
+[mcp_servers.vercel]
+url = "https://mcp.vercel.com"
+# theclawbay-managed:end
