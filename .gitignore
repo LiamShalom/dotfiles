@@ -1,3 +1,7 @@
 # Repo hygiene — NOT the global git excludes (that lives in home/.gitignore)
 .DS_Store
 *.bak
+*.bak-*
+
+# Claude Code writes runtime state into ~/.claude/skills; keep it out of here.
+claude/skills/**/.workspace/

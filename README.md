@@ -2,8 +2,10 @@
 
 Personal macOS dotfiles. A new machine is a clone away.
 
-Follow the steps below in order to bring a fresh Mac up to your usual shell,
-git, and editor setup.
+Covers the shell (zsh + starship + the modern CLI stack), git, vim, the Ghostty
+terminal, and the Claude Code / Codex agent setup.
+
+Follow the steps below in order on a fresh Mac.
 
 ---
 
@@ -20,82 +22,175 @@ wires this permanently via `.zprofile` later):
 eval "$(/opt/homebrew/bin/brew shellenv)"
 ```
 
-## Step 2 — Install prerequisites
+## Step 2 — Install oh-my-zsh
 
-These are referenced by the dotfiles and are **not** installed by this repo:
+`.zshrc` expects `~/.oh-my-zsh` to exist.
 
 ```bash
-# oh-my-zsh — .zshrc expects ~/.oh-my-zsh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
-# CLI tools sourced/used by the configs
-brew install direnv git vim
 ```
 
-> Note: installing oh-my-zsh overwrites `~/.zshrc`. That's fine — Step 4
-> replaces it again with the version from this repo (and backs up the
-> oh-my-zsh one to `~/.zshrc.bak`).
+> Installing oh-my-zsh overwrites `~/.zshrc`. That's fine — Step 5 replaces it
+> again with the version from this repo (and backs up the oh-my-zsh one).
 
-## Step 3 — Clone this repo
+## Step 3 — Clone this repo and install the packages
 
 ```bash
 git clone https://github.com/LiamShalom/dotfiles.git ~/dotfiles
 cd ~/dotfiles
+brew bundle --file=Brewfile
 ```
 
-## Step 4 — Run the installer
+`Brewfile` carries everything the configs actually reach for — `starship`,
+`eza`, `bat`, `zoxide`, `atuin`, `fzf`, `lazygit`, `git-delta`, `gnupg`,
+`direnv`, the JetBrains Mono Nerd Font, Ghostty, plus the global npm and uv
+packages. Skip it and the shell will load with a broken prompt and missing
+aliases.
+
+## Step 4 — Install fzf-tab
+
+The only dependency Homebrew can't supply. `.zshrc` lists `fzf-tab` in
+`plugins=(...)`, and zsh warns on every launch if it's missing.
+
+```bash
+git clone https://github.com/Aloxaf/fzf-tab ~/.oh-my-zsh/custom/plugins/fzf-tab
+```
+
+## Step 5 — Run the installer
 
 ```bash
 ./install.sh
 ```
 
-This symlinks everything in `home/` into `$HOME`. Any existing real file is
-moved to `<file>.bak` first, and the script is safe to re-run (correct symlinks
-are left untouched).
+Symlinks everything into place: `home/` lands flat in `$HOME`, and the nested
+configs (Ghostty, starship, atuin, Claude, Codex) go to their real paths. Any
+existing real file is moved to `<file>.bak` first, and the script is safe to
+re-run — correct symlinks are left untouched.
 
-## Step 5 — Reload the shell
+Because these are symlinks, edits you make live (including ones tools write for
+you, like `git config --global`) land straight in this repo. Check `git status`
+here now and then.
+
+## Step 6 — Create `~/.gitconfig.local`
+
+Identity and machine-specific git settings stay **out** of this repo.
+`home/.gitconfig` includes `~/.gitconfig.local` last, so anything here wins.
+
+```bash
+cat > ~/.gitconfig.local <<'EOF'
+# Machine-specific git config — NOT tracked in the dotfiles repo.
+[user]
+	email = you@example.com
+	signingkey = YOUR_KEY_ID
+[commit]
+	gpgsign = true
+[core]
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+[merge]
+	conflictStyle = zdiff3
+EOF
+```
+
+Verify it took (note: `git config --global` does **not** expand includes — read
+the effective value without that flag, from outside any repo):
+
+```bash
+cd ~ && git config --get user.email && git config --get commit.gpgsign
+```
+
+## Step 7 — Restore GPG commit signing
+
+Signing is on, so commits fail until the key is on the machine. Either import it:
+
+```bash
+gpg --import /path/to/your-private-key.asc   # from your backup / password manager
+git config --file ~/.gitconfig.local user.signingkey YOUR_KEY_ID
+```
+
+…or turn signing off on this machine:
+
+```bash
+git config --file ~/.gitconfig.local commit.gpgsign false
+```
+
+## Step 8 — Authenticate Codex
+
+`codex/config.toml` is a **redacted reference copy** — its
+`experimental_bearer_token` is a placeholder, and the installer deliberately
+does not symlink it. Let the Codex CLI write the real `~/.codex/config.toml`,
+then diff the two if you want the MCP server list from here.
+
+## Step 9 — Reload
 
 ```bash
 exec $SHELL -l
 ```
 
-You should now have the `gnzh` theme, all aliases from `.extra`, and `direnv`
-hooked in.
-
-## Step 6 — Restore GPG commit signing (optional)
-
-`.gitconfig` has `gpgsign = true` with `signingkey A61540BF4938459B`. Until that
-key is on the new machine, commits will fail to sign. Either import the key:
-
-```bash
-brew install gnupg
-gpg --import /path/to/your-private-key.asc   # from your backup / password manager
-```
-
-…or disable signing on this machine:
-
-```bash
-git config --global commit.gpgsign false
-```
+Ghostty picks its config up on `⌘⇧R`, or on next launch. One thing needs a human:
+granting the global-hotkey permission for the quake terminal — see
+[`ghostty/SETUP.md`](./ghostty/SETUP.md) Step 7.
 
 ---
 
 ## What's tracked
 
+### Shell and CLI (`home/` → `$HOME`)
+
 | File | Purpose |
 |------|---------|
-| `.zshrc` `.zshenv` `.zprofile` | zsh (oh-my-zsh, `gnzh` theme, brew, cargo) |
-| `.extra` | aliases, PATH, functions sourced by `.zshrc` |
+| `.zshrc` `.zshenv` `.zprofile` | zsh: oh-my-zsh, `fzf-tab`, fzf key bindings, brew, cargo |
+| `.extra` | aliases, PATH, functions — plus the starship/zoxide/atuin/eza/bat stack |
 | `.gitconfig` `.gitignore` `.gitattributes` | git config + global excludes |
 | `.vimrc` | vim config (expects a Solarized colorscheme) |
-| `.editorconfig` | editor defaults |
-| `.wgetrc` | wget defaults |
+| `.editorconfig` `.wgetrc` `.python-version` | editor, wget, pyenv defaults |
 | `.profile` | cargo env for non-zsh shells |
 | `.hushlogin` | silence login banner |
-| `.python-version` | pyenv default |
+
+The prompt is **starship**, not an oh-my-zsh theme — `ZSH_THEME` is empty on
+purpose and `~/.config/starship.toml` drives it.
+
+### Terminal (`ghostty/`)
+
+| Path | Purpose |
+|------|---------|
+| `ghostty/config` | → `~/.config/ghostty/config`. Blazer theme with a hand-brightened ANSI palette, JetBrains Mono Nerd Font, quake terminal on `⌘`+`` ` ``, `⌘D`/`⌘⇧D` splits |
+| `ghostty/SETUP.md` | Self-contained setup guide, verified on Ghostty 1.3.1. Hand it to an agent and it can do the whole thing |
+
+### Tool configs (`config/` → `~/.config/`)
+
+| Path | Purpose |
+|------|---------|
+| `config/starship.toml` | prompt: truncated dirs, git branch symbol, command duration |
+| `config/atuin/config.toml` | shell history (`enter_accept`, record sync) |
+
+### Agents (`claude/` → `~/.claude/`, `codex/` → `~/.codex/`)
+
+| Path | Purpose |
+|------|---------|
+| `claude/CLAUDE.md` | Global instructions for Claude Code. `~/.codex/AGENTS.md` is symlinked to it, so Codex reads the same file |
+| `claude/settings.json` | model, effort level, hooks, statusline, enabled plugins, skill overrides |
+| `claude/statusline.sh` | custom status line |
+| `claude/rules/` | always-on rules (Mintlify docs lookup) |
+| `claude/skills/` | 17 skills. Several are switched off in `settings.json` → `skillOverrides` |
+| `claude/hooks/` | gcloud auth refresh, usage cap, worktree `CLAUDE.md` / `.env.local` linking |
+| `claude/bin/` | worktree janitor + its guard. Linked per-file, since `~/.claude/bin` also holds a binary that isn't tracked here |
+| `codex/config.toml` | **Reference copy, token redacted, not symlinked.** MCP servers, model, provider |
+| `codex/rules/default.rules` | → `~/.codex/rules/default.rules` |
 
 ## What's intentionally NOT tracked
 
-Secrets and machine-specific state stay off GitHub: shell/SQL/python histories,
-`.pgpass`, `.ssh`, `.gnupg`, `.docker`, app state (`.claude.json`), and
-generated caches (`.DS_Store`, `.zcompdump*`).
+Secrets and machine state stay off GitHub, even though this repo is private:
+
+- `~/.gitconfig.local` — email, GPG key, delta pager
+- `~/.claude/.credentials.json`, `history.jsonl`, `sessions/`, `projects/`,
+  `logs/`, `telemetry/`, and the other runtime directories
+- `~/.claude/bin/codeagent-wrapper` — a 5.7M compiled binary
+- `~/.claude/settings.local.json` — machine-local permission grants that
+  accumulate as you work
+- The real `~/.codex/config.toml` auth token
+- Shell/SQL/python histories, `.pgpass`, `.ssh`, `.gnupg`, `.docker`
+- Generated caches (`.DS_Store`, `.zcompdump*`, `*.bak`)
