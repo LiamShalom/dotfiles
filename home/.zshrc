@@ -10,7 +10,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 #ZSH_THEME="agnoster"
 #prompt_context(){}
-ZSH_THEME="gnzh"
+ZSH_THEME=""   # prompt handled by starship (see ~/.extra)
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -72,12 +72,18 @@ HIST_STAMPS="yyyy-mm-dd"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git)
+plugins=(git fzf-tab)
 
 # Homebrew completions
 fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 
 source $ZSH/oh-my-zsh.sh
+
+# fzf: key bindings only (Ctrl-R / Ctrl-T / Alt-C). Tab completion is owned by
+# fzf-tab, so we deliberately don't source fzf's completion.zsh (it rebinds Tab).
+[ -f /opt/homebrew/opt/fzf/shell/key-bindings.zsh ] && source /opt/homebrew/opt/fzf/shell/key-bindings.zsh
+# fzf-tab: don't let oh-my-zsh's `menu select` pre-empt fzf-tab's UI
+zstyle ':completion:*' menu no
 
 # User configuration
 
@@ -110,5 +116,12 @@ source $ZSH/oh-my-zsh.sh
 source ~/.extra
 
 eval "$(direnv hook zsh)"
-eval "$(direnv hook zsh)"
-eval "$(direnv hook zsh)"
+
+
+
+# Use GitHub CLI's macOS keychain credential; env tokens override it.
+unset GH_TOKEN GITHUB_TOKEN
+
+# theclawbay-shell-managed:start
+[ -f "$HOME/.config/theclawbay/env" ] && . "$HOME/.config/theclawbay/env"
+# theclawbay-shell-managed:end

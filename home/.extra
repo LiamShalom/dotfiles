@@ -236,3 +236,32 @@ function rgr {
 function agr {
 	ag -0 -l "$1" | AGR_FROM="$1" AGR_TO="$2" xargs -0 perl -pi -e 's/$ENV{AGR_FROM}/$ENV{AGR_TO}/g'
 }
+
+# =============================================================================
+# Modern shell stack (added 2026-07-20)
+# =============================================================================
+
+# ghost-text suggestions (source before syntax highlighting)
+[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# zoxide (smart cd: `z <dir>`), atuin (Ctrl-R history), starship (prompt)
+command -v zoxide   >/dev/null && eval "$(zoxide init zsh)"
+command -v atuin    >/dev/null && eval "$(atuin init zsh --disable-up-arrow)"
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# eza replaces the ls family (defined here so it overrides the block above)
+if command -v eza >/dev/null; then
+	alias ls='eza --icons --group-directories-first'
+	alias l='eza -1 --icons'
+	alias la='eza -la --icons --git --group-directories-first'
+	alias ll='eza -la --icons --git --group-directories-first'
+	alias lsd='eza -D --icons'
+	alias tree='eza --tree --icons'
+fi
+
+# bat replaces cat; lazygit shortcut
+command -v bat     >/dev/null && alias cat='bat'
+command -v lazygit >/dev/null && alias lg='lazygit'
+
+# zsh-syntax-highlighting MUST be sourced last (after all ZLE-touching setup)
+[ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
