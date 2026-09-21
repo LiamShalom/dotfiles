@@ -5,6 +5,9 @@ model = "gpt-5.6-sol"
 model_provider = "theclawbay"
 model_reasoning_effort = "medium"
 service_tier = "default"
+# File store instead of keychain: keychain items are bound to one codex binary,
+# so the CLI and the ChatGPT.app-bundled codex kept forcing MCP re-logins.
+mcp_oauth_credentials_store = "file"
 [features]
 apps = true
 
