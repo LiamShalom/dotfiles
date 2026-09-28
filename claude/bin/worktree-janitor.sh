@@ -78,25 +78,43 @@ cd "$REPO" || exit 1
 # Drop registrations for worktrees whose directory is already gone.
 run git worktree prune
 
+# Every registered worktree, wherever it lives (~/sideshift-worktrees, /private/tmp,
+# ~/.worktrees-verify, ...). Scanning only .worktrees/ and .claude/worktrees/ once
+# let 80GB of caches outside them pile up unseen (2026-09-23).
+ALL_WT=$(git worktree list --porcelain | awk '/^worktree /{print substr($0, 10)}')
+
 # ---------------------------------------------------------------------------
 # Collect cwds of running node processes so we never yank a live dev server's
 # build cache out from under it.
 # ---------------------------------------------------------------------------
 BUSY=$(lsof -a -c node -d cwd -Fn 2>/dev/null | grep '^n' | cut -c2- | sort -u)
 
+# The worktree a busy cwd belongs to: the LONGEST registered path containing it.
+# A substring match would let `google-batch-backend` mark `google-batch` busy, and
+# any process in a nested .worktrees/* worktree mark the main checkout busy.
+BUSY_WT=$(
+  printf '%s\n' "$BUSY" | while IFS= read -r cwd; do
+    [ -n "$cwd" ] || continue
+    printf '%s\n' "$ALL_WT" | while IFS= read -r wt; do
+      case "$cwd" in ("$wt"|"$wt"/*) printf '%s\t%s\n' "${#wt}" "$wt" ;; esac
+    done | sort -rn | head -1 | cut -f2
+  done | sort -u
+)
+
 is_busy() {
-  local dir="$1"
-  [ -n "$BUSY" ] || return 1
-  printf '%s\n' "$BUSY" | grep -qF "$dir"
+  [ -n "$BUSY_WT" ] || return 1
+  printf '%s\n' "$BUSY_WT" | grep -qxF "$1"
 }
 
 # ---------------------------------------------------------------------------
 # Pass 1 — stale .next caches
 # ---------------------------------------------------------------------------
+# Includes the main checkout: its .next reached 29GB, the largest single item.
 NEXT_CLEARED=0
-while IFS= read -r nd; do
-  [ -n "$nd" ] || continue
-  wt="$(dirname "$nd")"
+while IFS= read -r wt; do
+  [ -d "$wt/.next" ] || continue
+  nd="$wt/.next"
+  [ -n "$(find "$nd" -maxdepth 0 -mtime "+${NEXT_AGE_DAYS}" 2>/dev/null)" ] || continue
   if is_busy "$wt"; then
     log "  skip .next (dev server live): $wt"
     continue
@@ -105,9 +123,7 @@ while IFS= read -r nd; do
   log "  clearing .next ($sz): $wt"
   run rm -rf "$nd"
   NEXT_CLEARED=$((NEXT_CLEARED + 1))
-done < <(find "$REPO/.worktrees" "$REPO/.claude/worktrees" \
-           -maxdepth 2 -type d -name .next -prune \
-           -mtime "+${NEXT_AGE_DAYS}" -print 2>/dev/null)
+done <<< "$ALL_WT"
 
 # ---------------------------------------------------------------------------
 # Pass 2 — dehydrate idle worktrees (drop regenerable node_modules)
@@ -133,9 +149,9 @@ is_idle() {
   [ -z "$hit" ]
 }
 
-for wt in "$REPO"/.worktrees/*/ "$REPO"/.claude/worktrees/*/; do
-  wt="${wt%/}"
+while IFS= read -r wt; do
   [ -d "$wt" ] || continue
+  # The main checkout is always in use and is the source other worktrees clone from.
   [ "$wt" = "$REPO" ] && continue
   [ -d "$wt/node_modules" ] || continue
 
@@ -149,7 +165,7 @@ for wt in "$REPO"/.worktrees/*/ "$REPO"/.claude/worktrees/*/; do
   log "  dehydrating node_modules ($sz, idle ${IDLE_DAYS}d+): $wt"
   run rm -rf "$wt/node_modules"
   DEHYDRATED=$((DEHYDRATED + 1))
-done
+done <<< "$ALL_WT"
 
 # ---------------------------------------------------------------------------
 # Pass 3 — dead worktrees, gated on GitHub PR state
