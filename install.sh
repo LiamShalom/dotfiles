@@ -56,15 +56,16 @@ LINKS=(
 	"config/atuin/config.toml:.config/atuin/config.toml"
 
 	"claude/CLAUDE.md:.claude/CLAUDE.md"
-	"claude/settings.json:.claude/settings.json"
 	"claude/statusline.sh:.claude/statusline.sh"
 	"claude/rules:.claude/rules"
 	"claude/hooks:.claude/hooks"
 	"claude/skills:.claude/skills"
+	"claude/mods:.claude/mods"
 	# ~/.claude/bin is linked per-file, not as a directory: it also holds
 	# codeagent-wrapper, a 5.7M binary that is deliberately not in this repo.
 	"claude/bin/worktree-janitor.sh:.claude/bin/worktree-janitor.sh"
 	"claude/bin/worktree-janitor-guard.sh:.claude/bin/worktree-janitor-guard.sh"
+	"claude/bin/chrome-reaper.sh:.claude/bin/chrome-reaper.sh"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
 )
@@ -72,6 +73,16 @@ LINKS=(
 for entry in "${LINKS[@]}"; do
 	link "$DOTFILES_DIR/${entry%%:*}" "$HOME/${entry#*:}"
 done
+
+# --- Claude settings: copied, not linked -------------------------------------
+# The live file holds the proxy auth token, so the tracked copy has a placeholder.
+# Copy it once; after that the live file is the source and this repo is a mirror.
+if [ -e "$HOME/.claude/settings.json" ]; then
+	echo "ok       ~/.claude/settings.json (exists, not overwritten)"
+else
+	cp "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
+	echo "copied   ~/.claude/settings.json (set ANTHROPIC_AUTH_TOKEN in it)"
+fi
 
 # --- Codex reads the same global instructions as Claude ----------------------
 # ~/.codex/AGENTS.md is a symlink to ~/.claude/CLAUDE.md, so both agents see one
@@ -89,6 +100,7 @@ fi
 echo
 echo "Done. Not handled automatically (see README):"
 echo "  - ~/.gitconfig.local  — email, GPG signing key, delta pager"
+echo "  - ~/.claude/settings.json — replace the ANTHROPIC_AUTH_TOKEN placeholder"
 echo "  - ~/.codex/config.toml — needs a real auth token; codex/config.toml is a redacted reference copy"
 echo "  - fzf-tab             — git clone into ~/.oh-my-zsh/custom/plugins/"
 echo

@@ -125,3 +125,26 @@ unset GH_TOKEN GITHUB_TOKEN
 # theclawbay-shell-managed:start
 [ -f "$HOME/.config/theclawbay/env" ] && . "$HOME/.config/theclawbay/env"
 # theclawbay-shell-managed:end
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<
+
+# >>> SideShift Gateway Claude context >>>
+if [ -r "$HOME/.9router-client/claude-env.sh" ]; then
+  . "$HOME/.9router-client/claude-env.sh"
+fi
+# <<< SideShift Gateway Claude context <<<
+
+# >>> recompact >>>
+# Interactive claude runs through recompact: /recompact and large contexts compact in place.
+# Remove this block (or run `recompact uninstall`) to undo.
+claude() {
+  if [ -x "$HOME/.claude/recompact/bin/recompact" ]; then
+    "$HOME/.claude/recompact/bin/recompact" shell "$@"
+  else
+    command claude "$@"
+  fi
+}
+# <<< recompact <<<

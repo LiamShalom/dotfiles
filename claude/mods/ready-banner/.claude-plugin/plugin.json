@@ -1,0 +1,6 @@
+{
+  "name": "ready-banner",
+  "version": "0.1.0",
+  "description": "Full-width CLAUDE READY rule above the prompt once the turn and every background agent are done; green when the turn merged a PR",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,24 @@
+# Blazer, with the palette brightened/saturated for the dark navy background.
+# Dark half of the light/dark pair in ../config.
+palette = 0=#000000
+palette = 1=#ff6b6b
+palette = 2=#5fd75f
+palette = 3=#ffc857
+palette = 4=#6b9fff
+palette = 5=#d76bd7
+palette = 6=#5fd7d7
+palette = 7=#e6edf5
+palette = 8=#4c4c4c
+palette = 9=#ff8f8f
+palette = 10=#87e587
+palette = 11=#ffdb70
+palette = 12=#8fb7ff
+palette = 13=#e587e5
+palette = 14=#87e5e5
+palette = 15=#ffffff
+background = #0d1926
+foreground = #d9e6f2
+cursor-color = #ffffff
+cursor-text = #0d1926
+selection-background = #c1ddff
+selection-foreground = #000000

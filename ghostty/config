@@ -1,24 +1,8 @@
 # ---- appearance ----
-theme = Blazer
-
-# ---- overrides on top of Blazer (keep its bg, brighten everything else) ----
-cursor-color = #ffffff
-# normal colors (brighter/more saturated than Blazer's pastels)
-palette = 1=#ff6b6b
-palette = 2=#5fd75f
-palette = 3=#ffc857
-palette = 4=#6b9fff
-palette = 5=#d76bd7
-palette = 6=#5fd7d7
-palette = 7=#e6edf5
-# bright colors
-palette = 9=#ff8f8f
-palette = 10=#87e587
-palette = 11=#ffdb70
-palette = 12=#8fb7ff
-palette = 13=#e587e5
-palette = 14=#87e5e5
-palette = 15=#ffffff
+# Follows the macOS system appearance automatically (System Settings >
+# Appearance). Both halves live in ./themes/ ; the palette tuning that used to
+# sit here is baked into blazer-bright so it can't leak onto the light theme.
+theme = light:blazer-bright-light,dark:blazer-bright
 
 font-family = JetBrainsMono Nerd Font
 font-size = 14

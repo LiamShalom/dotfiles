@@ -1,13 +1,24 @@
 {
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "API_TIMEOUT_MS": "600000"
+    "ENABLE_TOOL_SEARCH": "true",
+    "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1",
+    "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": "1",
+    "ANTHROPIC_BASE_URL": "https://proxy.sideshift.cloud",
+    "ANTHROPIC_AUTH_TOKEN": "REDACTED-set-on-each-machine",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "claude-fable-5-1[1m]",
+    "API_TIMEOUT_MS": "600000",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "inherit",
+    "CLAUDE_CODE_ENABLE_TASKS": "0",
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/ready-banner"
   },
   "permissions": {
     "allow": [],
     "defaultMode": "auto"
   },
-  "model": "fable",
+  "model": "cc/claude-opus-5-5[1m]",
   "skillOverrides": {
     "codebase-design": "off",
     "domain-modeling": "off",
@@ -16,7 +27,10 @@
     "systematic-debugging": "off",
     "test-driven-development": "off",
     "to-tickets": "off",
-    "wayfinder": "off"
+    "wayfinder": "off",
+    "graphify": "off",
+    "shalomify": "off",
+    "handoff": "off"
   },
   "hooks": {
     "SessionStart": [
@@ -37,42 +51,20 @@
           }
         ]
       }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/usage-cap.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/usage-cap.sh",
-            "timeout": 10
-          }
-        ]
-      }
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "/Users/liam-sideshift/.claude/statusline.sh"
+    "command": "if [ -x \"$HOME/.claude/recompact/bin/recompact\" ]; then \"$HOME/.claude/recompact/bin/recompact\" statusline -- '/Users/liam-sideshift/.claude/statusline.sh' || /Users/liam-sideshift/.claude/statusline.sh; else /Users/liam-sideshift/.claude/statusline.sh; fi",
+    "refreshInterval": 1
   },
   "enabledPlugins": {
     "ecc@ecc": false,
-    "vercel@claude-plugins-official": true,
-    "comprehensive-review@tag1consulting": true,
+    "vercel@claude-plugins-official": false,
+    "comprehensive-review@tag1consulting": false,
     "security-guidance@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": false
+    "swift-lsp@claude-plugins-official": false,
+    "segment-recompact@segment-recompact": true
   },
   "extraKnownMarketplaces": {
     "ecc": {
@@ -86,9 +78,20 @@
         "source": "github",
         "repo": "tag1consulting/claude-plugins"
       }
+    },
+    "segment-recompact": {
+      "source": {
+        "source": "github",
+        "repo": "Don-Osipov/segment_recompact"
+      }
     }
   },
   "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    }
+  },
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-ansi",
   "preferredNotifChannel": "terminal_bell",

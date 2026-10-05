@@ -5,3 +5,5 @@
 
 # Claude Code writes runtime state into ~/.claude/skills; keep it out of here.
 claude/skills/**/.workspace/
+# Org skills synced down from claude.ai; Claude Code re-downloads them.
+claude/skills/synced/

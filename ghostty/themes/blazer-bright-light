@@ -1,0 +1,26 @@
+# Light counterpart to blazer-bright: same hues, darkened for contrast on a
+# cool off-white. Every slot clears WCAG AA (4.5:1) against the background.
+# Slots 7/15 are dark greys, not light ones: they invert the DARK theme's
+# "brightest = most emphasis" intent rather than the literal colour name.
+palette = 0=#1a2733
+palette = 1=#e01919
+palette = 2=#2e822e
+palette = 3=#956a11
+palette = 4=#276be7
+palette = 5=#b242b2
+palette = 6=#2c7d7d
+palette = 7=#45525f
+palette = 8=#5c6b7a
+palette = 9=#bd0a0a
+palette = 10=#1d6c1d
+palette = 11=#765906
+palette = 12=#0b53d5
+palette = 13=#9c299c
+palette = 14=#1c6868
+palette = 15=#0d1926
+background = #f7f9fc
+foreground = #1a2733
+cursor-color = #0d1926
+cursor-text = #f7f9fc
+selection-background = #cfe0f5
+selection-foreground = #0d1926

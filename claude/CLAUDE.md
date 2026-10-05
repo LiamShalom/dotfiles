@@ -54,6 +54,14 @@ you made — not a transcript of the code.
   If a plan you're executing mandates a flag, say so before building it instead of complying
   silently. Logic that *is* the feature (paid users still get their real pages, admins still see
   the admin view) is not a flag — don't strip that.
+- **No explainer notice blocks in product UI.** Never add a box, alert, callout or stack of
+  paragraphs that explains how data is scoped, defined or limited: "includes X, excludes Y",
+  metric definitions, "timezone is not recorded", "sync does not confirm…", methodology
+  caveats. Customers don't read them, and they bury the page. This applies even when a plan,
+  review or "be honest about the data" task seems to call for one. Make the UI itself honest
+  instead: a dash for a missing value, a clear label ("Impressions", "Spend · 7D"), or a short
+  tooltip on the label if a definition is truly needed. Error and empty states are fine; a
+  permanent caveat is not. If you believe a caveat must be visible, ask me first.
 - **Finish the job.** When something is cheap for you and expensive for me, err toward thorough.
   A half-finished implementation, doc, or analysis is worse than none — never stop partway and
   hand me the remainder as an exercise.
@@ -75,6 +83,30 @@ you made — not a transcript of the code.
 Commit subjects in the imperative, under 72 characters, no trailing period. Keep commits small
 and self-contained. Look at `git diff` before you commit. Never force-push main or master.
 Branches are named `type/short-description`.
+
+## Merging PRs
+
+You may merge a PR on my behalf when **all** of these hold:
+
+- You verified and tested the change's real flow (not only "tests pass").
+- It has no large UI changes, or I have already approved the UI. Small UI changes (copy,
+  spacing, a colour or icon fix, a bug fix that restores intended UI) are fine. Large means a
+  new screen, flow, modal or component, or a visible layout change — those need my approval.
+  If unsure, treat it as large.
+- Every CI check passes. A check that is red on `main` too does not count as passing.
+
+If any condition fails, get the PR ready, tell me what is missing, and stop.
+
+To merge, use `/pr-approve` in the monorepo (`.claude/skills/pr-approve/scripts/gh-approve
+<pr> --merge`). It approves as the shared reviewer account, which branch protection needs,
+then waits for checks and squash-merges. Never use `gh pr merge --admin`.
+
+**Schema migration PRs:** merge them without asking once CI is green, then approve the
+`db-migrate-prod` apply without asking. This is my standing approval for every migration
+deployment. Use `/approve-deploy`, which approves with `--agent-confirmed`, and post the
+plan and lint evidence in chat as the record. One exception: if the pending
+apply contains destructive or data-rewriting SQL, or another person's migration, stop and
+show me first — one apply runs every pending file, not only yours.
 
 ## Bash commands
 
@@ -122,14 +154,9 @@ together.
   same region conflict however the branches are arranged. A conflict on handover means the
   split was wrong, not that the round went normally.
 - **Keep runs short.** Divergence is a function of elapsed time, not diff size.
-- **:3000 shows merged work only.** To watch your own in-flight change, start your own server on
-  a free port — a different port is a different browser origin, so you'll be logged out there.
+- **:3000 shows merged work only.** To watch your own in-flight change, ask first, then start
+  your own server on a free port — a different port is a different browser origin, so you'll be
+  logged out there.
 - **The one exception**: something that has to ship on its own clock — a schema migration, a fix
   that can't wait for the batch — gets its own branch off `main` and its own PR. That is the
   only reason to split.
-
-## graphify
-
-`~/.claude/skills/graphify/SKILL.md` turns any input into a knowledge graph; trigger it with
-`/graphify`. If a repo has a `graphify-out/` directory, treat questions about that codebase as
-a graphify query before reaching for raw search.

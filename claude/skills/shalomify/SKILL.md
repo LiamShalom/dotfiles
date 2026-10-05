@@ -1,6 +1,7 @@
 ---
 name: shalomify
-description: Rewrite a response in ASD-STE100 (Simplified Technical English) following Zinsser's four principles — simplicity, brevity, clarity, humanity. Use this whenever the user types /shalomify or "shalomify", and also whenever they ask for prose to be made plainer, shorter, or clearer: "say that again in plain English", "that was too wordy", "cut the fluff", "rewrite that simpler", "STE that", "simplified technical english", "too much jargon", "tighten this up". Applies to PROSE — an explanation, a message, a doc, a PR description, a comment. Not code: for making code simpler, use /simplify instead. With no target named, rewrite the immediately preceding assistant response.
+description: >-
+  Rewrite a response in ASD-STE100 (Simplified Technical English) following Zinsser's four principles — simplicity, brevity, clarity, humanity. Use this whenever the user types /shalomify or "shalomify", and also whenever they ask for prose to be made plainer, shorter, or clearer: "say that again in plain English", "that was too wordy", "cut the fluff", "rewrite that simpler", "STE that", "simplified technical english", "too much jargon", "tighten this up". Applies to PROSE — an explanation, a message, a doc, a PR description, a comment. Not code: for making code simpler, use /simplify instead. With no target named, rewrite the immediately preceding assistant response.
 ---
 
 # Shalomify

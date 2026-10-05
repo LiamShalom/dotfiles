@@ -172,12 +172,13 @@ purpose and `~/.config/starship.toml` drives it.
 | Path | Purpose |
 |------|---------|
 | `claude/CLAUDE.md` | Global instructions for Claude Code. `~/.codex/AGENTS.md` is symlinked to it, so Codex reads the same file |
-| `claude/settings.json` | model, effort level, hooks, statusline, enabled plugins, skill overrides |
+| `claude/settings.json` | **Copied, not linked — auth token redacted.** Proxy env and model aliases, model, effort, hooks, statusline (wrapped by recompact), enabled plugins and their marketplaces, skill overrides. Re-copy the live file here (token redacted) after changing settings |
 | `claude/statusline.sh` | custom status line |
 | `claude/rules/` | always-on rules (Mintlify docs lookup) |
-| `claude/skills/` | 17 skills. Several are switched off in `settings.json` → `skillOverrides` |
+| `claude/skills/` | 17 skills; 11 are switched off in `settings.json` → `skillOverrides`. `skills/synced/` (org skills from claude.ai) is ignored |
+| `claude/mods/` | Claude Code mods, loaded through `CLAUDE_CODE_PLUGIN_DIRS`. `ready-banner` draws a CLAUDE READY rule once the turn and all background agents finish |
 | `claude/hooks/` | gcloud auth refresh, usage cap, worktree `CLAUDE.md` / `.env.local` linking |
-| `claude/bin/` | worktree janitor + its guard. Linked per-file, since `~/.claude/bin` also holds a binary that isn't tracked here |
+| `claude/bin/` | worktree janitor + its guard, Chrome reaper. Linked per-file, since `~/.claude/bin` also holds a binary that isn't tracked here |
 | `codex/config.toml` | **Reference copy, token redacted, not symlinked.** MCP servers, model, provider |
 | `codex/rules/default.rules` | → `~/.codex/rules/default.rules` |
 
@@ -186,6 +187,7 @@ purpose and `~/.config/starship.toml` drives it.
 Secrets and machine state stay off GitHub, even though this repo is private:
 
 - `~/.gitconfig.local` — email, GPG key, delta pager
+- The `ANTHROPIC_AUTH_TOKEN` in `~/.claude/settings.json`
 - `~/.claude/.credentials.json`, `history.jsonl`, `sessions/`, `projects/`,
   `logs/`, `telemetry/`, and the other runtime directories
 - `~/.claude/bin/codeagent-wrapper` — a 5.7M compiled binary
