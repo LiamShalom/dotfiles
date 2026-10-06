@@ -4,8 +4,10 @@
 # user scope, so they work in every repo. Each one asks for an OAuth login the
 # first time you use it (run /mcp in Claude Code to sign in).
 #
-# The local servers (chrome-devtools, sideshift-firestore, the Postgres read
-# replica) are not here: they ship in sideshift-monorepo's .mcp.json.
+# chrome-devtools is also added here, as a local server that drives the one
+# shared agent Chrome (bin/chrome-devtools-mcp.sh). settings.json switches off
+# the monorepo .mcp.json entry of the same name. The other local servers
+# (sideshift-firestore, the Postgres read replica) ship in that .mcp.json.
 #
 # Re-running is safe: servers that already exist are skipped.
 #
@@ -46,6 +48,13 @@ if [ -n "${MINTLIFY_API_KEY:-}" ]; then
 		--header "Authorization: Bearer $MINTLIFY_API_KEY"
 else
 	echo "skip     mintlify-index (set MINTLIFY_API_KEY to add it)"
+fi
+
+if claude mcp get chrome-devtools 2>/dev/null | grep -q "User config"; then
+	echo "ok       chrome-devtools (already added)"
+else
+	claude mcp add --scope user chrome-devtools -- "$HOME/.claude/bin/chrome-devtools-mcp.sh" >/dev/null
+	echo "added    chrome-devtools (shared agent Chrome)"
 fi
 
 echo

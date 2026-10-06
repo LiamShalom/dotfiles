@@ -161,6 +161,28 @@ together.
   that can't wait for the batch — gets its own branch off `main` and its own PR. That is the
   only reason to split.
 
+## Browsers: one shared agent Chrome
+
+Every Claude session drives the same agent Chrome, so I see one agent browser in the Dock, not
+one per session, and it never jumps in front of what I'm working in.
+
+- **Use the `chrome-devtools` MCP tools first.** They attach to the shared browser
+  (`~/.claude/bin/agent-chrome.sh`, DevTools at `http://127.0.0.1:9222`) and open tabs in the
+  background by default. Don't pass `background: false` or `bringToFront: true` unless I ask to
+  see the page.
+- **Never launch another Chrome** — no `--remote-debugging-port`/`--user-data-dir` launch, no
+  headless browser, no Puppeteer or Playwright `launch()`. This overrides any skill or doc that
+  says to, including the monorepo `verify` skill's isolated-Chrome step. A script runs
+  `~/.claude/bin/agent-chrome.sh` (starts the browser if needed, prints its URL), connects to
+  that URL (`puppeteer.connect({ browserURL })`, Playwright `connectOverCDP`, or raw CDP), and
+  opens its own tab with `background: true`.
+- **A second login is an isolated context, not a second browser:** `new_page` with
+  `isolatedContext: "<name>"`, or `Target.createBrowserContext` / `browser.createBrowserContext()`
+  in a script. Isolated contexts share no cookies with anything else.
+- **Other sessions' tabs are in the same browser.** Act only on the `pageId` your own
+  `new_page` returned, never a tab you didn't open. Close your tabs and contexts when done;
+  never close the browser or anyone else's tabs.
+
 ## Codex session names and browser use
 
 These preferences apply when running in Codex.

@@ -67,6 +67,9 @@ LINKS=(
 	"claude/bin/worktree-janitor.sh:.claude/bin/worktree-janitor.sh"
 	"claude/bin/worktree-janitor-guard.sh:.claude/bin/worktree-janitor-guard.sh"
 	"claude/bin/chrome-reaper.sh:.claude/bin/chrome-reaper.sh"
+	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
+	"claude/bin/chrome-devtools-mcp.sh:.claude/bin/chrome-devtools-mcp.sh"
+	"claude/bin/chrome-devtools-mcp-proxy.mjs:.claude/bin/chrome-devtools-mcp-proxy.mjs"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
 )
