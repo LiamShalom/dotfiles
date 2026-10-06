@@ -8,7 +8,10 @@ setup is finished.
 
 1. On the new Mac, sign in with your Apple ID and the **App Store** (Xcode
    installs from there).
-2. AirDrop this folder. It lands in `~/Downloads/new-mac-handoff`.
+2. On the old Mac, open your home folder in Finder (⌘⇧H), right-click
+   `new-mac-handoff`, and choose **Share → AirDrop**. On the new Mac it lands in
+   `~/Downloads/new-mac-handoff`. Don't move it to Desktop or Documents if
+   those sync to iCloud.
 3. Open **Terminal** (the built-in one) and run:
 
    ```bash

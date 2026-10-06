@@ -18,14 +18,14 @@ restore_home() {
 		return
 	fi
 	# -k: never clobber a file that is already on this machine.
-	tar -C "$HOME" -xkf "$HANDOFF/home.tar" 2>/dev/null || true
+	tar -C "$HOME" -xkf "$HANDOFF/home.tar"
 	chmod 700 "$HOME/.ssh" "$HOME/.gnupg" 2>/dev/null || true
 	chmod 600 "$HOME"/.ssh/id_* 2>/dev/null || true
 	chmod 644 "$HOME"/.ssh/*.pub 2>/dev/null || true
 	echo "ok       home.tar (SSH, GPG, gitconfig.local, Claude settings + memory, env)"
 
 	if [ -f "$HANDOFF/transcripts.tar" ]; then
-		tar -C "$HOME" -xkf "$HANDOFF/transcripts.tar" 2>/dev/null || true
+		tar -C "$HOME" -xkf "$HANDOFF/transcripts.tar"
 		echo "ok       transcripts.tar"
 	fi
 }
@@ -73,7 +73,7 @@ restore_repo() {
 	fi
 
 	if [ -f "$src/ignored.tar" ]; then
-		tar -C "$repo" -xkf "$src/ignored.tar" 2>/dev/null || true
+		tar -C "$repo" -xkf "$src/ignored.tar"
 		echo "ok       $name: ignored files (.env, local skills, plans)"
 	fi
 

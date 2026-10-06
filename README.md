@@ -11,7 +11,7 @@ On the old Mac:
 
 ```bash
 ~/dotfiles/migrate/check.sh   # optional: list unpushed branches and dirty worktrees
-~/dotfiles/migrate/pack.sh    # builds ~/Desktop/new-mac-handoff
+~/dotfiles/migrate/pack.sh    # builds ~/new-mac-handoff (not ~/Desktop: it syncs to iCloud)
 ```
 
 AirDrop `new-mac-handoff` to the new Mac and run

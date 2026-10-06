@@ -15,14 +15,16 @@
 #                              memory, Codex config, SideShift env, shell history
 #   transcripts.tar            only with --with-transcripts (Claude session logs)
 #
-# It contains private keys and tokens. AirDrop it, then delete it from both Desktops.
+# It contains private keys and tokens. AirDrop it, then delete it from both Macs.
+# The default is ~/new-mac-handoff, not ~/Desktop: Desktop & Documents sync to
+# iCloud Drive on this Mac, which would upload the keys.
 #
 # Usage:  ./migrate/pack.sh [--with-transcripts] [--out DIR]
 set -euo pipefail
 
 MIGRATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$MIGRATE_DIR")"
-OUT="$HOME/Desktop/new-mac-handoff"
+OUT="$HOME/new-mac-handoff"
 WITH_TRANSCRIPTS=0
 
 while [ $# -gt 0 ]; do
