@@ -52,6 +52,7 @@ shopt -u dotglob nullglob
 # Format: <path relative to repo root>:<path relative to $HOME>
 LINKS=(
 	"ghostty/config:.config/ghostty/config"
+	"ghostty/themes:.config/ghostty/themes"
 	"config/starship.toml:.config/starship.toml"
 	"config/atuin/config.toml:.config/atuin/config.toml"
 
