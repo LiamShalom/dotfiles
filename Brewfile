@@ -46,10 +46,16 @@ brew "libpq"
 brew "mcp-toolbox"
 # Open-source, cross-platform JavaScript runtime environment
 brew "node@22"
+# Open-source, cross-platform JavaScript runtime environment
+brew "node@24"
 # Development kit for the Java programming language
 brew "openjdk"
 # Development kit for the Java programming language
 brew "openjdk@21"
+# Drop-in replacement for Terraform. Infrastructure as Code Tool
+brew "opentofu"
+# Mac App Store command-line interface (installs Xcode below)
+brew "mas"
 # Pinentry for GPG on Mac
 brew "pinentry-mac"
 # Modern replacement for ps written in Rust
@@ -76,8 +82,6 @@ brew "zsh-syntax-highlighting"
 brew "ariga/tap/atlas", trusted: true
 # Not so boring notch That Rocks 🎸🎶 
 cask "theboredteam/boring-notch/boring-notch", trusted: true
-# Terminal-based AI coding assistant
-cask "claude-code"
 cask "font-jetbrains-mono-nerd-font"
 # Terminal emulator — config + full setup guide in ghostty/.
 # (Installed by hand on the machine this Brewfile was dumped from, so
@@ -85,6 +89,29 @@ cask "font-jetbrains-mono-nerd-font"
 cask "ghostty"
 # Set of tools to manage resources and applications hosted on Google Cloud
 cask "gcloud-cli"
+# Utility that prevents the system from going to sleep
+cask "domzilla-caffeine"
+# CLI to create, run, and deploy Slack apps
+cask "slack-cli"
+# Desktop apps
+cask "arc"
+cask "betterdisplay"
+cask "chatgpt"
+cask "claude"
+cask "cursor"
+cask "docker-desktop"
+cask "google-chrome"
+cask "linear"
+cask "logi-options+"
+cask "notion"
+cask "raycast"
+cask "rectangle"
+cask "slack"
+cask "spotify"
+cask "zen"
+# Xcode for sideshift-mobile. Needs an App Store sign-in; bootstrap.sh keeps
+# going if this one entry fails.
+mas "Xcode", id: 497799835
 uv "graphifyy[gemini]"
 npm "@openai/codex"
 npm "ccg-workflow"

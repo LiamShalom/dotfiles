@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# mcp-servers.sh — register the remote (HTTP) MCP servers with Claude Code at
+# user scope, so they work in every repo. Each one asks for an OAuth login the
+# first time you use it (run /mcp in Claude Code to sign in).
+#
+# The local servers (chrome-devtools, sideshift-firestore, the Postgres read
+# replica) are not here: they ship in sideshift-monorepo's .mcp.json.
+#
+# Re-running is safe: servers that already exist are skipped.
+#
+# Usage:  MINTLIFY_API_KEY=mint_... ./claude/mcp-servers.sh
+#         (without MINTLIFY_API_KEY, mintlify-index is skipped)
+set -euo pipefail
+
+# Format: <name> <url>
+SERVERS=(
+	"linear https://mcp.linear.app/mcp"
+	"Jam https://mcp.jam.dev/mcp"
+	"posthog https://mcp.posthog.com/mcp"
+	"figma https://mcp.figma.com/mcp"
+	"vercel https://mcp.vercel.com"
+	"notion https://mcp.notion.com/mcp"
+	"intercom https://mcp.intercom.com/mcp"
+	"internal-dashboard https://sideshift-internal-dashboard-lnab.vercel.app/mcp"
+)
+
+add() {
+	local name="$1"
+	shift
+	if claude mcp get "$name" >/dev/null 2>&1; then
+		echo "ok       $name (already added)"
+		return
+	fi
+	claude mcp add --scope user --transport http "$name" "$@" >/dev/null
+	echo "added    $name"
+}
+
+for entry in "${SERVERS[@]}"; do
+	add "${entry%% *}" "${entry#* }"
+done
+
+# Mintlify needs a personal API key (Mintlify dashboard -> API keys).
+if [ -n "${MINTLIFY_API_KEY:-}" ]; then
+	add mintlify-index https://index.mintlify.com/mcp \
+		--header "Authorization: Bearer $MINTLIFY_API_KEY"
+else
+	echo "skip     mintlify-index (set MINTLIFY_API_KEY to add it)"
+fi
+
+echo
+echo "Next: open Claude Code, run /mcp, and sign in to each server."

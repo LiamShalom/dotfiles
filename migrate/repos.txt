@@ -1,0 +1,5 @@
+# Code repos to carry to a new machine: <directory under $HOME> <git remote>
+sideshift-monorepo git@github.com:SideShiftApp/sideshift-monorepo.git
+sideshift-mobile git@github.com:SideShiftApp/sideshift-mobile.git
+landing-page git@github.com:SideShiftApp/landing-page.git
+sideshift-internal-dashboard git@github.com:SideShiftApp/sideshift-internal-dashboard.git

@@ -5,7 +5,24 @@ Personal macOS dotfiles. A new machine is a clone away.
 Covers the shell (zsh + starship + the modern CLI stack), git, vim, the Ghostty
 terminal, and the Claude Code / Codex agent setup.
 
-Follow the steps below in order on a fresh Mac.
+## Moving to a new Mac (the fast path)
+
+On the old Mac:
+
+```bash
+~/dotfiles/migrate/check.sh   # optional: list unpushed branches and dirty worktrees
+~/dotfiles/migrate/pack.sh    # builds ~/Desktop/new-mac-handoff
+```
+
+AirDrop `new-mac-handoff` to the new Mac and run
+`bash ~/Downloads/new-mac-handoff/bootstrap.sh`. It does every step below,
+restores your keys, Claude memory and settings, and clones the repos with all
+local branches, stashes, worktrees and uncommitted work.
+[`migrate/START-HERE.md`](./migrate/START-HERE.md) (copied into the folder) has
+the details. Without a handoff folder, `bootstrap.sh` still does the install
+steps.
+
+The manual steps below are what `bootstrap.sh` automates.
 
 ---
 
@@ -124,7 +141,19 @@ git config --file ~/.gitconfig.local commit.gpgsign false
 does not symlink it. Let the Codex CLI write the real `~/.codex/config.toml`,
 then diff the two if you want the MCP server list from here.
 
-## Step 9 — Reload
+## Step 9 — Add the MCP servers to Claude Code
+
+```bash
+MINTLIFY_API_KEY=mint_... ./claude/mcp-servers.sh
+```
+
+Adds the remote MCP servers (Linear, Jam, PostHog, Figma, Vercel, Notion,
+Intercom, internal dashboard, Mintlify) at user scope. Leave out
+`MINTLIFY_API_KEY` to skip Mintlify. Then run `/mcp` in Claude Code and sign in
+to each one. The local servers (Chrome DevTools, Firestore, Postgres read
+replica) come with `sideshift-monorepo`'s `.mcp.json`.
+
+## Step 10 — Reload
 
 ```bash
 exec $SHELL -l
@@ -137,6 +166,17 @@ granting the global-hotkey permission for the quake terminal — see
 ---
 
 ## What's tracked
+
+### Setup and migration
+
+| Path | Purpose |
+|------|---------|
+| `bootstrap.sh` | Fresh Mac to working setup: command line tools, Homebrew, dotfiles, oh-my-zsh, `brew bundle`, `install.sh`, Claude Code + plugins + MCP servers, repos, `npm ci`, Xcode |
+| `migrate/repos.txt` | The code repos to clone on a new machine |
+| `migrate/check.sh` | Old Mac, read-only: lists unpushed commits and dirty worktrees |
+| `migrate/pack.sh` | Old Mac: builds the handoff folder (bundles of local git work, ignored `.env` files, keys, Claude settings and memory) |
+| `migrate/restore.sh` | New Mac, called by `bootstrap.sh`: unpacks the handoff folder |
+| `migrate/START-HERE.md` | Instructions that travel inside the handoff folder |
 
 ### Shell and CLI (`home/` → `$HOME`)
 
@@ -174,6 +214,7 @@ purpose and `~/.config/starship.toml` drives it.
 | `claude/CLAUDE.md` | Global instructions for Claude Code. `~/.codex/AGENTS.md` is symlinked to it, so Codex reads the same file |
 | `claude/settings.json` | **Copied, not linked — auth token redacted.** Proxy env and model aliases, model, effort, hooks, statusline (wrapped by recompact), enabled plugins and their marketplaces, skill overrides. Re-copy the live file here (token redacted) after changing settings |
 | `claude/statusline.sh` | custom status line |
+| `claude/mcp-servers.sh` | **Run, not linked.** Adds the remote MCP servers at user scope (Step 9). The Mintlify key comes from the environment, never this repo |
 | `claude/rules/` | always-on rules (Mintlify docs lookup) |
 | `claude/skills/` | 17 skills; 11 are switched off in `settings.json` → `skillOverrides`. `skills/synced/` (org skills from claude.ai) is ignored |
 | `claude/mods/` | Claude Code mods, loaded through `CLAUDE_CODE_PLUGIN_DIRS`. `ready-banner` draws a CLAUDE READY rule once the turn and all background agents finish |
