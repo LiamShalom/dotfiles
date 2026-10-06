@@ -11,6 +11,8 @@ export PATH="$HOME/.local/bin:$PATH"
 export PATH="/Users/jlaws/.antigravity/antigravity/bin:$PATH"
 export PATH="/usr/local/sbin:/Applications/Visual Studio Code.app/Contents/Resources/app/bin:$PATH"
 export PATH="${HOMEBREW_PREFIX}/opt/openssl/bin:$PATH"
+# Node 24 ahead of Homebrew's latest `node`: the monorepo's engines and Vercel builds are 24.x.
+export PATH="${HOMEBREW_PREFIX}/opt/node@24/bin:$PATH"
 export PATH="$(brew --prefix rustup)/bin:$PATH"
 
 # AWS
