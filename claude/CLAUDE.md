@@ -199,3 +199,4 @@ These preferences apply when running in Codex.
   same display as the main Codex window. Do not open or move them onto another display and
   interrupt the user's work there. If window placement cannot be controlled, report the
   limitation instead of claiming it is enforced.
+- Never open or show the floating mini screen preview in Codex. The user wants it hidden permanently.
