@@ -55,7 +55,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "if [ -x \"$HOME/.claude/recompact/bin/recompact\" ]; then \"$HOME/.claude/recompact/bin/recompact\" statusline -- '/Users/liam-sideshift/.claude/statusline.sh' || /Users/liam-sideshift/.claude/statusline.sh; else /Users/liam-sideshift/.claude/statusline.sh; fi",
+    "command": "if [ -x \"$HOME/.claude/recompact/bin/recompact\" ]; then \"$HOME/.claude/recompact/bin/recompact\" statusline -- \"$HOME/.claude/statusline.sh\" || \"$HOME/.claude/statusline.sh\"; else \"$HOME/.claude/statusline.sh\"; fi",
     "refreshInterval": 1
   },
   "enabledPlugins": {

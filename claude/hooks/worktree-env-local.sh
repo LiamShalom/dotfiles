@@ -25,7 +25,7 @@ esac
 main="$(cd "$(dirname "$common")" 2>/dev/null && pwd -P)" || exit 0
 
 # GUARD: only act for worktrees of MY sideshift-monorepo checkout.
-[ "$main" = "/Users/liam-sideshift/sideshift-monorepo" ] || exit 0
+[ "$main" = "$HOME/sideshift-monorepo" ] || exit 0
 
 { [ -e "$toplevel/.env.local" ] || [ -L "$toplevel/.env.local" ]; } && exit 0
 
