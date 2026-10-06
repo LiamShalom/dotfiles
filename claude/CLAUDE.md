@@ -160,3 +160,20 @@ together.
 - **The one exception**: something that has to ship on its own clock — a schema migration, a fix
   that can't wait for the batch — gets its own branch off `main` and its own PR. That is the
   only reason to split.
+
+## Codex session names and browser use
+
+These preferences apply when running in Codex.
+
+- Name sessions with short, simple names that capture the larger project or feature being
+  built. Keep the name stable as individual edits and fixes evolve. Preserve user-chosen names.
+- Open browser tabs and perform browser computer use only in Codex's native in-app browser.
+  Do not use Arc for computer use. If the native browser cannot handle a required step, report
+  the blocker instead of switching browsers unless the user explicitly requests another browser.
+- Check existing in-app browser tabs before opening a new one. Reuse a relevant tab and
+  navigate it as needed; open another tab only when there is no suitable tab or the task needs
+  separate pages open at the same time.
+- Keep Codex-related browser windows, popups, authorization dialogs, and previews on the
+  same display as the main Codex window. Do not open or move them onto another display and
+  interrupt the user's work there. If window placement cannot be controlled, report the
+  limitation instead of claiming it is enforced.
