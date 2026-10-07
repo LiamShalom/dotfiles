@@ -70,8 +70,10 @@ LINKS=(
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
 	"claude/bin/chrome-devtools-mcp.sh:.claude/bin/chrome-devtools-mcp.sh"
 	"claude/bin/chrome-devtools-mcp-proxy.mjs:.claude/bin/chrome-devtools-mcp-proxy.mjs"
+	"claude/bin/heavy:.claude/bin/heavy"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
+	"codex/hooks.json:.codex/hooks.json"
 )
 
 for entry in "${LINKS[@]}"; do

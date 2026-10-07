@@ -183,6 +183,17 @@ one per session, and it never jumps in front of what I'm working in.
   `new_page` returned, never a tab you didn't open. Close your tabs and contexts when done;
   never close the browser or anyone else's tabs.
 
+## Heavy commands: two machine-wide slots
+
+Many agents share this Mac's memory, so a hook (`~/.claude/hooks/heavy-gate.sh`) rewrites heavy
+commands before they run: Vitest runs on the default config get `--maxWorkers=4`, and full test
+suites, builds and whole-repo typecheck or lint wait for one of two slots (`~/.claude/bin/heavy`).
+
+- **"heavy: all 2 slots are busy" means wait, not fail.** Don't work around the queue or the
+  worker cap (no `--maxWorkers` overrides, no `bash -c` wrappers) unless I ask.
+- **While iterating, run the specific test files you changed.** Targeted runs skip the queue;
+  save the full suite for the final check.
+
 ## Codex session names and browser use
 
 These preferences apply when running in Codex.

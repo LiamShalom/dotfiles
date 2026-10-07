@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# heavy — run a command in one of N machine-wide slots, so only N heavy jobs
+# (full test suites, builds, whole-repo typecheck or lint) run at once across
+# every agent session. A job waits until a slot is free. The PreToolUse hook
+# (hooks/heavy-gate.sh) wraps heavy agent commands in this automatically.
+#
+# Slots are kernel file locks (macOS /usr/bin/lockf), released when the job
+# exits, even if it crashes. If the slots cannot be used at all (a sandbox
+# that blocks /tmp), the command runs unqueued rather than not at all.
+#
+# Usage:  heavy <command> [args...]        HEAVY_SLOTS=2 by default
+set -uo pipefail
+
+SLOTS="${HEAVY_SLOTS:-2}"
+DIR="/tmp/agent-heavy-$(id -u)"
+started="$DIR/started.$$"
+
+unqueued() {
+	echo "heavy: cannot use the job slots in $DIR; running without the queue" >&2
+	exec "$@"
+}
+mkdir -p "$DIR" 2>/dev/null && [ -w "$DIR" ] || unqueued "$@"
+
+notified=0
+while :; do
+	for i in $(seq 1 "$SLOTS"); do
+		rm -f "$started"
+		# lockf exits 75 when the slot is busy; the marker file tells that apart
+		# from the job itself exiting 75.
+		lockf -s -t 0 "$DIR/slot.$i" /bin/sh -c ': > "$1"; shift; exec "$@"' sh "$started" "$@"
+		rc=$?
+		if [ -e "$started" ]; then
+			rm -f "$started"
+			exit "$rc"
+		fi
+		# The job never started: busy (75) means try the next slot; anything
+		# else means the slots are unusable.
+		[ "$rc" -eq 75 ] || unqueued "$@"
+	done
+	if [ "$notified" -eq 0 ]; then
+		echo "heavy: all $SLOTS slots are busy (other agents are running test suites or builds); waiting for one..." >&2
+		notified=1
+	fi
+	sleep 5
+done

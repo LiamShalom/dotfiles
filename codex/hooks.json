@@ -1,0 +1,17 @@
+{
+  "description": "Cap Vitest workers and queue heavy jobs (claude/hooks/heavy-gate.sh), same as Claude Code.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/hooks/heavy-gate.sh\" --codex",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

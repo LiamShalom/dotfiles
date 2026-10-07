@@ -52,6 +52,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/heavy-gate.sh",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
