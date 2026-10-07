@@ -127,6 +127,14 @@ shell scripts you're writing are unaffected.
 - **Never copy files out** with `cp` or `rsync` — the branch is the delivery mechanism, so
   integrate via `git merge`. And never invoke `finishing-branch`; leave the changes on the
   branch for whoever called you.
+- **Worktrees are cleaned up on a schedule** (`~/.claude/bin/maintenance.sh`, logs in
+  `~/.claude/logs/`). A worktree whose PR merged or closed is removed 30 minutes after its last
+  edit; any worktree idle 14 days is retired; `node_modules` and `.next` are dropped from idle
+  worktrees. Never removed: open PRs, unpushed commits, anything a process is running in, and
+  Codex-managed worktrees (the Codex app does those). So once a PR merges, don't keep working
+  in its worktree — branch fresh off `origin/main`. If one vanished, its uncommitted changes
+  are in `~/.claude/worktree-archive/` and a detached HEAD in `refs/archive/worktrees/`; a
+  missing `node_modules` just needs `npm ci`.
 
 ## Several agents on one area at once
 

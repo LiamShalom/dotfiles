@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: install.sh replaces __HOME__ and loads it. See claude/bin/maintenance.sh. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.sideshift.maintenance.sweep</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>__HOME__/.claude/bin/maintenance.sh</string>
+		<string>sweep</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>900</integer>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>Nice</key>
+	<integer>10</integer>
+	<key>StandardOutPath</key>
+	<string>__HOME__/.claude/logs/maintenance.launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>__HOME__/.claude/logs/maintenance.launchd.log</string>
+</dict>
+</plist>

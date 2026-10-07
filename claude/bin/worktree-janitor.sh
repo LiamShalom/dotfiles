@@ -80,9 +80,8 @@ run() {
 }
 
 # ---------------------------------------------------------------------------
-# Single-instance lock. The 04:00 schedule alone could never overlap, but the
-# low-disk guard (worktree-janitor-guard.sh, every 30min) can fire while a run
-# is still going. Two concurrent runs would race on `rm -rf` and
+# Single-instance lock. maintenance.sh runs this every 15 min, daily and weekly,
+# so a run can start while another is still going. Two concurrent runs would race on `rm -rf` and
 # `git worktree remove` over the same paths. mkdir is atomic, so it works as a
 # lock without flock (which macOS does not ship).
 LOCK_DIR="$HOME/.claude/logs/.worktree-janitor.lock"
@@ -139,6 +138,16 @@ BUSY_WT=$(
 is_busy() {
   [ -n "$BUSY_WT" ] || return 1
   printf '%s\n' "$BUSY_WT" | grep -qxF "$1"
+}
+
+# The Codex app owns the worktrees it creates under $CODEX_HOME/worktrees: it caps
+# their number and snapshots each one before deleting it, so its thread can be
+# restored. Removing one here skips that snapshot and can leave the thread unable
+# to reopen. Passes 1 and 2 (build caches, node_modules) still apply to them.
+CODEX_WORKTREES="${CODEX_HOME:-$HOME/.codex}/worktrees"
+codex_managed() {
+  case "$1" in ("$CODEX_WORKTREES"/*) return 0 ;; esac
+  return 1
 }
 
 # A .next is in use only while a Next process runs from that worktree. is_busy is
@@ -379,6 +388,7 @@ while IFS=$'\t' read -r wt br state pr_sha; do
   # Never touch the primary checkout.
   [ "$wt" = "$REPO" ] && continue
   [ -d "$wt" ] || continue
+  codex_managed "$wt" && { SKIPPED=$((SKIPPED + 1)); continue; }
 
   # --- rail: PR must exist and be merged/closed -----------------------------
   case "$state" in
@@ -497,6 +507,7 @@ fi
 
 while IFS=$'\t' read -r wt br head state; do
   [ -n "$wt" ] && [ -d "$wt" ] || continue
+  codex_managed "$wt" && continue
   [ "$br" = "-" ] && br=""
   [ "$state" = "OPEN" ] && continue
 
@@ -567,6 +578,7 @@ if [ "$MODE" = "idle" ]; then
     [ -n "$wt" ] || continue
     [ "$wt" = "$REPO" ] && continue
     [ -d "$wt" ] || continue
+    codex_managed "$wt" && continue
     is_busy "$wt" && { log "  KEEP (process live inside): $wt"; continue; }
 
     # Reflog entry time, not file mtime: git maintenance rewrites the reflog files.

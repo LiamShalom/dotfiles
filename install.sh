@@ -65,7 +65,7 @@ LINKS=(
 	# ~/.claude/bin is linked per-file, not as a directory: it also holds
 	# codeagent-wrapper, a 5.7M binary that is deliberately not in this repo.
 	"claude/bin/worktree-janitor.sh:.claude/bin/worktree-janitor.sh"
-	"claude/bin/worktree-janitor-guard.sh:.claude/bin/worktree-janitor-guard.sh"
+	"claude/bin/maintenance.sh:.claude/bin/maintenance.sh"
 	"claude/bin/chrome-reaper.sh:.claude/bin/chrome-reaper.sh"
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
 	"claude/bin/chrome-devtools-mcp.sh:.claude/bin/chrome-devtools-mcp.sh"
@@ -102,6 +102,30 @@ else
 	ln -s "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"
 	echo "linked   ~/.codex/AGENTS.md -> ~/.claude/CLAUDE.md"
 fi
+
+# --- Scheduled maintenance (launchd) -----------------------------------------
+# launchd needs absolute paths, so the templates in launchd/ are rendered with
+# this $HOME. A job is reloaded only when its rendered file changed.
+AGENTS_DIR="$HOME/Library/LaunchAgents"
+mkdir -p "$AGENTS_DIR"
+for tpl in "$DOTFILES_DIR"/launchd/*.plist; do
+	[ -e "$tpl" ] || continue
+	label=$(basename "$tpl" .plist)
+	dest="$AGENTS_DIR/$label.plist"
+	rendered=$(sed "s#__HOME__#$HOME#g" "$tpl")
+	if [ -f "$dest" ] && [ "$(cat "$dest")" = "$rendered" ] &&
+		launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then
+		echo "ok       launchd $label (loaded)"
+		continue
+	fi
+	printf '%s\n' "$rendered" >"$dest"
+	launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true # not loaded yet
+	if launchctl bootstrap "gui/$(id -u)" "$dest"; then
+		echo "loaded   launchd $label"
+	else
+		echo "FAILED   launchd $label"
+	fi
+done
 
 echo
 echo "Done. Not handled automatically (see README):"
