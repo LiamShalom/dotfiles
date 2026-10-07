@@ -86,7 +86,7 @@ place, but git no longer knows that a merge was in progress.
 - **Not installed by the script**: GarageBand, iMovie, Keynote, Numbers, Pages
   (App Store, if you want them), Grok, Vorssaint and "Studio by Spotify Labs"
   (no Homebrew package, so download them by hand).
-- **Browsers**: sign in to Arc, Chrome and Zen to sync them. The script does not
+- **Browsers**: sign in to Arc and Chrome to sync them. The script does not
   copy browser profiles.
 - **Keychain**: items in the login keychain sync only if iCloud Keychain is on.
 - **macOS settings** (Dock, trackpad, keyboard) are not scripted.

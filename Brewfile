@@ -108,7 +108,6 @@ cask "raycast"
 cask "rectangle"
 cask "slack"
 cask "spotify"
-cask "zen"
 # Xcode for sideshift-mobile. Needs an App Store sign-in; bootstrap.sh keeps
 # going if this one entry fails.
 mas "Xcode", id: 497799835
