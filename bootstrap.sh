@@ -115,9 +115,7 @@ if command -v claude >/dev/null; then
 		"$RECOMPACT" install >/dev/null && echo "ok       recompact shell wrapper" || fail "recompact install"
 	fi
 
-	MINTLIFY_API_KEY=""
-	[ -n "$HANDOFF" ] && [ -f "$HANDOFF/mintlify-api-key" ] && MINTLIFY_API_KEY=$(cat "$HANDOFF/mintlify-api-key")
-	MINTLIFY_API_KEY="$MINTLIFY_API_KEY" bash "$DOTFILES/claude/mcp-servers.sh" || fail "MCP servers"
+	bash "$DOTFILES/claude/mcp-servers.sh" || fail "MCP servers"
 fi
 
 # --- 9. GitHub access --------------------------------------------------------

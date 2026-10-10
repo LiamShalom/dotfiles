@@ -37,7 +37,7 @@ are skipped.
 | oh-my-zsh, fzf-tab | shell plugins |
 | `brew bundle` | every CLI tool and app from `~/dotfiles/Brewfile`, including Xcode through `mas` |
 | `install.sh` | config symlinks: zsh, git, Ghostty, starship, Claude rules/skills/hooks/mods |
-| Claude Code | native installer, the recompact and security-guidance plugins, every MCP server (the Mintlify key is in this folder) |
+| Claude Code | native installer, the recompact and security-guidance plugins, every MCP server |
 | Repos | clones the 4 repos, then adds back all local work from the old Mac (see below) |
 | `npm ci` | `node_modules` in each JS repo |
 | Xcode | selects it, accepts the licence, optionally downloads the iOS simulator |

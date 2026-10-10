@@ -144,13 +144,12 @@ then diff the two if you want the MCP server list from here.
 ## Step 9 — Add the MCP servers to Claude Code
 
 ```bash
-MINTLIFY_API_KEY=mint_... ./claude/mcp-servers.sh
+./claude/mcp-servers.sh
 ```
 
 Adds the remote MCP servers (Linear, Jam, PostHog, Figma, Vercel, Notion,
-Intercom, internal dashboard, Mintlify) at user scope. Leave out
-`MINTLIFY_API_KEY` to skip Mintlify. Then run `/mcp` in Claude Code and sign in
-to each one. The local servers (Chrome DevTools, Firestore, Postgres read
+Intercom, internal dashboard, Context7) at user scope. Then run `/mcp` in
+Claude Code and sign in to each one. The local servers (Chrome DevTools, Firestore, Postgres read
 replica) come with `sideshift-monorepo`'s `.mcp.json`.
 
 ## Step 10 — Reload
@@ -214,8 +213,8 @@ purpose and `~/.config/starship.toml` drives it.
 | `claude/CLAUDE.md` | Global instructions for Claude Code. `~/.codex/AGENTS.md` is symlinked to it, so Codex reads the same file |
 | `claude/settings.json` | **Copied, not linked — auth token redacted.** Proxy env and model aliases, model, effort, hooks, statusline (wrapped by recompact), enabled plugins and their marketplaces, skill overrides. Re-copy the live file here (token redacted) after changing settings |
 | `claude/statusline.sh` | custom status line |
-| `claude/mcp-servers.sh` | **Run, not linked.** Adds the remote MCP servers at user scope (Step 9). The Mintlify key comes from the environment, never this repo |
-| `claude/rules/` | always-on rules (Mintlify docs lookup) |
+| `claude/mcp-servers.sh` | **Run, not linked.** Adds the remote MCP servers at user scope (Step 9) |
+| `claude/rules/` | always-on rules (Context7 docs lookup) |
 | `claude/skills/` | 17 skills; 11 are switched off in `settings.json` → `skillOverrides`. `skills/synced/` (org skills from claude.ai) is ignored |
 | `claude/mods/` | Claude Code mods, loaded through `CLAUDE_CODE_PLUGIN_DIRS`. `ready-banner` draws a CLAUDE READY rule once the turn and all background agents finish |
 | `claude/hooks/` | gcloud auth refresh, usage cap, worktree `CLAUDE.md` / `.env.local` linking |

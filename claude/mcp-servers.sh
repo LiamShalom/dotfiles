@@ -11,8 +11,7 @@
 #
 # Re-running is safe: servers that already exist are skipped.
 #
-# Usage:  MINTLIFY_API_KEY=mint_... ./claude/mcp-servers.sh
-#         (without MINTLIFY_API_KEY, mintlify-index is skipped)
+# Usage:  ./claude/mcp-servers.sh
 set -euo pipefail
 
 # Format: <name> <url>
@@ -25,6 +24,7 @@ SERVERS=(
 	"notion https://mcp.notion.com/mcp"
 	"intercom https://mcp.intercom.com/mcp"
 	"internal-dashboard https://sideshift-internal-dashboard-lnab.vercel.app/mcp"
+	"context7 https://mcp.context7.com/mcp/oauth"
 )
 
 add() {
@@ -41,14 +41,6 @@ add() {
 for entry in "${SERVERS[@]}"; do
 	add "${entry%% *}" "${entry#* }"
 done
-
-# Mintlify needs a personal API key (Mintlify dashboard -> API keys).
-if [ -n "${MINTLIFY_API_KEY:-}" ]; then
-	add mintlify-index https://index.mintlify.com/mcp \
-		--header "Authorization: Bearer $MINTLIFY_API_KEY"
-else
-	echo "skip     mintlify-index (set MINTLIFY_API_KEY to add it)"
-fi
 
 if claude mcp get chrome-devtools 2>/dev/null | grep -q "User config"; then
 	echo "ok       chrome-devtools (already added)"

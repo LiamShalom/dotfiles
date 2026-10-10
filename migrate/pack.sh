@@ -188,13 +188,6 @@ done
 tar -C "$HOME" --exclude '.gnupg/S.*' --exclude '.#lk*' --exclude '*.lock' --exclude '.ssh/agent' -cf "$OUT/home.tar" "${present[@]}"
 echo "ok       home.tar (${#present[@]} paths, $(du -h "$OUT/home.tar" | cut -f1))"
 
-# The Mintlify MCP key lives only in ~/.claude.json; mcp-servers.sh reads it from env.
-key=$(jq -r '.mcpServers["mintlify-index"].headers.Authorization // empty' "$HOME/.claude.json" 2>/dev/null | sed 's/^Bearer //')
-if [ -n "$key" ]; then
-	(umask 077; printf '%s\n' "$key" > "$OUT/mintlify-api-key")
-	echo "ok       mintlify-api-key"
-fi
-
 if [ "$WITH_TRANSCRIPTS" = 1 ]; then
 	transcripts=()
 	for d in "$HOME"/.claude/projects/-Users-*; do
