@@ -10,7 +10,8 @@
 # - this script gathers every input; the model gets no Bash, web, Grep, Glob or subagents
 # - reads are limited to the inputs, ~/dotfiles/claude, the monorepo memory and AGENTS.md
 # - writes are limited to three exact files: the report, a proposals patch, and a draft
-#   copy of the ledger. Nothing is applied or committed here.
+#   copy of the ledger (Edit(path) rules; Write(path) allow rules match nothing).
+#   Nothing is applied or committed here.
 # - claude runs from an empty temp dir with user settings only, so no project-level
 #   settings, CLAUDE.md or skills can be planted for a later run
 # Output: ~/.local/state/claude-learning/ (outside ~/.claude/, where writes are refused).
@@ -51,7 +52,7 @@ Repo-level fixes (lint, CI, test) become ledger rows with status \`open\` and th
   --permission-mode default \
   --allowedTools "Skill" "Read(~/.local/state/claude-learning/**)" "Read(~/dotfiles/claude/**)" \
   "Read(~/.claude/projects/-Users-liamshalom-sideshift-monorepo/memory/**)" "Read(~/sideshift-monorepo/AGENTS.md)" \
-  "Write(~/.local/state/claude-learning/weekly-$day.md)" "Write(~/.local/state/claude-learning/proposals-$day.patch)" \
+  "Edit(~/.local/state/claude-learning/weekly-$day.md)" "Edit(~/.local/state/claude-learning/proposals-$day.patch)" \
   "Edit(~/.local/state/claude-learning/ledger-$day.md)" \
   --disallowedTools "Bash" "WebFetch" "WebSearch" "Agent" "NotebookEdit" "Grep" "Glob" \
   --max-turns 80 </dev/null >"$dir/weekly-$day.log" 2>&1
