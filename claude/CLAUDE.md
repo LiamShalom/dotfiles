@@ -172,12 +172,20 @@ together.
 ## Browsers: one shared agent Chrome
 
 Every Claude session drives the same agent Chrome, so I see one agent browser in the Dock, not
-one per session, and it never jumps in front of what I'm working in.
+one per session, and it never jumps in front of what I'm working in. Each chat has its own
+window in it: its tabs never mix with another chat's.
 
 - **Use the `chrome-devtools` MCP tools first.** They attach to the shared browser
   (`~/.claude/bin/agent-chrome.sh`, DevTools at `http://127.0.0.1:9222`) and open tabs in the
   background by default. Don't pass `background: false` or `bringToFront: true` unless I ask to
   see the page.
+- **Your chat's window** opens at your first browser tool call. It starts with the shared
+  profile's cookies, so sites I'm signed in to stay signed in; logins kept in local storage (the
+  SideShift app) start signed out. A sign-in done there stays in your chat, and the window closes
+  when the chat ends. `new_page` opens in it by default and `list_pages` hides other chats' tabs.
+  A script puts its tabs in the same window with
+  `Target.createTarget({ url, background: true, browserContextId })`, where `browserContextId`
+  is the content of `~/.cache/agent-chrome/chats/$CLAUDE_CODE_SESSION_ID`.
 - **Never launch another Chrome** — no `--remote-debugging-port`/`--user-data-dir` launch, no
   headless browser, no Puppeteer or Playwright `launch()`. This overrides any skill or doc that
   says to, including the monorepo `verify` skill's isolated-Chrome step. A script runs
@@ -186,10 +194,18 @@ one per session, and it never jumps in front of what I'm working in.
   opens its own tab with `background: true`.
 - **A second login is an isolated context, not a second browser:** `new_page` with
   `isolatedContext: "<name>"`, or `Target.createBrowserContext` / `browser.createBrowserContext()`
-  in a script. Isolated contexts share no cookies with anything else.
+  in a script. A named context shares no cookies with anything else, and it closes when the
+  connection that made it closes.
 - **Other sessions' tabs are in the same browser.** Act only on the `pageId` your own
   `new_page` returned, never a tab you didn't open. Close your tabs and contexts when done;
   never close the browser or anyone else's tabs.
+- **When a step needs me in the browser** (a sign-in, a code, 2FA, OAuth consent), hand it to me
+  in Session Board's browser pane: `node ~/session-board/scripts/board-browser.mjs <https-url>
+  "<what I need to do>"`. It opens the page as a tab in your chat's window and notifies me, so
+  what I do there is what you see afterwards. Tell me in chat what to do, wait
+  until I say I'm done, then find the tab with `list_pages`. If the command fails (the board is
+  not running), open the page in a background tab of the agent Chrome, tell me the URL and what
+  to do, and wait. Never route browser or computer-use work to Codex.
 
 ## Heavy commands: two machine-wide slots
 
