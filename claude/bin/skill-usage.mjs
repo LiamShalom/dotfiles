@@ -13,8 +13,11 @@ const auto = new Map();
 const typed = new Map();
 let files = 0;
 
+// Other jobs delete project folders while this runs, so a vanished path is skipped.
 function* walk(dir) {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) yield* walk(p);
     else if (e.name.endsWith('.jsonl')) yield p;
@@ -29,7 +32,11 @@ const bump = (m, k, sid) => {
 };
 
 for (const f of walk(root)) {
-  if (fs.statSync(f).mtimeMs < since) continue;
+  try {
+    if (fs.statSync(f).mtimeMs < since) continue;
+  } catch {
+    continue;
+  }
   files++;
   const sid = path.basename(f, '.jsonl');
   const rl = readline.createInterface({ input: fs.createReadStream(f) });

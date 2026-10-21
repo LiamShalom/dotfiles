@@ -31,8 +31,11 @@ const SIGNAL = new RegExp(
 const NOISE =
   /^(<command-|<task-notification|<local-command|\[Request interrupted|Caveat:|This session is being continued|Continue the work from|Recompact compacted|Reply with|LIVECHECK|Call the |Do two tool calls)/;
 
+// Other jobs delete project folders while this runs, so a vanished path is skipped.
 function* walk(dir) {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
       if (e.name !== 'subagents' && e.name !== 'memory') yield* walk(p);
@@ -49,29 +52,39 @@ const clean = (s) =>
 const seen = new Set();
 const hits = [];
 for (const f of walk(root)) {
-  if (fs.statSync(f).mtimeMs < since) continue;
+  try {
+    if (fs.statSync(f).mtimeMs < since) continue;
+  } catch {
+    continue;
+  }
   const project = path.basename(path.dirname(f)).replace(/^-Users-[^-]+-/, '');
   const sid = path.basename(f, '.jsonl').slice(0, 8);
   let lastAgent = '';
   const rl = readline.createInterface({ input: fs.createReadStream(f) });
-  for await (const line of rl) {
-    let o;
-    try { o = JSON.parse(line); } catch { continue; }
-    if (o.isSidechain || o.isMeta) continue;
-    const c = o?.message?.content;
-    if (o.type === 'assistant') {
+  try {
+    for await (const line of rl) {
+      let o;
+      try { o = JSON.parse(line); } catch { continue; }
+      // Headless runs (claude -p: reviews, tests, compaction) are not the operator typing.
+      if (o.isSidechain || o.isMeta || o.entrypoint?.startsWith('sdk')) continue;
+      const c = o?.message?.content;
+      if (o.type === 'assistant') {
+        const t = clean(textOf(c));
+        if (t) lastAgent = t;
+        continue;
+      }
+      if (o.type !== 'user' || Date.parse(o.timestamp) < since) continue;
+      if (Array.isArray(c) && c.some((b) => b.type === 'tool_result')) continue;
       const t = clean(textOf(c));
-      if (t) lastAgent = t;
-      continue;
+      // Corrections are short; long turns are pastes or tool-driven prompts.
+      if (!t || t.length > 1500 || NOISE.test(t) || !SIGNAL.test(t)) continue;
+      const key = o.timestamp.slice(0, 16) + t;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push({ ts: o.timestamp, project, sid, user: t, agent: lastAgent });
     }
-    if (o.type !== 'user' || Date.parse(o.timestamp) < since) continue;
-    if (Array.isArray(c) && c.some((b) => b.type === 'tool_result')) continue;
-    const t = clean(textOf(c));
-    if (!t || NOISE.test(t) || !SIGNAL.test(t)) continue;
-    const key = o.timestamp.slice(0, 16) + t;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    hits.push({ ts: o.timestamp, project, sid, user: t, agent: lastAgent });
+  } catch {
+    // The file vanished mid-read; keep what was read.
   }
 }
 
