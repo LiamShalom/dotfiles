@@ -1,0 +1,29 @@
+{
+  "skill_name": "quick-fix",
+  "evals": [
+    {
+      "id": 0,
+      "name": "layout-bug-viewport",
+      "prompt": "getting reports that creators arent putting in referral codes during signup. the field is there, i tested it on my laptop and it works fine. but the numbers say almost nobody is using it. this is on the creator onboarding flow",
+      "expected_output": "Root cause identified as a LAYOUT/viewport problem — the referral code input sits far below the fold at phone widths, so it is never seen on mobile. Should reproduce at a mobile viewport rather than concluding from desktop. Should NOT propose a fix to the reveal/validation logic.",
+      "ground_truth": "554px of options rendered in a 458px scroller puts the code input ~172px below the fold on every phone. Desktop verification passes, which is why it shipped. Correct fix is scrollIntoView on reveal, with the effect depending on visibleSteps.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "roster-drift-evidence",
+      "prompt": "noel moore - we removed her from candy's campaign and the toast said 'removed from 0 active programs'. but she definitely had contracts, and shes still showing up on the payouts page. can you look into it",
+      "expected_output": "Root cause traced to membership/removal reading the program roster rather than contracts, with the roster written before a swallowed contract-cancel leaving terminal drift. Evidence gathered from real data (PG replica or Firestore by id) before proposing a fix.",
+      "ground_truth": "Membership read the program roster, never contracts. The roster was written BEFORE the swallowed contract-cancel, so the state is terminal. Related trap: the campaign still cannot be deleted because a contract of any status 409s; archive is the end state.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "vague-report-asks",
+      "prompt": "a brand is saying their payouts page shows $0 owed but they have active creators posting. can you fix",
+      "expected_output": "Should NOT jump to a fix. Should ask which company/account (no id given), and probe for whether a filter was applied on the page, since a known pre-existing bug makes the owed tile jump when a filter is applied. Any investigation done before asking should be attached to the question.",
+      "ground_truth": "Under-specified by construction. There is no company id, no route detail, and no indication whether a filter was active. A known pre-existing prod bug causes the owed tile to jump by the accrual total when a filter is applied. The correct behaviour is a single well-formed question with prior findings attached.",
+      "files": []
+    }
+  ]
+}

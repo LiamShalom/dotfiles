@@ -1,0 +1,64 @@
+---
+name: design
+description: "Design and build the real UI components for a SideShift feature before its backend exists: real React components on the design system, driven by fixture data, shown on a dev preview route the operator can click through, iterated until approved. Use after brainstorm when a feature has new or changed UI, or when the operator asks to design, mock up, or prototype screens or components ahead of the backend."
+---
+
+# Design
+
+The output is approved UI that is production code, not a mockup. The components built here
+are the components `execute` wires to real data. Nothing is thrown away.
+
+The operator's rules stay in force and win over this skill: the repo `CLAUDE.md` (reuse rules,
+design system, one modal at a time, CTA never disabled for invalid input), `DESIGN_SYSTEM.md`,
+`~/.claude/CLAUDE.md`, and agent memory. For a Figma handoff, also use `figma-to-code`.
+
+## Input
+
+The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec, run
+`brainstorm` first, or for a small UI ask, write the UI surfaces and states into
+`design.md` and confirm them with the operator.
+
+## Steps
+
+1. **Work on the feature branch** in a worktree (operator's worktree rules: link env files,
+   clone `node_modules`). This branch is the one `execute` continues on.
+
+2. **Find the reference.** For each surface in the spec, open the closest shipped screen and
+   list the primitives in `components/ui/` and `components/ui/icons/` you will use. A new
+   component composes those primitives and tokens. Creator surfaces (`CREATOR_SURFACES` in
+   `eslint.config.mjs`) stay off the design system.
+
+3. **Define the data contract first.** Write the props type each component takes: the shape
+   the backend must deliver. Put it next to the component, or in the existing domain types
+   if the concept is already modelled. This is the handover to `execute`.
+
+4. **Build the components** in their final location, with props only (no fetching inside
+   presentational components). Cover every state: loading, empty, error, populated, long
+   content, disabled-because-busy, and each role's variant from the party matrix.
+
+5. **Make a preview route**: `app/dev-<slug>-preview/` with `page.tsx` + `preview.tsx`, copied
+   from `app/dev-start-today-preview/`. It 404s outside development and Vercel preview. It
+   renders each state from typed fixtures, with a state switcher, inside the same layout
+   scope the real page uses (`.design-system-scope` for business pages) so DS styles apply.
+   Interactions work locally (open modal, switch tab, submit shows inline error).
+
+6. **Check it yourself first.** Open the route in the shared agent Chrome
+   (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. Put
+   it beside the reference screen. Fix spacing, type, colour and overflow until it matches
+   the product.
+
+7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
+   (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
+   Iterate on feedback until they approve. Big visual choices: show two options side by side
+   on the route, and say which you would pick.
+
+8. **Write `design.md`** in the feature folder: preview route, components and their props
+   types, reused primitives, states, screenshots, and decisions the operator made. Commit the
+   components, preview route and `design.md` on the feature branch. Do not open a PR.
+
+## Rules
+
+- No fake backend. Fixtures live only in the preview route; components never import them.
+- No new palette, hard-coded colours, or lookalike of an existing component.
+- The preview route is removed by `execute` once the real page is verified, unless the
+  operator wants to keep it for QA.

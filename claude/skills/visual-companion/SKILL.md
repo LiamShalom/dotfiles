@@ -1,6 +1,15 @@
-# Visual Companion Guide
+---
+name: visual-companion
+description: "Show the operator mockups, wireframes, diagrams, flowcharts and side-by-side visual options in a live browser tab, and read back which option they clicked. Use in any session, at any stage (brainstorm, design, execute, quick-fix, debugging, plain questions), whenever seeing something would be clearer than reading it: a UI layout choice, a before/after, an architecture or data-flow diagram, a state machine. Open it without asking first."
+---
 
-Browser-based visual brainstorming companion for showing mockups, diagrams, and options.
+# Visual Companion
+
+Browser-based companion for showing mockups, diagrams, and options. It works in any session.
+**Do not ask permission to open it.** When a question is visual, start the server (or reuse a
+running one) and show the screen in the same turn. Scripts live in
+`~/.claude/skills/visual-companion/scripts/`; `scripts/…` below means that folder. Always pass
+`--project-dir <repo root>` (files land in `.superpowers/brainstorm/`; `/tmp` gets wiped).
 
 ## When to Use
 
@@ -33,9 +42,9 @@ The server watches a directory for HTML files and serves the newest one to the b
 ## Starting a Session
 
 ```bash
-# Start AFTER the user approves the companion. --open auto-opens their browser on
+# --open auto-opens their browser on
 # the first screen; --project-dir persists mockups and enables same-port restart.
-scripts/start-server.sh --project-dir /path/to/project --open
+bash scripts/start-server.sh --project-dir /path/to/project --open
 
 # Returns: {"type":"server-started","port":52341,
 #           "url":"http://localhost:52341/?key=ab12…",
@@ -62,7 +71,7 @@ without repeating it.
 **Claude Code:**
 ```bash
 # Default mode works — the script backgrounds the server itself.
-scripts/start-server.sh --project-dir /path/to/project --open
+bash scripts/start-server.sh --project-dir /path/to/project --open
 ```
 
 On Windows, the script auto-detects and switches to foreground mode (which blocks the tool call). Use `run_in_background: true` on the Bash tool call so the server survives across conversation turns, then read `$STATE_DIR/server-info` on the next turn to get the URL and port.
@@ -71,15 +80,23 @@ On Windows, the script auto-detects and switches to foreground mode (which block
 ```bash
 # Codex reaps background processes. The script auto-detects CODEX_CI and
 # switches to foreground mode. Run it normally — no extra flags needed.
-scripts/start-server.sh --project-dir /path/to/project --open
+bash scripts/start-server.sh --project-dir /path/to/project --open
+```
+
+**Gemini CLI:**
+```bash
+# Use --foreground and set is_background: true on your shell tool call
+# so the process survives across turns
+bash scripts/start-server.sh --project-dir /path/to/project --open --foreground
 ```
 
 **Copilot CLI:**
 ```bash
-# Use --foreground and start the server via the bash tool with mode: "async"
-# so the process survives across turns. Capture the returned shellId for
-# read_bash / stop_bash if you need to interact with it later.
-scripts/start-server.sh --project-dir /path/to/project --open --foreground
+# Start it with Copilot CLI's non-blocking/background shell mechanism so the
+# server survives across turns. Keep --foreground so the harness, not the
+# script, owns backgrounding. The launcher is a .sh, so invoke it via bash
+# (on Windows, call Git Bash's bash.exe from the PowerShell tool).
+bash scripts/start-server.sh --project-dir /path/to/project --open --foreground
 ```
 
 **Other environments:** The server must keep running in the background across conversation turns. If your environment reaps detached processes, use `--foreground` and launch the command with your platform's background execution mechanism.
@@ -87,7 +104,7 @@ scripts/start-server.sh --project-dir /path/to/project --open --foreground
 If the URL is unreachable from your browser (common in remote/containerized setups), bind a non-loopback host:
 
 ```bash
-scripts/start-server.sh \
+bash scripts/start-server.sh \
   --project-dir /path/to/project \
   --host 0.0.0.0 \
   --url-host localhost
@@ -280,7 +297,7 @@ If `$STATE_DIR/events` doesn't exist, the user didn't interact with the browser 
 ## Cleaning Up
 
 ```bash
-scripts/stop-server.sh $SESSION_DIR
+bash scripts/stop-server.sh $SESSION_DIR
 ```
 
 If the session used `--project-dir`, mockup files persist in `.superpowers/brainstorm/` for later reference. Only `/tmp` sessions get deleted on stop.
