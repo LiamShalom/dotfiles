@@ -179,13 +179,15 @@ window in it: its tabs never mix with another chat's.
   (`~/.claude/bin/agent-chrome.sh`, DevTools at `http://127.0.0.1:9222`) and open tabs in the
   background by default. Don't pass `background: false` or `bringToFront: true` unless I ask to
   see the page.
-- **Your chat's window** opens at your first browser tool call. It starts with the shared
+- **Your chat's window** appears with its first tab, whether `new_page`, a Session Board
+  hand-off or a script opened it. It starts with the shared
   profile's cookies, so sites I'm signed in to stay signed in; logins kept in local storage (the
   SideShift app) start signed out. A sign-in done there stays in your chat, and the window closes
   when the chat ends. `new_page` opens in it by default and `list_pages` hides other chats' tabs.
   A script puts its tabs in the same window with
   `Target.createTarget({ url, background: true, browserContextId })`, where `browserContextId`
-  is the content of `~/.cache/agent-chrome/chats/$CLAUDE_CODE_SESSION_ID`.
+  is the content of `~/.cache/agent-chrome/chats/$CLAUDE_CODE_SESSION_ID`, which exists from the
+  start of the chat.
 - **Never launch another Chrome** — no `--remote-debugging-port`/`--user-data-dir` launch, no
   headless browser, no Puppeteer or Playwright `launch()`. This overrides any skill or doc that
   says to, including the monorepo `verify` skill's isolated-Chrome step. A script runs
