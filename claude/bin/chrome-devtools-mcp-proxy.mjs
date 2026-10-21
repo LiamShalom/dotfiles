@@ -284,10 +284,20 @@ async function copyCookies(send, browserContextId) {
 }
 
 // Sign-ins made in the shared profile since, for a window with no tab open, so the next tab has them.
+// Says whether the window had no tab.
 async function topUpCookies() {
 	const { send, context } = chat;
 	const { targetInfos } = await send("Target.getTargets");
-	if (!targetInfos.some((t) => t.type === "page" && t.browserContextId === context)) await copyCookies(send, context);
+	const empty = !targetInfos.some((t) => t.type === "page" && t.browserContextId === context);
+	if (empty) await copyCookies(send, context);
+	return empty;
+}
+
+// Chrome opens a chat's window 500 px wide, which gives sites their phone layout. The window gets a
+// desktop size once, as its first tab opens, before the agent works in it.
+async function sizeNewWindow(send, targetId) {
+	const { windowId } = await send("Browser.getWindowForTarget", { targetId });
+	await send("Browser.setWindowBounds", { windowId, bounds: { width: 1440, height: 987 } });
 }
 
 const readText = (path) => {
@@ -331,9 +341,10 @@ function unrecord() {
 // Opens a tab in the chat's window, has chrome-devtools-mcp select it, and returns its page id.
 async function openChatPage() {
 	const { send, context } = await chatWindow();
-	await topUpCookies().catch(() => undefined);
+	const empty = await topUpCookies().catch(() => false);
 	const token = randomUUID();
-	await send("Target.createTarget", { url: `about:blank#${token}`, browserContextId: context, background: true });
+	const { targetId } = await send("Target.createTarget", { url: `about:blank#${token}`, browserContextId: context, background: true });
+	if (empty) await sizeNewWindow(send, targetId).catch(() => undefined);
 	for (let i = 0; i < 50; i++) {
 		const listed = await callTool("list_pages", {});
 		const text = listed.result?.content?.find((c) => c.type === "text")?.text ?? "";
