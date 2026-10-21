@@ -63,10 +63,24 @@ async function openBackgroundTab(url) {
 	return list.find((t) => t.id === targetId) ?? { id: targetId };
 }
 
+// Chrome refuses DevTools requests from web pages by their Host and Origin headers, but it sees
+// only this proxy's, so the proxy checks them itself. Without this, a page using DNS rebinding
+// could read the browser's address and drive the agent Chrome with every login in it.
+const fromLocalTool = (req) =>
+	[`127.0.0.1:${LISTEN}`, `localhost:${LISTEN}`].includes(req.headers.host) && req.headers.origin === undefined;
+
 const server = http.createServer(async (req, res) => {
 	try {
 		const { pathname, search } = new URL(req.url, `http://${HOST}`);
+		if (!fromLocalTool(req)) {
+			res.writeHead(403, { "content-type": "text/plain" }).end("agent-chrome-proxy: only local tools may connect\n");
+			return;
+		}
 		let status, headers, body;
+		if (pathname === "/json/new" && req.method !== "PUT") {
+			res.writeHead(405, { "content-type": "text/plain" }).end("agent-chrome-proxy: /json/new needs PUT, as in Chrome\n");
+			return;
+		}
 		if (pathname === "/json/new") {
 			const url = decodeURIComponent(search.slice(1)) || "about:blank";
 			status = 200;
@@ -90,6 +104,10 @@ const server = http.createServer(async (req, res) => {
 const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: MAX_PAYLOAD });
 
 server.on("upgrade", (req, socket, head) => {
+	if (!fromLocalTool(req)) {
+		socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+		return;
+	}
 	const upstream = new WebSocket(`ws://${HOST}:${CHROME}${req.url}`, {
 		perMessageDeflate: false,
 		maxPayload: MAX_PAYLOAD,
