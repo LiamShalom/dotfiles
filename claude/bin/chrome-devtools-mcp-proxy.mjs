@@ -5,6 +5,14 @@
 // a call asks for `background: false`. Upstream defaults to the foreground,
 // which pulls Chrome in front of whatever app you are working in.
 //
+// chrome-devtools-mcp starts on the chat's first call that needs it. Until
+// then the proxy answers Claude Code's discovery probe, the handshake and the
+// tool list itself, from what the same server command answered before
+// (~/.cache/agent-chrome/handshakes), so a chat that never uses the browser
+// never runs the server (~160 MB each). Without saved answers for this command
+// and protocol version, the server starts at once and its answers are saved for
+// the next chat.
+//
 // When the server is attached to the shared agent Chrome (--browserUrl), each
 // chat also gets a window of its own: a browser context this proxy creates as
 // the chat starts, over a DevTools connection of its own that it holds for the
@@ -28,12 +36,12 @@
 //
 // Usage:  chrome-devtools-mcp-proxy.mjs <command> [args...]
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
 const [command, ...args] = process.argv.slice(2);
-const child = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"] });
+let child = null; // chrome-devtools-mcp, once a call needs it
 const toolListIds = new Set();
 const screenshotCalls = new Map(); // id -> request, until its first answer arrives
 
@@ -43,13 +51,24 @@ const ownCalls = new Map(); // id -> resolve, for calls this proxy makes itself
 const ownContexts = new Set(); // the named contexts this chat opened pages in
 // A page list line: "7: Title (https://url) [selected] isolatedContext=name". A tab with no title shows its URL alone.
 const PAGE_LINE = /^\d+: (.*?)(?: \(([^ ()]*)\))?(?: \[selected\])?(?: isolatedContext=(\S+))?$/;
-let queue = null; // calls wait here while the proxy opens a tab for the chat
+let queue = null; // calls wait here while the server starts or the proxy opens a tab for the chat
 
 let chat = null; // { send, context } while the chat's window is open
 let opening = null;
 let lastAttempt = 0;
 let recorded = null; // { file, context }: where the chat's window is recorded
 let copied = new Map(); // cookie -> the value copied into the chat's window
+
+// What the server answered before, one file per server command; the browser URL does not change it.
+const serverKey = JSON.stringify([command, ...args.map((a, i) => (args[i - 1] === "--browserUrl" ? "" : a))]);
+const savedFile = `${homedir()}/.cache/agent-chrome/handshakes/${createHash("sha256").update(serverKey).digest("hex").slice(0, 16)}.json`;
+// Claude Code probes with server/discover before it initializes, offering a protocol version.
+const discoverKey = (params) => String(params?._meta?.["io.modelcontextprotocol/protocolVersion"] ?? JSON.stringify(params ?? null));
+let handshake = null; // { saved, params } once the proxy answered the chat's initialize itself
+let logLevel = null; // a logging/setLevel the proxy answered before the server started
+const learned = {}; // the server's own answers to this chat, to save: { discover, version, initialize, tools }
+const learning = new Map(); // id of a chat request the server answers -> what to keep from the answer
+let answers = Promise.resolve(); // answers go to Claude Code one at a time, in the order they came
 
 // MCP stdio is newline-delimited JSON-RPC.
 function eachLine(stream, onLine) {
@@ -66,11 +85,124 @@ function eachLine(stream, onLine) {
 	stream.on("end", () => buf && onLine(buf));
 }
 
-function callTool(name, args) {
-	const id = `chat-window-${randomUUID()}`;
+function request(method, params) {
+	const id = `proxy-${randomUUID()}`;
 	const answered = new Promise((resolve) => ownCalls.set(id, resolve));
-	child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }) + "\n");
+	child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
 	return answered;
+}
+
+const callTool = (name, args) => request("tools/call", { name, arguments: args });
+
+function readSaved() {
+	try {
+		const saved = JSON.parse(readFileSync(savedFile, "utf8"));
+		return saved.server === serverKey ? saved : null;
+	} catch {
+		return null;
+	}
+}
+
+// Adds to the saved answers. Chats that start together may each write; the last one wins, and a chat
+// that finds nothing saved for it starts its server at once.
+function save(update) {
+	try {
+		const saved = readSaved() ?? { server: serverKey, discover: {}, versions: {} };
+		update(saved);
+		mkdirSync(savedFile.slice(0, savedFile.lastIndexOf("/")), { recursive: true });
+		writeFileSync(`${savedFile}.${process.pid}`, JSON.stringify(saved));
+		renameSync(`${savedFile}.${process.pid}`, savedFile);
+	} catch {
+		// the next chat starts its server at once and tries again
+	}
+}
+
+function saveLearned() {
+	const { discover, version, initialize, tools } = learned;
+	save((saved) => {
+		if (discover) saved.discover[discover.key] = discover.answer;
+		if (initialize && tools) saved.versions[version] = { initialize, tools };
+	});
+}
+
+// Notes what to keep from the server's answer to a chat request it is about to get.
+function learnFrom(msg) {
+	if (msg.method === "server/discover") {
+		const key = discoverKey(msg.params);
+		learning.set(msg.id, (m) => (learned.discover = { key, answer: m.error ? { error: m.error } : { result: m.result } }));
+	}
+	if (msg.method === "initialize") learning.set(msg.id, (m) => m.result && Object.assign(learned, { version: msg.params?.protocolVersion, initialize: m.result }));
+	if (msg.method === "tools/list" && !msg.params?.cursor) {
+		learning.set(msg.id, (m) => {
+			if (!m.result || m.result.nextCursor) return;
+			learned.tools = structuredClone(m.result);
+			saveLearned();
+		});
+	}
+}
+
+function start() {
+	child = spawn(command, args, { stdio: ["pipe", "pipe", "inherit"] });
+	eachLine(child.stdout, (line) => {
+		answers = answers.then(() => answer(line)).catch(() => process.stdout.write(line + "\n"));
+	});
+	child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+}
+
+// Starts the server for a chat whose handshake the proxy answered: the server gets the chat's own
+// initialize, then any log level the chat asked for. Its tool list is checked against the one the chat
+// got, and the chat is told to read it again if it differs.
+async function startLate() {
+	start();
+	const { saved, params } = handshake;
+	const init = await request("initialize", params);
+	child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+	if (logLevel) await request("logging/setLevel", logLevel);
+	const tools = await request("tools/list", {});
+	if (!init.result || !tools.result || tools.result.nextCursor) return;
+	if (JSON.stringify(tools.result) === JSON.stringify(saved.tools)) return;
+	save((s) => (s.versions[params?.protocolVersion] = { initialize: init.result, tools: tools.result }));
+	process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) + "\n");
+}
+
+// outcome: { result } or { error }
+function reply(id, outcome) {
+	const line = JSON.stringify({ jsonrpc: "2.0", id, ...outcome });
+	answers = answers.then(() => answer(line));
+}
+
+// Answers what the chat asks before it needs the server. Anything else starts it.
+function answerLocally(msg) {
+	if (msg.method === "server/discover") {
+		const saved = readSaved()?.discover?.[discoverKey(msg.params)];
+		if (!saved) return false;
+		reply(msg.id, saved);
+		return true;
+	}
+	if (msg.method === "initialize") {
+		const saved = readSaved()?.versions?.[msg.params?.protocolVersion];
+		if (!saved) return false;
+		handshake = { saved, params: msg.params };
+		reply(msg.id, { result: saved.initialize });
+		return true;
+	}
+	if (!handshake) return false;
+	if (msg.method === "tools/list" && !msg.params?.cursor) {
+		toolListIds.add(msg.id);
+		reply(msg.id, { result: handshake.saved.tools });
+		return true;
+	}
+	if (msg.method === "ping") {
+		reply(msg.id, { result: {} });
+		return true;
+	}
+	if (msg.method === "logging/setLevel") {
+		logLevel = msg.params;
+		reply(msg.id, { result: {} });
+		return true;
+	}
+	// A notification (initialized, cancelled, roots changed) has nothing to tell a server that is not running.
+	return msg.id === undefined && typeof msg.method === "string";
 }
 
 async function connect(onClose) {
@@ -256,6 +388,7 @@ async function withoutOtherChats(text) {
 }
 
 function forward(msg) {
+	learnFrom(msg);
 	if (msg.method === "tools/list") toolListIds.add(msg.id);
 	if (msg.method === "tools/call" && msg.params?.name === "new_page") {
 		const a = (msg.params.arguments ??= {});
@@ -270,23 +403,27 @@ const isChatNewPage = (msg) =>
 	browserUrl && msg.method === "tools/call" && msg.params?.name === "new_page" && msg.params.arguments?.isolatedContext === undefined && typeof msg.params.arguments?.url === "string";
 
 eachLine(process.stdin, (line) => {
-	let msg;
+	let msg = null;
 	try {
 		msg = JSON.parse(line);
 	} catch {
-		child.stdin.write(line + "\n");
-		return;
+		// passed on as it came
 	}
-	if (isChatNewPage(msg)) queue = (queue ?? Promise.resolve()).then(() => newChatPage(msg)).catch(() => undefined);
+	if (!child && msg && answerLocally(msg)) return;
+	if (!child) {
+		if (handshake) queue = startLate().catch(() => undefined);
+		else start();
+	}
+	if (!msg) {
+		if (queue) queue = queue.then(() => child.stdin.write(line + "\n"));
+		else child.stdin.write(line + "\n");
+	} else if (isChatNewPage(msg)) queue = (queue ?? Promise.resolve()).then(() => newChatPage(msg)).catch(() => undefined);
 	else if (queue) queue = queue.then(() => forward(msg));
 	else forward(msg);
 });
-process.stdin.on("end", () => (queue ?? Promise.resolve()).then(() => child.stdin.end()));
-
-// Answers are rewritten one at a time, so they reach Claude Code in the order they came.
-let answers = Promise.resolve();
-eachLine(child.stdout, (line) => {
-	answers = answers.then(() => answer(line)).catch(() => process.stdout.write(line + "\n"));
+process.stdin.on("end", () => {
+	if (!child) process.exit(0);
+	(queue ?? Promise.resolve()).then(() => child.stdin.end());
 });
 
 async function answer(line) {
@@ -311,6 +448,11 @@ async function answer(line) {
 			setTimeout(() => child.stdin.write(JSON.stringify(shot) + "\n"), 500);
 			return;
 		}
+	}
+	const learn = msg.method === undefined && learning.get(msg.id);
+	if (learn) {
+		learning.delete(msg.id);
+		learn(msg);
 	}
 	if (Array.isArray(msg.result?.content)) {
 		for (const c of msg.result.content) {
@@ -349,5 +491,4 @@ if (browserUrl) {
 }
 
 process.on("exit", unrecord);
-child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
-for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(sig, () => child.kill(sig));
+for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(sig, () => (child ? child.kill(sig) : process.exit(0)));

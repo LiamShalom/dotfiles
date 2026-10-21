@@ -10,8 +10,9 @@
 # it did before, so the tools keep working either way. Both paths go through
 # chrome-devtools-mcp-proxy.mjs, which opens new tabs in the background.
 #
-# Every session runs its own copy of this server, so its footprint is paid
-# per session: the pinned version is installed once and run directly (an
+# Every session that uses the browser runs its own copy of this server (the
+# proxy starts it on the session's first browser call), so its footprint is
+# paid per session: the pinned version is installed once and run directly (an
 # `npx` wrapper process costs ~200 MB per session), and usage statistics are
 # off (they add a ~50 MB watchdog process per session).
 set -uo pipefail
