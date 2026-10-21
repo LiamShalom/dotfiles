@@ -68,6 +68,13 @@ you made — not a transcript of the code.
 - **Turn the task into something checkable.** Decide up front what "done and correct" looks
   like, then keep going until it actually passes.
 
+## Learning from my corrections
+
+When I correct something you did, fix it, then run the `correct` skill's in-session step. If
+a rule for it already existed, that's a repeat: don't add another line or more emphasis. Move
+it up to something that fails (a script default, hook, lint, test, or a step in the skill
+where the decision is made), and log it in `~/dotfiles/claude/learning/ledger.md`.
+
 ## Managing your own context
 
 - When context gets compacted, keep the current task, the file paths in play, test results, and
