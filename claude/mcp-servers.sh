@@ -8,8 +8,10 @@
 # shared agent Chrome (bin/chrome-devtools-mcp.sh). So are the monorepo's
 # database servers, sideshift-firestore and the Postgres read replica: launchd
 # runs one copy of each for every session, over HTTP
-# (launchd/com.sideshift.mcp-*.plist), instead of one per session.
-# settings.json switches off the monorepo .mcp.json entries of these names.
+# (launchd/com.sideshift.mcp-*.plist), instead of one per session. Only
+# sessions in a project that defines them get the token they need
+# (bin/mcp-shared-auth.sh). settings.json switches off the monorepo .mcp.json
+# entries of these names.
 #
 # Re-running is safe: servers that already exist are skipped.
 #
@@ -61,7 +63,8 @@ for entry in "${LOCAL_SERVERS[@]}"; do
 	if claude mcp get "$name" 2>/dev/null | grep -q "User config"; then
 		echo "ok       $name (already added)"
 	else
-		claude mcp add --scope user --transport http "$name" "${entry#* }" >/dev/null
+		claude mcp add-json --scope user "$name" \
+			"{\"type\":\"http\",\"url\":\"${entry#* }\",\"headersHelper\":\"$HOME/.claude/bin/mcp-shared-auth.sh\"}" >/dev/null
 		echo "added    $name (one shared copy, launchd)"
 	fi
 done

@@ -1,12 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Template: install.sh replaces __HOME__ and loads it. See claude/bin/mcp-shared-cloudsql.sh. -->
+<!-- Template: install.sh replaces __HOME__ and loads it. One Postgres read-replica MCP server for every
+     Claude Code session (http://127.0.0.1:47801/mcp): up to 4 copies of the monorepo's toolbox server,
+     because toolbox answers one stdio call at a time. They restart when the repo's .mcp.json or tool
+     file changes. See claude/bin/mcp-http-bridge.mjs and claude/bin/mcp-shared-cloudsql.sh. -->
 <plist version="1.0">
 <dict>
 	<key>Label</key>
 	<string>com.sideshift.mcp-cloudsql</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/usr/bin/env</string>
+		<string>node</string>
+		<string>__HOME__/.claude/bin/mcp-http-bridge.mjs</string>
+		<string>--port</string>
+		<string>47801</string>
+		<string>--pool</string>
+		<string>4</string>
+		<string>--restart-on-change</string>
+		<string>__HOME__/sideshift-monorepo/.mcp.json</string>
+		<string>--restart-on-change</string>
+		<string>__HOME__/sideshift-monorepo/mcp/cloud-sql-postgres/read-replica.tools.yaml</string>
+		<string>--</string>
 		<string>/bin/bash</string>
 		<string>__HOME__/.claude/bin/mcp-shared-cloudsql.sh</string>
 	</array>
