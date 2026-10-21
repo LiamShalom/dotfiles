@@ -71,6 +71,8 @@ LINKS=(
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
 	"claude/bin/chrome-devtools-mcp.sh:.claude/bin/chrome-devtools-mcp.sh"
 	"claude/bin/chrome-devtools-mcp-proxy.mjs:.claude/bin/chrome-devtools-mcp-proxy.mjs"
+	"claude/bin/mcp-http-bridge.mjs:.claude/bin/mcp-http-bridge.mjs"
+	"claude/bin/mcp-shared-cloudsql.sh:.claude/bin/mcp-shared-cloudsql.sh"
 	"claude/bin/heavy:.claude/bin/heavy"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"

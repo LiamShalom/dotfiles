@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: install.sh replaces __HOME__ and loads it. One Firestore MCP server for every Claude
+     Code session (http://127.0.0.1:47802/mcp), from the monorepo's mcp/sideshift-firestore; it restarts
+     when its code, start script or .env.local changes. See claude/bin/mcp-http-bridge.mjs. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.sideshift.mcp-firestore</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/env</string>
+		<string>node</string>
+		<string>__HOME__/.claude/bin/mcp-http-bridge.mjs</string>
+		<string>--port</string>
+		<string>47802</string>
+		<string>--restart-on-change</string>
+		<string>__HOME__/sideshift-monorepo/mcp/sideshift-firestore/dist/index.js</string>
+		<string>--restart-on-change</string>
+		<string>__HOME__/sideshift-monorepo/mcp/sideshift-firestore/start.sh</string>
+		<string>--restart-on-change</string>
+		<string>__HOME__/sideshift-monorepo/.env.local</string>
+		<string>--</string>
+		<string>/bin/bash</string>
+		<string>__HOME__/sideshift-monorepo/mcp/sideshift-firestore/start.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>StandardOutPath</key>
+	<string>__HOME__/.claude/logs/mcp-firestore.log</string>
+	<key>StandardErrorPath</key>
+	<string>__HOME__/.claude/logs/mcp-firestore.log</string>
+</dict>
+</plist>

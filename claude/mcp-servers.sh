@@ -5,9 +5,11 @@
 # first time you use it (run /mcp in Claude Code to sign in).
 #
 # chrome-devtools is also added here, as a local server that drives the one
-# shared agent Chrome (bin/chrome-devtools-mcp.sh). settings.json switches off
-# the monorepo .mcp.json entry of the same name. The other local servers
-# (sideshift-firestore, the Postgres read replica) ship in that .mcp.json.
+# shared agent Chrome (bin/chrome-devtools-mcp.sh). So are the monorepo's
+# database servers, sideshift-firestore and the Postgres read replica: launchd
+# runs one copy of each for every session, over HTTP
+# (launchd/com.sideshift.mcp-*.plist), instead of one per session.
+# settings.json switches off the monorepo .mcp.json entries of these names.
 #
 # Re-running is safe: servers that already exist are skipped.
 #
@@ -48,6 +50,21 @@ else
 	claude mcp add --scope user chrome-devtools -- "$HOME/.claude/bin/chrome-devtools-mcp.sh" >/dev/null
 	echo "added    chrome-devtools (shared agent Chrome)"
 fi
+
+# In the monorepo, `claude mcp get` also finds the .mcp.json entry of the same name.
+LOCAL_SERVERS=(
+	"sideshift-firestore http://127.0.0.1:47802/mcp"
+	"cloud-sql-postgres-read-replica http://127.0.0.1:47801/mcp"
+)
+for entry in "${LOCAL_SERVERS[@]}"; do
+	name="${entry%% *}"
+	if claude mcp get "$name" 2>/dev/null | grep -q "User config"; then
+		echo "ok       $name (already added)"
+	else
+		claude mcp add --scope user --transport http "$name" "${entry#* }" >/dev/null
+		echo "added    $name (one shared copy, launchd)"
+	fi
+done
 
 echo
 echo "Next: open Claude Code, run /mcp, and sign in to each server."
