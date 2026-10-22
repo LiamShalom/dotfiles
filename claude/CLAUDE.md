@@ -189,8 +189,10 @@ window in it: its tabs never mix with another chat's.
 - **Your chat's window** appears with its first tab, whether `new_page`, a Session Board
   hand-off or a script opened it. It starts with the shared
   profile's cookies, so sites I'm signed in to stay signed in; logins kept in local storage (the
-  SideShift app) start signed out. A sign-in done there stays in your chat, and the window closes
-  when the chat ends. `new_page` opens in it by default and `list_pages` hides other chats' tabs.
+  SideShift app) start signed out. A sign-in done there is saved to the shared profile within
+  about 10 seconds, so later chats start signed in too, except on the SideShift app, its Vercel
+  previews and local servers, where agents sign in as test users. The window closes when the
+  chat ends. `new_page` opens in it by default and `list_pages` hides other chats' tabs.
   A script puts its tabs in the same window with
   `Target.createTarget({ url, background: true, browserContextId })`, where `browserContextId`
   is the content of `~/.cache/agent-chrome/chats/$CLAUDE_CODE_SESSION_ID`, which exists from the
@@ -204,7 +206,11 @@ window in it: its tabs never mix with another chat's.
 - **A second login is an isolated context, not a second browser:** `new_page` with
   `isolatedContext: "<name>"`, or `Target.createBrowserContext` / `browser.createBrowserContext()`
   in a script. A named context shares no cookies with anything else, and it closes when the
-  connection that made it closes.
+  connection that made it closes. When I must sign in with another account in your chat's
+  window (a hand-off with a test account), first add the site to
+  `~/.cache/agent-chrome/unshared/$CLAUDE_CODE_SESSION_ID` (one per line, e.g. `tiktok.com`) and
+  delete the window's copies of its cookies; otherwise that sign-in replaces my own for every
+  later chat.
 - **Other sessions' tabs are in the same browser.** Act only on the `pageId` your own
   `new_page` returned, never a tab you didn't open. Close your tabs and contexts when done;
   never close the browser or anyone else's tabs.

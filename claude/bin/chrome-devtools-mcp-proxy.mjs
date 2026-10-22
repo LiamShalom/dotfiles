@@ -20,9 +20,12 @@
 // in ~/.cache/agent-chrome/chats/<session id>, under the chat's current id (a
 // recompact or /clear changes it while this process runs), so Session Board
 // hand-offs and CDP scripts open their tabs in the same window. The shared
-// profile's cookies are copied in. agent-chrome-proxy.mjs disposes the
-// context, and so closes the window, when this proxy exits: when the chat is
-// archived, stopped or retired.
+// profile's cookies are copied in, and sign-ins made in the window are copied
+// back, so the next chat starts signed in too. Sign-ins on the SideShift app,
+// its previews and local servers stay in the chat, as do those on the sites a
+// chat lists in ~/.cache/agent-chrome/unshared/<session id>. agent-chrome-proxy.mjs
+// disposes the context, and so closes the window, when this proxy exits: when
+// the chat is archived, stopped or retired.
 //
 // A `new_page` without an `isolatedContext` opens in that window: the proxy
 // opens the tab, has chrome-devtools-mcp select it, and passes the call on as
@@ -58,6 +61,14 @@ let opening = null;
 let lastAttempt = 0;
 let recorded = null; // { file, context }: where the chat's window is recorded
 let copied = new Map(); // cookie -> the value copied into the chat's window
+let shared = new Map(); // cookie -> the value copied back from the chat's window to the shared profile
+let hadTab = false; // whether the chat's window had a tab when its sign-ins were last copied back
+
+// Agents sign in to these as test users and as other people, so a sign-in there stays in the chat.
+const KEPT_IN_CHAT = ["sideshift.app", "vercel.app", "localhost", "127.0.0.1"];
+const unsharedDir = `${homedir()}/.cache/agent-chrome/unshared`;
+const unshared = new Set(KEPT_IN_CHAT); // sites whose sign-ins stay in the chat's window
+const unsharedFiles = new Set(); // the chat's lists of them, removed when it ends
 
 // What the server answered before, one file per server command; the browser URL does not change it.
 const serverKey = JSON.stringify([command, ...args.map((a, i) => (args[i - 1] === "--browserUrl" ? "" : a))]);
@@ -146,7 +157,15 @@ function start() {
 	eachLine(child.stdout, (line) => {
 		answers = answers.then(() => answer(line)).catch(() => process.stdout.write(line + "\n"));
 	});
-	child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+	child.on("exit", (code, signal) => finish(code ?? (signal ? 1 : 0)));
+}
+
+// Copies the chat's last sign-ins back before the proxy exits and its window closes.
+let finishing = null;
+function finish(code) {
+	finishing ??= Promise.race([chat && shareSignIns(true), new Promise((resolve) => setTimeout(resolve, 2000))])
+		.catch(() => undefined)
+		.finally(() => process.exit(code));
 }
 
 // Starts the server for a chat whose handshake the proxy answered: the server gets the chat's own
@@ -247,6 +266,8 @@ function openChatWindow() {
 			try {
 				const { browserContextId } = await send("Target.createBrowserContext");
 				copied = new Map();
+				shared = new Map();
+				hadTab = false;
 				await copyCookies(send, browserContextId).catch(() => undefined);
 				chat = opened = { send, context: browserContextId };
 				record();
@@ -263,6 +284,15 @@ function openChatWindow() {
 const chatWindow = () => (chat ? Promise.resolve(chat) : openChatWindow());
 
 const cookieKey = (c) => `${c.name}\t${c.domain}\t${c.path}\t${JSON.stringify(c.partitionKey ?? null)}`;
+const asParam = ({ size, session, expires, ...c }) => (session ? c : { ...c, expires });
+
+// Sets cookies in a browser context, or in the shared profile when browserContextId is undefined.
+async function setCookies(send, browserContextId, cookies) {
+	await send("Storage.setCookies", { browserContextId, cookies }).catch(() =>
+		// One cookie Chrome will not take back fails the whole batch.
+		Promise.all(cookies.map((c) => send("Storage.setCookies", { browserContextId, cookies: [c] }).catch(() => undefined))),
+	);
+}
 
 // Copies the shared profile's cookies into the chat's window. A cookie the window changed itself, such
 // as a sign-in done there, stays as it is.
@@ -274,13 +304,49 @@ async function copyCookies(send, browserContextId) {
 			const value = have.get(cookieKey(c));
 			return value === undefined || (value !== c.value && value === copied.get(cookieKey(c)));
 		})
-		.map(({ size, session, expires, ...c }) => (session ? c : { ...c, expires }));
+		.map(asParam);
 	if (!params.length) return;
-	await send("Storage.setCookies", { browserContextId, cookies: params }).catch(() =>
-		// One cookie Chrome will not take back fails the whole batch.
-		Promise.all(params.map((c) => send("Storage.setCookies", { browserContextId, cookies: [c] }).catch(() => undefined))),
-	);
+	await setCookies(send, browserContextId, params);
 	for (const c of params) copied.set(cookieKey(c), c.value);
+}
+
+// Sites the chat keeps its sign-ins to, for a sign-in with another account: listed one per line in
+// ~/.cache/agent-chrome/unshared/<session id>. A site stays listed for the rest of the chat, under any id.
+function readUnshared() {
+	const id = sessionId();
+	if (!id || !/^[\w-]+$/.test(id)) return;
+	const file = `${unsharedDir}/${id}`;
+	const text = readText(file);
+	if (text === null) return;
+	unsharedFiles.add(file);
+	for (const site of text.split(/\s+/)) if (site) unshared.add(site.toLowerCase().replace(/^\./, ""));
+}
+
+const keptInChat = (domain) => {
+	const host = domain.replace(/^\./, "");
+	return [...unshared].some((site) => host === site || host.endsWith(`.${site}`));
+};
+
+// Copies sign-ins made in the chat's window back to the shared profile, so the next chat starts signed
+// in too: every cookie the window set or changed itself, outside the sites kept in the chat. A cookie
+// the window deleted, as on a sign-out, stays in the shared profile.
+async function shareSignIns(always = false) {
+	const { send, context } = chat;
+	if (!always) {
+		const { targetInfos } = await send("Target.getTargets");
+		const hasTab = targetInfos.some((t) => t.type === "page" && t.browserContextId === context);
+		// A window sets cookies only while it has a tab; one more pass catches what its last tab set.
+		if (!hasTab && !hadTab) return;
+		hadTab = hasTab;
+	}
+	readUnshared();
+	const { cookies } = await send("Storage.getCookies", { browserContextId: context });
+	const params = cookies
+		.filter((c) => c.value !== copied.get(cookieKey(c)) && c.value !== shared.get(cookieKey(c)) && !keptInChat(c.domain))
+		.map(asParam);
+	if (!params.length) return;
+	await setCookies(send, undefined, params);
+	for (const c of params) shared.set(cookieKey(c), c.value);
 }
 
 // Sign-ins made in the shared profile since, for a window with no tab open, so the next tab has them.
@@ -433,7 +499,7 @@ eachLine(process.stdin, (line) => {
 	else forward(msg);
 });
 process.stdin.on("end", () => {
-	if (!child) process.exit(0);
+	if (!child) return finish(0);
 	(queue ?? Promise.resolve()).then(() => child.stdin.end());
 });
 
@@ -480,7 +546,8 @@ async function answer(line) {
 		if (browserUrl && props?.isolatedContext) {
 			props.isolatedContext.description =
 				"Name of a separate browser context with its own cookies and storage, for a second login. " +
-				"Omit it to open the page in this chat's own window, which starts signed in to the sites the shared agent Chrome is signed in to.";
+				"Omit it to open the page in this chat's own window, which starts signed in to the sites the shared agent Chrome is signed in to. " +
+				"A sign-in made in that window is saved to the shared agent Chrome for later chats, except on the SideShift app, its previews and local servers.";
 		}
 	}
 	process.stdout.write(JSON.stringify(msg) + "\n");
@@ -488,9 +555,10 @@ async function answer(line) {
 
 if (browserUrl) {
 	openChatWindow().catch(() => undefined);
-	// Follows the chat's session id, opens a new window after the agent Chrome restarted, and keeps a
-	// window with no tab open signed in.
+	// Follows the chat's session id, opens a new window after the agent Chrome restarted, keeps a
+	// window with no tab open signed in, and copies sign-ins made in the window back.
 	let lastTopUp = Date.now();
+	let lastShare = 0;
 	setInterval(() => {
 		if (!chat && !opening && Date.now() - lastAttempt >= 30_000) openChatWindow().catch(() => undefined);
 		record();
@@ -498,8 +566,15 @@ if (browserUrl) {
 			lastTopUp = Date.now();
 			topUpCookies().catch(() => undefined);
 		}
+		if (chat && Date.now() - lastShare >= 10_000) {
+			lastShare = Date.now();
+			shareSignIns().catch(() => undefined);
+		}
 	}, 3000).unref();
 }
 
-process.on("exit", unrecord);
-for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(sig, () => (child ? child.kill(sig) : process.exit(0)));
+process.on("exit", () => {
+	unrecord();
+	for (const file of unsharedFiles) rmSync(file, { force: true });
+});
+for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(sig, () => (child ? child.kill(sig) : finish(0)));
