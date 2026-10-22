@@ -184,6 +184,13 @@ style, comment density, and idioms. Reuse existing components and code.
 Touch only what the task requires. Unrelated ugly or dead code gets flagged in chat, not
 changed — except an orphan your own fix creates, which you remove.
 
+**Before you commit, `rg` for every other copy of the broken pattern** (the same class
+string, hardcoded count, query or guard) and fix each copy in this PR, through one shared
+constant or helper. A copy of the same bug is the bug the operator reported, seen from
+another screen, not a second defect to ask about. (2026-10-22: the 6-column platform row
+was fixed in the ad builder only; the campaign wizard's copy stayed broken, and "no its
+not" was the answer.)
+
 A second real defect you notice: **fix it, say it, or file it**, in that order. A small
 safe fix rides along as its own commit; anything needing its own deploy clock or decision
 gets said in chat or filed with a concrete `Why not now:` line.
