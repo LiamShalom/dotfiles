@@ -23,7 +23,24 @@ try {
   process.exit(0)
 }
 const cmd = input?.tool_input?.command
+if (typeof cmd === 'string' && cmd.includes('board-browser.mjs') && !cmd.includes('--simulator')) boardBrowserCheck(cmd)
 if (typeof cmd !== 'string' || !/^\s*open\s/.test(cmd)) process.exit(0)
+
+// A board-browser.mjs hand-off. On 10-21 and 10-22 Liam could not see a page the agent said was in the pane: the
+// agent closed the tab the board opened, or overrode CLAUDE_CODE_SESSION_ID so the tab went outside his pane, and
+// said "it's there" without a screenshot. The override is refused; every other hand-off gets the check to run first.
+function boardBrowserCheck(command) {
+  const out = /\bCLAUDE_CODE_SESSION_ID=/.test(command)
+    ? {
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'Do not override CLAUDE_CODE_SESSION_ID for board-browser.mjs: the board then opens the tab outside the pane the operator is looking at. Run it as it is; the tab it opens is the pane\'s tab.',
+      }
+    : {
+        additionalContext: 'Before you tell the operator the page is in the pane: (1) the tab board-browser.mjs just opened IS the pane\'s tab, even when chrome-devtools list_pages does not show it (find it in http://127.0.0.1:9222/json/list). Never close it as a stray tab; if the page needs a login, sign in that tab where it is (brand-tab.mjs adopt). (2) Screenshot that exact tab (CDP Page.captureScreenshot on its target id) and look at the image. If you cannot, tell the operator you could not confirm it.',
+      }
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', ...out } }))
+  process.exit(0)
+}
 
 // Splits a simple command into words. Returns null for anything with shell operators,
 // substitutions or variables outside quotes: those pass through untouched.
