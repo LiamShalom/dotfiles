@@ -23,7 +23,8 @@ try {
   process.exit(0)
 }
 const cmd = input?.tool_input?.command
-if (typeof cmd === 'string' && cmd.includes('board-browser.mjs') && !cmd.includes('--simulator')) boardBrowserCheck(cmd)
+// A run of the script, not a commit message or grep that only names it.
+if (typeof cmd === 'string' && /\bnode\s+\S*board-browser\.mjs(\s|$)/.test(cmd) && !cmd.includes('--simulator')) boardBrowserCheck(cmd)
 if (typeof cmd !== 'string' || !/^\s*open\s/.test(cmd)) process.exit(0)
 
 // A board-browser.mjs hand-off. On 10-21 and 10-22 Liam could not see a page the agent said was in the pane: the
