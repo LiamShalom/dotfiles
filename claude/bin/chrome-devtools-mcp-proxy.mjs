@@ -64,8 +64,9 @@ let copied = new Map(); // cookie -> the value copied into the chat's window
 let shared = new Map(); // cookie -> the value copied back from the chat's window to the shared profile
 let hadTab = false; // whether the chat's window had a tab when its sign-ins were last copied back
 
-// Agents sign in to these as test users and as other people, so a sign-in there stays in the chat.
-const KEPT_IN_CHAT = ["sideshift.app", "vercel.app", "localhost", "127.0.0.1"];
+// Agents sign in to these as test users and as other people, so a sign-in there stays in the chat, as
+// one on a server reached by IP address does.
+const KEPT_IN_CHAT = ["sideshift.app", "vercel.app", "localhost"];
 const unsharedDir = `${homedir()}/.cache/agent-chrome/unshared`;
 const unshared = new Set(KEPT_IN_CHAT); // sites whose sign-ins stay in the chat's window
 const unsharedFiles = new Set(); // the chat's lists of them, removed when it ends
@@ -324,6 +325,7 @@ function readUnshared() {
 
 const keptInChat = (domain) => {
 	const host = domain.replace(/^\./, "");
+	if (/^[\d.]+$/.test(host) || host.includes(":")) return true; // an IPv4 or IPv6 address
 	return [...unshared].some((site) => host === site || host.endsWith(`.${site}`));
 };
 
