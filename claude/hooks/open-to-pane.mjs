@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+// open-to-pane.mjs — PreToolUse hook on Bash for Claude Code. A session that runs
+// `open <url | page | image | pdf | md | folder>` to show Liam something would open
+// it in the default browser (Arc) or another app. While Session Board runs, the
+// command becomes open-in-pane.sh, which shows each target in the board's browser
+// pane. Any other command, `open -a App`, `open -R`, an app bundle, or a file the pane
+// does not show, passes through untouched.
+//
+// Usage (settings): node ~/.claude/hooks/open-to-pane.mjs
+import { appendFileSync, globSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname, extname, isAbsolute, join, resolve } from 'node:path'
+
+const PANE = new Set('html htm svg png jpg jpeg gif webp avif pdf mp4 webm md'.split(' '))
+const BUNDLE = /\.(app|bundle|framework|pkg|prefpane|workflow|xcodeproj|xcworkspace)\/?$/i
+// `open` flags that still mean "open this in its usual app"; any other flag passes through.
+const PLAIN_FLAGS = new Set(['-g', '-n', '-F', '-j', '-u'])
+
+let input
+try {
+  input = JSON.parse(readFileSync(0, 'utf8'))
+} catch {
+  process.exit(0)
+}
+const cmd = input?.tool_input?.command
+if (typeof cmd !== 'string' || !/^\s*open\s/.test(cmd)) process.exit(0)
+
+// Splits a simple command into words. Returns null for anything with shell operators,
+// substitutions or variables outside quotes: those pass through untouched.
+function words(text) {
+  const out = []
+  let word = null
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (c === "'") {
+      const end = text.indexOf("'", i + 1)
+      if (end < 0) return null
+      word = (word ?? '') + text.slice(i + 1, end)
+      i = end
+    } else if (c === '"') {
+      let j = i + 1
+      let part = ''
+      for (; j < text.length && text[j] !== '"'; j++) {
+        if (text[j] === '\\' && j + 1 < text.length) part += text[++j]
+        else if (text[j] === '$' || text[j] === '`') return null
+        else part += text[j]
+      }
+      if (j >= text.length) return null
+      word = (word ?? '') + part
+      i = j
+    } else if (c === '\\' && i + 1 < text.length) {
+      word = (word ?? '') + text[++i]
+    } else if (/\s/.test(c)) {
+      if (word !== null) out.push({ text: word })
+      word = null
+    } else if (';&|<>()`$\n'.includes(c)) {
+      return null
+    } else {
+      word = (word ?? '') + c
+    }
+  }
+  if (word !== null) out.push({ text: word })
+  return out
+}
+
+const parsed = words(cmd.trim())
+if (!parsed || parsed[0]?.text !== 'open') process.exit(0)
+const cwd = input.cwd || process.cwd()
+const targets = []
+for (const { text } of parsed.slice(1)) {
+  if (text.startsWith('-')) {
+    if (!PLAIN_FLAGS.has(text)) process.exit(0)
+    continue
+  }
+  if (/^https?:\/\/\S+$/i.test(text)) {
+    targets.push(text)
+    continue
+  }
+  const path = text.replace(/^~(?=\/|$)/, homedir())
+  const matches = /[*?[]/.test(path) ? globSync(path, { cwd }).map((m) => (isAbsolute(m) ? m : join(cwd, m))) : [resolve(cwd, path)]
+  if (!matches.length) process.exit(0)
+  for (const match of matches) {
+    let stats
+    try {
+      stats = statSync(match)
+    } catch {
+      process.exit(0)
+    }
+    if (stats.isDirectory() ? BUNDLE.test(match) : !PANE.has(extname(match).slice(1).toLowerCase())) process.exit(0)
+    targets.push(match)
+  }
+}
+if (!targets.length) process.exit(0)
+
+const board = join(homedir(), 'Library', 'Application Support', 'Session Board', 'browser-requests', 'board.pid')
+try {
+  process.kill(Number(readFileSync(board, 'utf8')), 0)
+} catch {
+  process.exit(0)
+}
+
+const quote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`
+const note = typeof input.tool_input.description === 'string' ? input.tool_input.description : ''
+const next = [join(homedir(), '.claude', 'bin', 'open-in-pane.sh'), '--note', note, ...targets].map(quote).join(' ')
+
+try {
+  const log = join(homedir(), '.claude', 'logs', 'open-to-pane.log')
+  mkdirSync(dirname(log), { recursive: true })
+  appendFileSync(log, `${new Date().toISOString()} ${input.session_id ?? ''}\n  before: ${cmd}\n  after:  ${next}\n`)
+} catch {
+  // the log is only for looking back
+}
+process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput: { ...input.tool_input, command: next } } }))
