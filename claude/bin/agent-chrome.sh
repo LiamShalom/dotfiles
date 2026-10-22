@@ -55,13 +55,16 @@ if ! chrome_up; then
 	# opens while it is hidden is never drawn, and a shown one flashes in front
 	# of your apps: its pages are seen only in Session Board's pane. The user
 	# agent is the one Chrome gives itself with a window, so sites do not see
-	# "HeadlessChrome". setsid so ending the session that started it does not
-	# take it down. Headless and windowed Chrome encrypt cookies with different
-	# keys: moving the profile from one to the other deletes every sign-in.
+	# "HeadlessChrome". Scale 2, because headless Chrome streams a page at its
+	# own screen's scale whatever scale the page is given, and the pane shows it
+	# on a Retina screen: at scale 1 every page there looked blurry. setsid so
+	# ending the session that started it does not take it down. Headless and
+	# windowed Chrome encrypt cookies with different keys: moving the profile
+	# from one to the other deletes every sign-in.
 	CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 	MAJOR="$("$CHROME" --version | sed -E 's/[^0-9]*([0-9]+).*/\1/')"
 	nohup perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' "$CHROME" \
-		--headless --window-size=1440,987 \
+		--headless --window-size=1440,987 --force-device-scale-factor=2 \
 		--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$MAJOR.0.0.0 Safari/537.36" \
 		--remote-debugging-port="$CHROME_PORT" \
 		--user-data-dir="$PROFILE" \
