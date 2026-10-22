@@ -51,13 +51,20 @@ if ! chrome_up; then
 	# The flags puppeteer gave the browser chrome-devtools-mcp used to launch,
 	# so pages behave the same: background tabs are not throttled (screenshots
 	# of a tab that is not in front still work), and the mock keychain stops
-	# Chrome asking for Keychain access. --no-startup-window because Chrome
-	# brings itself to the front when it opens its first window, even with
-	# `open -g`; the first window now comes from a background tab instead.
-	open -g -n -a "Google Chrome" --args \
+	# Chrome asking for Keychain access. Headless, because a window Chrome
+	# opens while it is hidden is never drawn, and a shown one flashes in front
+	# of your apps: its pages are seen only in Session Board's pane. The user
+	# agent is the one Chrome gives itself with a window, so sites do not see
+	# "HeadlessChrome". setsid so ending the session that started it does not
+	# take it down. Headless and windowed Chrome encrypt cookies with different
+	# keys: moving the profile from one to the other deletes every sign-in.
+	CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+	MAJOR="$("$CHROME" --version | sed -E 's/[^0-9]*([0-9]+).*/\1/')"
+	nohup perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' "$CHROME" \
+		--headless --window-size=1440,987 \
+		--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$MAJOR.0.0.0 Safari/537.36" \
 		--remote-debugging-port="$CHROME_PORT" \
 		--user-data-dir="$PROFILE" \
-		--no-startup-window \
 		--no-first-run --no-default-browser-check \
 		--allow-pre-commit-input --disable-background-networking \
 		--disable-background-timer-throttling --disable-backgrounding-occluded-windows \
@@ -70,7 +77,8 @@ if ! chrome_up; then
 		--export-tagged-pdf --force-color-profile=srgb --generate-pdf-document-outline \
 		--metrics-recording-only --password-store=basic --use-mock-keychain \
 		--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints,WebUIReloadButton,WebUIOmniboxPopup,WebUIOmniboxAimPopup,ProcessPerSiteUpToMainFrameThreshold,IsolateSandboxedIframes \
-		--enable-features=PdfOopif --disable-extensions --hide-crash-restore-bubble
+		--enable-features=PdfOopif --disable-extensions --hide-crash-restore-bubble \
+		>/dev/null 2>&1 </dev/null &
 	for _ in $(seq 1 75); do
 		chrome_up && break
 		sleep 0.2
