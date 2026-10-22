@@ -13,10 +13,24 @@
 //   - A browser context closes, with its window, when the connection that
 //     created it closes. Nothing else closes them: chrome-devtools-mcp leaves
 //     its contexts open when its chat ends.
+//   - A client that auto-attaches to pages browser-wide, as Playwright's
+//     connectOverCDP does, is attached only to the pages it opened: those in
+//     the browser contexts it created, the tabs it created, and their popups.
+//     Playwright takes every page it is attached to as its own and dismisses
+//     any dialog it has no handler for, so while a Playwright script ran, a
+//     confirm() in Session Board's pane or in another chat's window closed by
+//     itself. The proxy lets the other pages go at once, so none of them waits
+//     on that client. Clients that attach to pages themselves
+//     (chrome-devtools-mcp, Session Board, CDP scripts) still reach every tab.
 //
 // Everything else passes through unchanged. The JSON endpoints are rewritten
 // to name this port, so clients that read webSocketDebuggerUrl stay on the
 // proxy.
+//
+// To run a new version without closing anyone's window: `kill -USR2 <pid>`
+// makes this proxy stop taking connections and keep serving the ones it has
+// (a chat's window lives as long as the connection that created it), and
+// agent-chrome.sh then starts the new version on the port.
 //
 // Usage:  agent-chrome-proxy.mjs <listen-port> <chrome-port>
 import http from "node:http";
@@ -30,6 +44,8 @@ const [LISTEN, CHROME] = process.argv.slice(2).map(Number);
 const HOST = "127.0.0.1";
 const MAX_PAYLOAD = 512 * 1024 * 1024; // screenshots and heap snapshots are large
 const SWALLOWED = new Set(["Page.bringToFront", "Target.activateTarget"]);
+// Ids of the proxy's own commands, far above any a client reaches.
+const OWN_IDS = 2_000_000_000;
 
 const toProxy = (text) => text.replace(new RegExp(`(127\\.0\\.0\\.1|localhost):${CHROME}\\b`, "g"), `$1:${LISTEN}`);
 
@@ -61,6 +77,127 @@ async function openBackgroundTab(url) {
 	ws.close();
 	const list = JSON.parse((await chromeHttp("/json/list")).body);
 	return list.find((t) => t.id === targetId) ?? { id: targetId };
+}
+
+// Keeps a client that auto-attaches to pages browser-wide to the pages it opened (see the top).
+// Chrome announces each auto-attached page with Target.attachedToTarget; the proxy passes on those
+// of the client's pages and detaches the client from the others, telling it nothing.
+function ownPagesOnly(toClient, toChrome) {
+	const contexts = new Set(); // browser contexts the client created
+	const targets = new Set(); // tabs it created, and the popups they opened
+	const asked = new Map(); // "<session>:<id>" -> { method, targetId }, until Chrome answers what the client opened
+	// Pages the client attaches to itself (Target.attachToTarget), which Chrome announces with the same event,
+	// usually before it answers the call.
+	const attaching = new Map(); // targetId -> calls Chrome has not answered
+	const announced = new Set(); // their sessions Chrome announced before answering
+	const attached = new Set(); // their sessions Chrome answered with before announcing them
+	const mine = new Set(); // ids of the proxy's own commands Chrome has not answered: never the client's to see
+	const letGo = new Set(); // sessions of pages the client was detached from
+	const held = []; // messages to the client, in order, behind an attach not judged yet
+	let autoAttach = false;
+	let nextId = OWN_IDS;
+	let timer = null;
+
+	const judge = ({ targetInfo: t, sessionId }) => {
+		if (attaching.has(t.targetId)) {
+			announced.add(sessionId);
+			return "asked";
+		}
+		if (attached.delete(sessionId)) return "asked";
+		if (contexts.has(t.browserContextId) || targets.has(t.targetId) || (t.openerId && targets.has(t.openerId))) {
+			targets.add(t.targetId);
+			return "own";
+		}
+		// Chrome can announce the client's new tab before it answers the Target.createTarget that opened it.
+		for (const { method } of asked.values()) if (method === "Target.createTarget") return "wait";
+		return "other";
+	};
+
+	const send = (msg) => {
+		msg.id = nextId++;
+		mine.add(msg.id);
+		toChrome(msg);
+	};
+
+	const detach = ({ sessionId, waitingForDebugger }) => {
+		letGo.add(sessionId);
+		if (waitingForDebugger) send({ method: "Runtime.runIfWaitingForDebugger", sessionId });
+		send({ method: "Target.detachFromTarget", params: { sessionId } });
+	};
+
+	const flush = () => {
+		clearTimeout(timer);
+		while (held.length) {
+			const next = held[0];
+			if (next.attach) {
+				const verdict = judge(next.attach);
+				if (verdict === "wait") {
+					// A tab Chrome does not answer for in time is taken as the client's: a client
+					// missing one of its own pages is worse off than one seeing a page too many.
+					next.since ??= Date.now();
+					const left = next.since + 2000 - Date.now();
+					if (left > 0) {
+						timer = setTimeout(flush, left);
+						return;
+					}
+				}
+				held.shift();
+				if (verdict === "other") detach(next.attach);
+				else toClient(next.data, next.isBinary);
+				continue;
+			}
+			held.shift();
+			toClient(next.data, next.isBinary);
+		}
+	};
+
+	return {
+		fromClient(msg) {
+			if (msg.method === "Target.setAutoAttach" && !msg.sessionId) autoAttach = msg.params?.autoAttach === true;
+			if (!["Target.createTarget", "Target.createBrowserContext", "Target.attachToTarget"].includes(msg.method)) return;
+			// Only a client that auto-attaches gets announcements judged.
+			if (msg.method === "Target.attachToTarget" && !autoAttach) return;
+			const targetId = msg.params?.targetId;
+			asked.set(`${msg.sessionId ?? ""}:${msg.id}`, { method: msg.method, targetId });
+			if (msg.method === "Target.attachToTarget") attaching.set(targetId, (attaching.get(targetId) ?? 0) + 1);
+		},
+		fromChrome(data, isBinary) {
+			const watching = asked.size > 0 || mine.size > 0 || letGo.size > 0;
+			if (!autoAttach && !watching && !held.length) return toClient(data, isBinary);
+			// The messages that matter here are small; frames and screenshots pass unread.
+			let msg = null;
+			if (!isBinary && data.length < 65536 && (watching || data.includes('"Target.attachedToTarget"'))) {
+				try {
+					msg = JSON.parse(data);
+				} catch {}
+			}
+			let attach = null;
+			if (msg) {
+				if (mine.delete(msg.id)) return;
+				if (msg.sessionId && letGo.has(msg.sessionId)) return;
+				if (msg.method === "Target.detachedFromTarget" && !msg.sessionId && letGo.delete(msg.params?.sessionId)) return;
+				const key = `${msg.sessionId ?? ""}:${msg.id}`;
+				if (msg.id !== undefined && asked.has(key)) {
+					const { method, targetId } = asked.get(key);
+					asked.delete(key);
+					if (method === "Target.createTarget" && msg.result?.targetId) targets.add(msg.result.targetId);
+					if (method === "Target.createBrowserContext" && msg.result?.browserContextId) contexts.add(msg.result.browserContextId);
+					if (method === "Target.attachToTarget") {
+						const left = attaching.get(targetId) - 1;
+						left > 0 ? attaching.set(targetId, left) : attaching.delete(targetId);
+						if (msg.result?.sessionId && !announced.delete(msg.result.sessionId)) attached.add(msg.result.sessionId);
+					}
+				}
+				if (autoAttach && !msg.sessionId && msg.method === "Target.attachedToTarget" && msg.params?.targetInfo?.type === "page") attach = msg.params;
+			}
+			if (!attach && !held.length) return toClient(data, isBinary);
+			held.push({ data, isBinary, attach });
+			flush();
+		},
+		close() {
+			clearTimeout(timer);
+		},
+	};
 }
 
 // Chrome refuses DevTools requests from web pages by their Host and Origin headers, but it sees
@@ -118,6 +255,10 @@ server.on("upgrade", (req, socket, head) => {
 			upstream.removeAllListeners("error");
 			upstream.on("error", () => client.terminate());
 			client.on("error", () => upstream.terminate());
+			const pages = ownPagesOnly(
+				(data, isBinary) => client.send(data, { binary: isBinary }),
+				(msg) => upstream.send(JSON.stringify(msg)),
+			);
 
 			client.on("message", (data, isBinary) => {
 				let msg;
@@ -139,14 +280,21 @@ server.on("upgrade", (req, socket, head) => {
 				if (msg.method === "Target.createBrowserContext") {
 					msg.params = { ...msg.params, disposeOnDetach: true };
 				}
+				pages.fromClient(msg);
 				upstream.send(JSON.stringify(msg));
 			});
-			upstream.on("message", (data, isBinary) => client.send(data, { binary: isBinary }));
+			upstream.on("message", (data, isBinary) => pages.fromChrome(data, isBinary));
 
-			client.on("close", () => upstream.close());
+			client.on("close", () => {
+				pages.close();
+				upstream.close();
+			});
 			upstream.on("close", () => client.close());
 		});
 	});
 });
+
+// See "To run a new version" at the top.
+process.on("SIGUSR2", () => server.close());
 
 server.listen(LISTEN, HOST);
