@@ -18,7 +18,9 @@
 #   - its branch has a MERGED or CLOSED PR (never OPEN, never no-PR/unpushed work)
 #   - local HEAD is the PR's head commit or behind it (no local-only commits)
 #   - nothing in it was modified in the last ACTIVE_MINUTES (a session may still be in it)
-#   - no running process of any kind has its cwd inside it
+#   - no running process of any kind has its cwd inside it (checked again just before removal)
+#   - no Claude Code chat used in the last CHAT_KEEP_DAYS works in it; such a worktree
+#     loses only node_modules and .next, so the chat can still be woken
 # Uncommitted changes do not block removal: they are archived first to
 # ~/.claude/worktree-archive/ (patch + untracked files), and removal is refused if the
 # archive fails. Anything failing a rail is skipped and logged, never deleted.
@@ -57,6 +59,9 @@ MAIN_IDLE_HOURS="${MAIN_IDLE_HOURS:-24}"
 DEP_CACHE_KEEP="${DEP_CACHE_KEEP:-2}"
 DRY_RUN="${DRY_RUN:-0}"
 ARCHIVE_DIR="$HOME/.claude/worktree-archive"
+# Claude Code background chats; each state.json names the folder the chat wakes in.
+JOBS_DIR="${JOBS_DIR:-$HOME/.claude/jobs}"
+CHAT_KEEP_DAYS="${CHAT_KEEP_DAYS:-14}"
 
 LOG_DIR="$HOME/.claude/logs"
 LOG="$LOG_DIR/worktree-janitor.log"
@@ -379,6 +384,68 @@ archive_changes() {
   printf '%s' "$dest"
 }
 
+# A fresh lsof scan (under a second). No output at all means lsof failed: treat as busy.
+busy_now() {
+  local cwds cwd
+  cwds=$(lsof -a -d cwd -Fn 2>/dev/null | grep '^n' | cut -c2-)
+  [ -n "$cwds" ] || return 0
+  while IFS= read -r cwd; do
+    case "$cwd" in ("$1"|"$1"/*) return 0 ;; esac
+  done <<< "$cwds"
+  return 1
+}
+
+# Name of the most recently used chat (used within CHAT_KEEP_DAYS) that works in $1,
+# either because it started there (cwd) or because it entered it (worktreePath).
+chat_in() {
+  python3 - "$1" "$JOBS_DIR" "$CHAT_KEEP_DAYS" 2>/dev/null <<'PY'
+import glob, json, os, sys, time
+from datetime import datetime
+wt, jobs, days = sys.argv[1], sys.argv[2], float(sys.argv[3])
+cutoff = time.time() - days * 86400
+best = None
+for f in glob.glob(os.path.join(jobs, "*", "state.json")):
+    try:
+        d = json.load(open(f))
+    except Exception:
+        continue
+    try:
+        used = datetime.fromisoformat(d["updatedAt"].replace("Z", "+00:00")).timestamp()
+    except Exception:
+        used = os.path.getmtime(f)
+    if used < cutoff:
+        continue
+    for p in (d.get("cwd"), d.get("worktreePath")):
+        if p and (p == wt or p.startswith(wt + "/")) and (best is None or used > best[0]):
+            best = (used, d.get("name") or d.get("daemonShort") or "?")
+if best:
+    print(best[1])
+PY
+}
+
+# Last gate before pass 3, 3c or 3b removes a worktree; returns 1 to keep it.
+# The BUSY snapshot is taken once per run, and a run can last hours: on 2026-10-21 one ran
+# 6 h 40 m and deleted a worktree whose chat had restarted after the snapshot. So lsof is
+# asked again here. A chat wakes in its folder and cannot wake once it is gone (Claude
+# Code reports "Workspace not trusted ... could not be resolved on disk"), so a worktree a
+# recent chat works in keeps its checkout and loses only node_modules and .next.
+removal_gate() {
+  local wt="$1" label="$2" chat
+  chat=$(chat_in "$wt")
+  if [ -n "$chat" ] && [ ! -e "$wt/node_modules" ] && [ ! -e "$wt/.next" ]; then
+    return 1
+  fi
+  if busy_now "$wt"; then
+    log "  KEEP (process live inside): $wt [$label]"
+    return 1
+  fi
+  [ -n "$chat" ] || return 0
+  log "  KEEP (chat \"$chat\" works here), dropping node_modules and .next: $wt [$label]"
+  run rm -rf "$wt/node_modules" "$wt/.next"
+  DEHYDRATED=$((DEHYDRATED + 1))
+  return 1
+}
+
 REMOVED=0
 ARCHIVED=0
 SKIPPED=0
@@ -414,6 +481,7 @@ while IFS=$'\t' read -r wt br state pr_sha; do
     log "  KEEP (modified in last ${ACTIVE_MINUTES}m): $wt [$br]"
     SKIPPED=$((SKIPPED + 1)); continue
   fi
+  removal_gate "$wt" "$br" || { SKIPPED=$((SKIPPED + 1)); continue; }
 
   force=""
   if [ -n "$(git -C "$wt" status --porcelain 2>/dev/null)" ]; then
@@ -525,6 +593,7 @@ while IFS=$'\t' read -r wt br head state; do
   fi
   # Quiet skip: an on-main worktree under 24h idle is normal, not news, every 15 min.
   recently_active "$wt" "$idle_min" && { SKIPPED=$((SKIPPED + 1)); continue; }
+  removal_gate "$wt" "${br:-detached}" || { SKIPPED=$((SKIPPED + 1)); continue; }
 
   if [ -z "$br" ]; then
     ref="refs/archive/worktrees/$(basename "$wt")"
@@ -589,6 +658,7 @@ if [ "$MODE" = "idle" ]; then
             -type f -newermt "-${RETIRE_DAYS} days" -print -quit 2>/dev/null)" ] && continue
 
     br=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null)
+    removal_gate "$wt" "${br:-detached}" || continue
     if [ -z "$br" ]; then
       ref="refs/archive/worktrees/$(basename "$wt")"
       if [ "$DRY_RUN" = "1" ]; then
