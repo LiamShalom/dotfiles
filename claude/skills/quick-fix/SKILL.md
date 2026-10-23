@@ -184,6 +184,14 @@ style, comment density, and idioms. Reuse existing components and code.
 Touch only what the task requires. Unrelated ugly or dead code gets flagged in chat, not
 changed — except an orphan your own fix creates, which you remove.
 
+**Remove the failure, do not only make it rarer.** A retry, a longer timeout or a wait that
+can still end in the same error is a mitigation: the reporter's "I got an error" still
+happens. Fix the source (the refusal, the lock, the race) so the user never sees it, or, if
+that is a real design choice, give the operator the options with your pick before you build
+(their `CLAUDE.md` asks for that). (2026-10-22: #7087 retried a refused contract update on
+the client for 2 minutes and then showed the same error; "no it should just queue it
+instead of showing an error".)
+
 **Before you commit, `rg` for every other copy of the broken pattern** (the same class
 string, hardcoded count, query or guard) and fix each copy in this PR, through one shared
 constant or helper. A copy of the same bug is the bug the operator reported, seen from
