@@ -32,7 +32,15 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    the backend must deliver. Put it next to the component, or in the existing domain types
    if the concept is already modelled. This is the handover to `execute`.
 
-4. **Build the components** in their final location, with props only (no fetching inside
+4. **Build two or three directions first.** A new screen, flow or modal, or a visible layout
+   change, starts as two or three genuinely different directions: a different layout or
+   metaphor each, not a colour or spacing tweak, and not a copy of the closest shipped
+   component's layout. Build them as variants behind one prop with a switcher on the preview
+   route. Skip this only for a small change or when the operator already chose the direction.
+   (10-23: one trial checkout copied from the Get started cards → "This is awful… This is
+   why I asked for you to provide options.")
+
+   **Then build the components** in their final location, with props only (no fetching inside
    presentational components). Cover every state: loading, empty, error, populated, long
    content, disabled-because-busy, and each role's variant from the party matrix.
 
@@ -49,8 +57,8 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
-   Iterate on feedback until they approve. Big visual choices: show two options side by side
-   on the route, and say which you would pick.
+   Show the directions from step 4 side by side and say which you would pick and why. Once
+   one is chosen, delete the others and iterate on feedback until they approve.
 
 8. **Write `design.md`** in the feature folder: preview route, components and their props
    types, reused primitives, states, screenshots, and decisions the operator made. Commit the
