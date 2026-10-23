@@ -40,12 +40,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/worktree-claude-md.sh",
-            "timeout": 10,
-            "statusMessage": "Linking worktree CLAUDE.md"
-          },
-          {
-            "type": "command",
             "command": "bash ~/.claude/hooks/worktree-env-local.sh",
             "timeout": 10,
             "statusMessage": "Linking worktree .env.local"
