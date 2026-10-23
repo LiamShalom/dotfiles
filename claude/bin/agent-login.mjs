@@ -62,7 +62,7 @@ const savedFor = (item, host) => itemHosts(item).some((h) => hostMatches(host, h
 function op(opArgs) {
   const r = spawnSync("op", opArgs, { encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
   if (r.error?.code === "ETIMEDOUT" || /authorization (timeout|prompt dismissed)/i.test(r.stderr || "")) {
-    fail("1Password needs Liam's approval: ask him to approve the 1Password prompt on his Mac, then run this again", 4);
+    fail("1Password needs Liam's approval: ask Liam to approve the 1Password prompt on the Mac, then run this again", 4);
   }
   if (r.status !== 0) fail(`1Password refused: ${(r.stderr || "no reason given").trim().split("\n")[0]}`);
   return r.stdout;

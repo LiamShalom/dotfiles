@@ -5,7 +5,7 @@ description: "Sign in to a website as Liam from the agent browser with a login s
 
 # Agent login
 
-Liam keeps his logins and two-step codes in 1Password. This tool signs you in for him without
+Liam's logins and two-step codes are in 1Password. This tool signs you in as Liam without
 showing you either: it reads the login through the 1Password app, which asks Liam to approve,
 and types it straight into your tab.
 
@@ -25,7 +25,7 @@ site, so a login never goes to the wrong site.
 | 0 | Filled; it names the fields | Check that the page moved on. |
 | 2 | Several logins or tabs match; it lists them | Run again with `--item <id>` or `--account <username>`. If the task does not say which account, ask Liam. |
 | 3 | No sign-in field is showing, or 1Password holds no value for it | Bring the field up (close a cookie banner, click "Log in") and run again, or hand the step to Liam. |
-| 4 | Waiting for Liam's approval | Tell Liam in chat that 1Password is asking him to approve, then run it again. |
+| 4 | Waiting for Liam's approval | Tell Liam in chat to approve the 1Password prompt on the Mac, then run it again. |
 | 1 | Error, for example the login is saved for another site | Read the message. Never add a website to an item unless Liam says that site is right. |
 
 ## Rules
