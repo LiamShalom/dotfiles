@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 //
 // agent-chrome-proxy.mjs — the DevTools endpoint every agent connects to. It
-// sits in front of the shared agent Chrome (agent-chrome.sh) and stops agents
-// pulling Chrome in front of whatever app you are working in:
+// sits in front of the agents' browser: Session Board while it runs (see
+// below), the shared agent Chrome (agent-chrome.sh) otherwise. It stops
+// agents pulling the browser in front of whatever app you are working in:
 //
 //   - Target.createTarget always opens in the background. Puppeteer,
 //     Playwright and raw CDP scripts omit `background`, and Chrome then
@@ -27,12 +28,34 @@
 // to name this port, so clients that read webSocketDebuggerUrl stay on the
 // proxy.
 //
+// While Session Board runs, it is the agents' browser: it serves the same
+// DevTools endpoints on a port of its own and names that port in
+// ~/.cache/agent-chrome/board.json (AGENT_CHROME_BOARD_FILE overrides the
+// path). Each new request and connection goes to:
+//
+//   - Session Board, when the file names a live process whose port answers
+//     /json/version within a second. One look serves every request for a
+//     second, so a burst of requests costs one probe.
+//   - Session Board after a wait, when it is starting (its process is alive
+//     but its port does not answer yet) or quit less than 90 s ago (an install
+//     restarts it within seconds). The proxy looks again every 250 ms for up
+//     to 45 s, then uses the headless Chrome. It does not wait again for a
+//     board.json it already waited on, so a board that never answers costs
+//     one wait, not one per request.
+//   - The headless Chrome on <chrome-port> otherwise.
+//
+// The rules above hold for both. While Session Board is up, the proxy closes
+// the connections it sent to the headless Chrome, so their clients reconnect
+// and land on the board. It looks every 2 s, and when it sends a new
+// connection to the board.
+//
 // To run a new version without closing anyone's window: `kill -USR2 <pid>`
 // makes this proxy stop taking connections and keep serving the ones it has
 // (a chat's window lives as long as the connection that created it), and
 // agent-chrome.sh then starts the new version on the port.
 //
 // Usage:  agent-chrome-proxy.mjs <listen-port> <chrome-port>
+import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
@@ -46,12 +69,15 @@ const MAX_PAYLOAD = 512 * 1024 * 1024; // screenshots and heap snapshots are lar
 const SWALLOWED = new Set(["Page.bringToFront", "Target.activateTarget"]);
 // Ids of the proxy's own commands, far above any a client reaches.
 const OWN_IDS = 2_000_000_000;
+const BOARD_FILE = process.env.AGENT_CHROME_BOARD_FILE || `${homedir()}/.cache/agent-chrome/board.json`;
 
-const toProxy = (text) => text.replace(new RegExp(`(127\\.0\\.0\\.1|localhost):${CHROME}\\b`, "g"), `$1:${LISTEN}`);
+const toProxy = (text, port) => text.replace(new RegExp(`(127\\.0\\.0\\.1|localhost):${port}\\b`, "g"), `$1:${LISTEN}`);
 
-function chromeHttp(path, method = "GET") {
+const log = (line) => process.stderr.write(`${new Date().toISOString()} ${line}\n`);
+
+function chromeHttp(port, path, method = "GET") {
 	return new Promise((resolve, reject) => {
-		const req = http.request({ host: HOST, port: CHROME, path, method }, (res) => {
+		const req = http.request({ host: HOST, port, path, method }, (res) => {
 			const chunks = [];
 			res.on("data", (c) => chunks.push(c));
 			res.on("end", () => resolve({ res, body: Buffer.concat(chunks) }));
@@ -62,8 +88,8 @@ function chromeHttp(path, method = "GET") {
 }
 
 // /json/new opens a foreground tab in Chrome, so open it over CDP instead.
-async function openBackgroundTab(url) {
-	const version = JSON.parse((await chromeHttp("/json/version")).body);
+async function openBackgroundTab(port, url) {
+	const version = JSON.parse((await chromeHttp(port, "/json/version")).body);
 	const ws = new WebSocket(version.webSocketDebuggerUrl, { perMessageDeflate: false });
 	await new Promise((resolve, reject) => ws.once("open", resolve).once("error", reject));
 	const targetId = await new Promise((resolve, reject) => {
@@ -75,7 +101,7 @@ async function openBackgroundTab(url) {
 		ws.send(JSON.stringify({ id: 1, method: "Target.createTarget", params: { url, background: true } }));
 	});
 	ws.close();
-	const list = JSON.parse((await chromeHttp("/json/list")).body);
+	const list = JSON.parse((await chromeHttp(port, "/json/list")).body);
 	return list.find((t) => t.id === targetId) ?? { id: targetId };
 }
 
@@ -206,6 +232,110 @@ function ownPagesOnly(toClient, toChrome) {
 const fromLocalTool = (req) =>
 	[`127.0.0.1:${LISTEN}`, `localhost:${LISTEN}`].includes(req.headers.host) && req.headers.origin === undefined;
 
+// Whether Session Board's port answers /json/version within a second. The probe uses a connection
+// of its own, so its timeout cannot cut a kept-alive connection that a later request reuses.
+const answers = (port) =>
+	new Promise((resolve) => {
+		const options = { host: HOST, port, path: "/json/version", agent: false, signal: AbortSignal.timeout(1000) };
+		http
+			.get(options, (res) => {
+				res.resume();
+				resolve(res.statusCode === 200);
+			})
+			.on("error", () => resolve(false));
+	});
+
+function alive(pid) {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+// What board.json says: Session Board is "up" (on its port), "coming" back, or "gone". A board that
+// crashed leaves a dead pid behind, so it is gone at once.
+async function readBoard() {
+	let text, board;
+	try {
+		text = await readFile(BOARD_FILE, "utf8");
+		board = JSON.parse(text) ?? {};
+	} catch {
+		return { state: "gone" };
+	}
+	const { pid, port, quitAt } = board;
+	if (Number.isInteger(pid) && pid > 0 && Number.isInteger(port) && alive(pid)) {
+		return (await answers(port)) ? { state: "up", port } : { state: "coming", text };
+	}
+	return Date.now() - quitAt < 90_000 ? { state: "coming", text } : { state: "gone" };
+}
+
+// A look at the board serves every request for maxAge ms, and requests that arrive while one is
+// in flight share it.
+let look = null;
+function lookAtBoard(maxAge = 1000) {
+	if (look && (look.at === undefined || Date.now() - look.at < maxAge)) return look.promise;
+	const current = {};
+	current.promise = readBoard().then((board) => {
+		current.at = Date.now();
+		return board;
+	});
+	look = current;
+	return current.promise;
+}
+
+let waiting = null; // the wait for a board coming back, shared by every request that arrives meanwhile
+let gaveUpOn = null; // board.json as it read when a wait last ran out
+let routed = null; // the backend the last request went to
+
+// The port of the backend for a new request or connection (see the top).
+async function backend() {
+	const board = await lookAtBoard();
+	let port = board.port ?? CHROME;
+	if (board.state === "coming" && board.text !== gaveUpOn) {
+		waiting ??= waitForBoard().finally(() => (waiting = null));
+		port = await waiting;
+	}
+	if (port !== routed) {
+		log(port === CHROME ? `routing to the headless Chrome on port ${CHROME}` : `routing to Session Board on port ${port}`);
+	}
+	routed = port;
+	return port;
+}
+
+async function waitForBoard() {
+	const until = Date.now() + 45_000;
+	let board;
+	do {
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		board = await lookAtBoard(0);
+		if (board.state !== "coming") return board.port ?? CHROME;
+	} while (Date.now() < until);
+	gaveUpOn = board.text;
+	log("Session Board did not come back within 45 s");
+	return CHROME;
+}
+
+// Connections the proxy sent to the headless Chrome.
+const onChrome = new Set();
+
+function moveToBoard() {
+	if (!onChrome.size) return;
+	const count = onChrome.size === 1 ? "1 connection" : `${onChrome.size} connections`;
+	log(`closed ${count} to the headless Chrome so their clients reconnect to Session Board`);
+	for (const { client, upstream } of onChrome) {
+		client.close(1012, "agent-chrome-proxy: moving to Session Board");
+		upstream.close();
+	}
+	onChrome.clear();
+}
+
+// Unref'd, so that after SIGUSR2 the process still exits when its last connection closes.
+setInterval(async () => {
+	if (onChrome.size && (await lookAtBoard()).state === "up") moveToBoard();
+}, 2000).unref();
+
 const server = http.createServer(async (req, res) => {
 	try {
 		const { pathname, search } = new URL(req.url, `http://${HOST}`);
@@ -218,19 +348,23 @@ const server = http.createServer(async (req, res) => {
 			res.writeHead(405, { "content-type": "text/plain" }).end("agent-chrome-proxy: /json/new needs PUT, as in Chrome\n");
 			return;
 		}
+		const port = await backend();
 		if (pathname === "/json/new") {
 			const url = decodeURIComponent(search.slice(1)) || "about:blank";
 			status = 200;
 			headers = { "content-type": "application/json; charset=UTF-8" };
-			body = Buffer.from(JSON.stringify(await openBackgroundTab(url), null, 2));
+			body = Buffer.from(JSON.stringify(await openBackgroundTab(port, url), null, 2));
 		} else {
-			const upstream = await chromeHttp(req.url, req.method);
+			const upstream = await chromeHttp(port, req.url, req.method);
 			status = upstream.res.statusCode;
 			headers = { ...upstream.res.headers };
 			body = upstream.body;
 		}
-		if (String(headers["content-type"] ?? "").includes("json")) body = Buffer.from(toProxy(body.toString()));
+		if (String(headers["content-type"] ?? "").includes("json")) body = Buffer.from(toProxy(body.toString(), port));
 		headers["content-length"] = body.length;
+		// The body goes out whole, so an upstream's chunked framing does not apply to it. Chrome never
+		// chunks, but a Node server does unless it sets the length, and a response with both is refused.
+		delete headers["transfer-encoding"];
 		headers["x-agent-chrome-proxy"] = "1";
 		res.writeHead(status, headers).end(body);
 	} catch (err) {
@@ -240,12 +374,17 @@ const server = http.createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: MAX_PAYLOAD });
 
-server.on("upgrade", (req, socket, head) => {
+server.on("upgrade", async (req, socket, head) => {
 	if (!fromLocalTool(req)) {
 		socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
 		return;
 	}
-	const upstream = new WebSocket(`ws://${HOST}:${CHROME}${req.url}`, {
+	// Nothing listens for the socket's errors until the upgrade completes, and picking a backend can
+	// wait up to 45 s for Session Board. An unhandled socket error would end the proxy for everyone.
+	socket.on("error", () => socket.destroy());
+	const port = await backend();
+	if (socket.destroyed) return;
+	const upstream = new WebSocket(`ws://${HOST}:${port}${req.url}`, {
 		perMessageDeflate: false,
 		maxPayload: MAX_PAYLOAD,
 	});
@@ -290,6 +429,14 @@ server.on("upgrade", (req, socket, head) => {
 				upstream.close();
 			});
 			upstream.on("close", () => client.close());
+
+			if (port === CHROME) {
+				const connection = { client, upstream };
+				onChrome.add(connection);
+				client.on("close", () => onChrome.delete(connection));
+			} else {
+				moveToBoard();
+			}
 		});
 	});
 });
