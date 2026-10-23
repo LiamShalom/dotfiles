@@ -28,7 +28,9 @@ PROXY="$HOME/.claude/bin/agent-chrome-proxy.mjs"
 PROXY_DEPS="$HOME/.cache/agent-chrome/cdp-proxy"
 PROXY_LOG="$HOME/.claude/logs/agent-chrome-proxy.log"
 
-up() { curl -fsS --max-time 2 "$URL/json/version" >/dev/null 2>&1; }
+# The proxy answers /agent-chrome-proxy at once, while /json/version waits for Session Board when it
+# restarts. An older proxy knows only /json/version.
+up() { curl -fsS --max-time 1 "$URL/agent-chrome-proxy" >/dev/null 2>&1 || curl -fsS --max-time 2 "$URL/json/version" >/dev/null 2>&1; }
 chrome_up() { curl -fsS --max-time 2 "http://127.0.0.1:$CHROME_PORT/json/version" >/dev/null 2>&1; }
 
 if up; then

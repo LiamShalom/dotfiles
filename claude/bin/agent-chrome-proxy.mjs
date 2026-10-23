@@ -343,6 +343,11 @@ const server = http.createServer(async (req, res) => {
 			res.writeHead(403, { "content-type": "text/plain" }).end("agent-chrome-proxy: only local tools may connect\n");
 			return;
 		}
+		// agent-chrome.sh asks whether the proxy runs; the answer never waits on a browser.
+		if (pathname === "/agent-chrome-proxy") {
+			res.writeHead(200, { "content-type": "text/plain" }).end("ok\n");
+			return;
+		}
 		let status, headers, body;
 		if (pathname === "/json/new" && req.method !== "PUT") {
 			res.writeHead(405, { "content-type": "text/plain" }).end("agent-chrome-proxy: /json/new needs PUT, as in Chrome\n");
