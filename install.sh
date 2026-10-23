@@ -76,6 +76,7 @@ LINKS=(
 	"claude/bin/mcp-shared-cloudsql.sh:.claude/bin/mcp-shared-cloudsql.sh"
 	"claude/bin/mcp-shared-auth.sh:.claude/bin/mcp-shared-auth.sh"
 	"claude/bin/heavy:.claude/bin/heavy"
+	"claude/bin/agent-login.mjs:.claude/bin/agent-login.mjs"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
 	"codex/hooks.json:.codex/hooks.json"
