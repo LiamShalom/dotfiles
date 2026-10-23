@@ -14,9 +14,15 @@ case "$input" in
 	*gh-approve*--merge*) ;;
 	*) exit 0 ;;
 esac
-IFS=$'\t' read -r session cmd < <(jq -r '[.session_id // "unknown", (.tool_input.command // "" | tostring)] | @tsv' <<<"$input" 2>/dev/null)
-# Only a command that runs gh-approve: at the start of a command (or after && || ; |),
-# optionally behind env assignments and a path. A commit message that mentions it does not count.
+# One jq: the session, the working folder, then the command exactly as written (newlines kept).
+{ IFS= read -r session; IFS= read -r cwd; IFS= read -r -d '' cmd; } < <(jq -r '(.session_id // "unknown"), (.cwd // ""), (.tool_input.command // "" | tostring)' <<<"$input" 2>/dev/null)
+case "$cmd" in
+	*gh-approve*--merge*) ;;
+	*) exit 0 ;;
+esac
+
+# A command that runs gh-approve: at the start of a line or after && || ; |, optionally
+# behind env assignments and a path.
 run='(^|[|][[:space:]]*)[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*([^[:space:]|]*/)?gh-approve([[:space:]][^|]*)'
 merge='[[:space:]]--merge([[:space:]]|$)'
 parts=${cmd//&&/$'\n'}
@@ -31,21 +37,50 @@ while IFS= read -r part; do
 		break
 	fi
 done <<<"$parts"
-[ -n "$segment" ] || exit 0
 
-pr=current
-if [[ $segment =~ ^[[:space:]]+(-R[[:space:]]+[^[:space:]]+[[:space:]]+)?([0-9]+) ]]; then
-	pr=${BASH_REMATCH[2]}
+# The PR: a bare number or a pull link anywhere in the arguments, not the -R value.
+pr=
+if [ -n "$segment" ]; then
+	read -ra words <<<"$segment"
+	skip=
+	for word in "${words[@]}"; do
+		if [ -n "$skip" ]; then
+			skip=
+			continue
+		fi
+		case "$word" in
+			-R | --repo) skip=1 ;;
+			*/pull/*) [[ $word =~ /pull/([0-9]+) ]] && pr=${BASH_REMATCH[1]} && break ;;
+			*) [[ $word =~ ^#?([0-9]+)$ ]] && pr=${BASH_REMATCH[1]} && break ;;
+		esac
+	done
+fi
+if [ -n "$pr" ]; then
+	key="pr-$pr"
+else
+	# The current branch's PR, or a mention this cannot parse: key on the folder and the
+	# exact command, so another branch or another command is asked again.
+	sum=$(printf '%s\n%s' "$cwd" "$cmd" | cksum)
+	key="cmd-${sum%% *}"
 fi
 state="$HOME/.cache/claude-merge-reach"
-mark="$state/${session}-${pr}"
+mark="$state/${session}-${key}"
 [ -e "$mark" ] && exit 0
 mkdir -p "$state"
 : >"$mark"
 
-reason="Before you merge PR #${pr}, answer two questions in your reply to the operator.
-1. Which real accounts does this change reach? List every account whose emails, notices, cancellations, charges or access change, from live data (Stripe, Postgres, Firestore), not from a derived flag. For a cron, billing or email change, the blast-radius skill finds the list.
-2. Did the operator approve each of them? Approval for the case that prompted the change does not cover other accounts. If any account is not covered, stop and ask, with the list.
+questions="1. Which real accounts does this change reach? List every account whose emails, notices, cancellations, charges or access change, from live data (Stripe, Postgres, Firestore), not from a derived flag. For a cron, billing or email change, the blast-radius skill finds the list.
+2. Did the operator approve each of them? Approval for the case that prompted the change does not cover other accounts. If any account is not covered, stop and ask, with the list."
+if [ -n "$segment" ]; then
+	label="this PR"
+	[ -n "$pr" ] && label="PR #$pr"
+	reason="Before you merge $label, answer two questions in your reply to the operator.
+$questions
 If the change reaches no one beyond what the operator approved, run the same command again."
+else
+	reason="This command mentions gh-approve and --merge. If it merges a PR, first answer two questions in your reply to the operator.
+$questions
+If it only mentions the command (a commit message, a note), or the change reaches no one beyond what the operator approved, run the same command again."
+fi
 jq -nc --arg r "$reason" '{hookSpecificOutput: {hookEventName: "PreToolUse",
 	permissionDecision: "deny", permissionDecisionReason: $r}}'
