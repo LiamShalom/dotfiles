@@ -587,6 +587,7 @@ async function main() {
     title: 'user journeys', // ADAPT: the feature name
     results,
     promises: PROMISES,
+    recorded: REPLAY,
   });
   console.log(`\n${pass} passed / ${fail} failed — REPORT.md + REPORT.html written`);
   process.exit(fail ? 1 : 0);

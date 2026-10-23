@@ -236,7 +236,9 @@ const esc = s =>
   String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const stepLabel = f => f.replace(/^\d+-/, '').replace(/\.png$/, '');
 
-export async function writeReports({ folder, base, title = 'user journeys', results, promises = {} }) {
+// `recorded`: this run wrote `replay.json`. False for --no-replay, so the report does not show an
+// earlier run's recording, possibly of an older build, beside this run's results.
+export async function writeReports({ folder, base, title = 'user journeys', results, promises = {}, recorded = true }) {
   const pass = results.filter(r => r.status === 'PASS').length;
   const fail = results.filter(r => r.status === 'FAIL').length;
   const manual = results.filter(r => r.status === 'MANUAL').length;
@@ -341,7 +343,8 @@ export async function writeReports({ folder, base, title = 'user journeys', resu
   let replay = null;
   let jr = [];
   const baked = [];
-  if (fs.existsSync(replayPath)) {
+  if (!recorded && fs.existsSync(replayPath)) console.log('(report) this run was not recorded: the replay.json an earlier run left is not shown');
+  if (recorded && fs.existsSync(replayPath)) {
     replay = JSON.parse(fs.readFileSync(replayPath, 'utf8'));
     // one .mp4 per surface with the cursor rendered into the pixels, so the
     // video is worth something outside this page
@@ -385,7 +388,7 @@ export async function writeReports({ folder, base, title = 'user journeys', resu
   md += `## ${proven ? '✅ PROVEN' : '❌ NOT PROVEN'} — ${pass}/${pass + fail} assertions across ${journeys.length} journeys\n\n`;
   md += `Against \`${base}\` · ${generated} · [interactive proof — watch the run](REPORT.html)\n\n`;
   if (hasPlayer) await tryGif({ folder, webm: path.join(folder, tracksOf(replay.journeys[jr[0].name])[0].video), ffmpeg });
-  if (fs.existsSync(path.join(folder, 'replay.gif'))) md += `![journey replay](replay.gif)\n\n`;
+  if (hasPlayer && fs.existsSync(path.join(folder, 'replay.gif'))) md += `![journey replay](replay.gif)\n\n`;
   if (failed.length) {
     md += `**Failed steps:**\n\n`;
     for (const r of failed) md += `- ❌ ${r.journey} :: ${r.step}${r.note ? ` — ${r.note}` : ''}\n`;
