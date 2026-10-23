@@ -2,12 +2,13 @@
 // agent-login.mjs — sign a tab in this chat's agent-Chrome window in to a site with a login saved
 // in 1Password.
 //
-// It finds the 1Password Login whose website is the tab's site, then types whichever of the
-// username, password and one-time code fields the page shows. Run it again at each step of a
-// sign-in that spans several pages. 1Password asks Liam to approve a new use (Touch ID or
-// Authorize), so a session cannot read the vault on its own. Values go from `op` straight into
-// the page, never to stdout, argv or disk; the script prints only which fields it filled. A login
-// is only ever typed into a page on that login's own site, over https.
+// It finds the 1Password Login saved for the tab's host, then types whichever of the username,
+// password and one-time code fields the page shows. Run it again at each step of a sign-in that
+// spans several pages. 1Password asks Liam to approve a new use (Touch ID or Authorize), so a
+// session cannot read the vault on its own. Values go from `op` straight into the page, never to
+// stdout, argv or disk; the script prints only which fields it filled. A login is only ever typed
+// into an https page on a host saved on that login (or a subdomain of one), and only while the
+// page keeps the origin it had when the run started.
 //
 // Usage: agent-login.mjs [--tab <targetId>] [--url <text in the tab's URL>]
 //                        [--item <item id or title>] [--account <username>] [--submit]
@@ -30,26 +31,33 @@ for (let i = 0; i < args.length; i++) {
   else fail(`unknown or incomplete argument: ${args[i]}`);
 }
 
-// Public suffixes with two labels, so that a.co.uk and b.co.uk count as different sites.
-const TWO_LABEL_SUFFIXES = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "net.au", "org.au", "co.nz",
-  "co.jp", "co.in", "co.il", "co.kr", "co.za", "com.br", "com.mx", "com.sg", "com.hk", "com.tr"]);
+// Platforms that give each customer a subdomain. A login saved for one customer's site there
+// matches that exact host only, never a sibling site on the same platform.
+const SHARED_HOSTS = ["vercel.app", "github.io", "netlify.app", "herokuapp.com", "pages.dev", "web.app",
+  "firebaseapp.com", "appspot.com", "cloudfront.net", "amazonaws.com", "azurewebsites.net", "blogspot.com",
+  "workers.dev", "onrender.com", "fly.dev", "railway.app", "ngrok.io", "ngrok-free.app", "glitch.me", "surge.sh",
+  "myshopify.com", "wixsite.com", "webflow.io", "framer.app", "replit.app"];
 
-function siteOf(host) {
-  host = host.toLowerCase().replace(/\.$/, "");
-  if (!host.includes(".") || /^[\d.]+$/.test(host) || host.startsWith("[")) return host;
-  const labels = host.split(".");
-  return labels.slice(TWO_LABEL_SUFFIXES.has(labels.slice(-2).join(".")) ? -3 : -2).join(".");
-}
+const normalHost = (host) => host.toLowerCase().replace(/\.$/, "");
 
-function itemSites(item) {
+function itemHosts(item) {
   return (item.urls || []).flatMap((u) => {
     try {
-      return [siteOf(new URL(u.href.includes("://") ? u.href : `https://${u.href}`).hostname)];
+      return [normalHost(new URL(u.href.includes("://") ? u.href : `https://${u.href}`).hostname).replace(/^www\./, "")];
     } catch {
       return [];
     }
   });
 }
+
+// The page must be on a host saved on the item, or on a subdomain of one (compared label by label).
+function hostMatches(pageHost, itemHost) {
+  if (pageHost === itemHost) return true;
+  const shared = SHARED_HOSTS.some((s) => itemHost === s || itemHost.endsWith(`.${s}`));
+  return !shared && itemHost.includes(".") && !/^[\d.]+$/.test(itemHost) && pageHost.endsWith(`.${itemHost}`);
+}
+
+const savedFor = (item, host) => itemHosts(item).some((h) => hostMatches(host, h));
 
 function op(opArgs) {
   const r = spawnSync("op", opArgs, { encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
@@ -190,26 +198,26 @@ try {
   const page = new URL(before.href);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(page.hostname);
   if (page.protocol !== "https:" && !local) fail(`refusing to type a login into ${page.origin}: the page is not https`);
-  const site = siteOf(page.hostname);
+  const host = normalHost(page.hostname);
   if (!fieldsShowing(before)) fail(`no username, password or one-time-code field is showing on ${page.origin}${page.pathname}`, 3);
 
   const logins = JSON.parse(op(["item", "list", "--categories", "Login", "--format", "json"]));
-  let candidates = logins.filter((it) => itemSites(it).includes(site));
+  let candidates = logins.filter((it) => savedFor(it, host));
   if (opts.item) {
     const named = logins.filter((it) => it.id === opts.item || (it.title || "").toLowerCase() === opts.item.toLowerCase());
     if (!named.length) fail(`no 1Password login called "${opts.item}"`);
-    candidates = named.filter((it) => itemSites(it).includes(site));
+    candidates = named.filter((it) => savedFor(it, host));
     if (!candidates.length) {
-      fail(`"${opts.item}" is saved for ${[...new Set(named.flatMap(itemSites))].join(", ") || "no website"}, not ${site}; `
-        + `add ${site} as a website on that item in 1Password if it really signs in here`);
+      fail(`"${opts.item}" is saved for ${[...new Set(named.flatMap(itemHosts))].join(", ") || "no website"}, not ${host}; `
+        + `add ${host} as a website on that item in 1Password if it really signs in here`);
     }
   }
   if (opts.account) {
     candidates = candidates.filter((it) => (it.additional_information || "").toLowerCase() === opts.account.toLowerCase());
   }
-  if (!candidates.length) fail(`no 1Password login is saved for ${site}${opts.account ? ` with username ${opts.account}` : ""}`, 2);
+  if (!candidates.length) fail(`no 1Password login is saved for ${host}${opts.account ? ` with username ${opts.account}` : ""}`, 2);
   if (candidates.length > 1) {
-    console.log(`Several 1Password logins are saved for ${site}. Run again with --item <id> (or --account <username>):`);
+    console.log(`Several 1Password logins are saved for ${host}. Run again with --item <id> (or --account <username>):`);
     for (const it of candidates) console.log(`  ${it.id}  "${it.title}"  ${it.additional_information || "-"}  [vault ${it.vault.name}]`);
     process.exit(2);
   }
@@ -228,7 +236,7 @@ try {
 
   // The approval prompt can take a while: look at the page again before typing anything into it.
   const found = await evaluate(markFields);
-  if (siteOf(new URL(found.href).hostname) !== site) {
+  if (new URL(found.href).origin !== page.origin) {
     await evaluate(unmark);
     fail(`the tab moved to ${new URL(found.href).origin} while 1Password asked for approval; run again`);
   }
@@ -251,6 +259,9 @@ try {
   const typeInto = async (marker, value) => {
     const id = await element(marker);
     if (!id) return false;
+    // The page can still navigate: type only into a field whose page has the origin checked above.
+    const origin = await call(id, "function () { return this.ownerDocument.location.origin; }");
+    if (origin !== page.origin) throw new Error(`the field is now on ${origin}, not ${page.origin}; nothing more was typed`);
     await call(id, clearAndFocus);
     await send("Input.insertText", { text: value }, sessionId);
     if (await call(id, "function () { return this.value.length; }") === value.length) return true;
@@ -305,8 +316,8 @@ try {
   await evaluate(unmark).catch(() => {});
 
   const who = `1Password "${item.title}" (${item.additional_information || "no username"}, vault ${item.vault.name})`;
-  if (!filled.length) fail(`nothing filled on ${site} from ${who}: ${notFilled.join("; ")}`, 3);
-  console.log(`Filled ${filled.join(", ")} on ${site} from ${who}${submitted ? ", then pressed Enter" : ""}.`);
+  if (!filled.length) fail(`nothing filled on ${host} from ${who}: ${notFilled.join("; ")}`, 3);
+  console.log(`Filled ${filled.join(", ")} on ${host} from ${who}${submitted ? ", then pressed Enter" : ""}.`);
   if (notFilled.length) console.log(`Not filled: ${notFilled.join("; ")}.`);
   process.exit(0);
 } catch (e) {
