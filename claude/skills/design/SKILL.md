@@ -58,7 +58,12 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
    Show the directions from step 4 side by side and say which you would pick and why. Once
-   one is chosen, delete the others and iterate on feedback until they approve.
+   one is chosen, delete the others and iterate on feedback until they approve. When the
+   operator rejects a piece of UI ("I don't like…", "there should be a better solution"),
+   replace it on the preview in the same turn with your best alternative, and put any
+   remaining choice behind the switcher; never leave the rejected UI up while you ask
+   questions. (10-23: the Ads hub banner stayed up while I asked about rules → "I still
+   dont like the yellow banner on ads hub".)
 
 8. **Write `design.md`** in the feature folder: preview route, components and their props
    types, reused primitives, states, screenshots, and decisions the operator made. Commit the
