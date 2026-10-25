@@ -10,13 +10,18 @@
 // into an https page on a host saved on that login (or a subdomain of one), and only while the
 // page keeps the origin it had when the run started.
 //
+// A code the site emailed instead comes from Liam's Gmail inboxes through agent-mail.mjs (read-only
+// grant in the Keychain, no approval prompt): pass --email-code, or it is used by itself when the
+// page shows only a code box and 1Password holds no login for the site.
+//
 // Usage: agent-login.mjs [--tab <targetId>] [--url <text in the tab's URL>]
-//                        [--item <item id or title>] [--account <username>] [--submit]
+//                        [--item <item id or title>] [--account <username>] [--email-code] [--submit]
 // Exit codes: 0 filled · 1 error · 2 a choice is needed (choices printed) · 3 nothing to fill ·
 // 4 still waiting for Liam's approval in 1Password.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { findEmailCode } from "./agent-mail.mjs";
 
 function fail(message, code = 1) {
   console.error(`agent-login: ${message}`);
@@ -27,6 +32,7 @@ const opts = {};
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--submit") opts.submit = true;
+  else if (args[i] === "--email-code") opts.emailCode = true;
   else if (["--tab", "--url", "--item", "--account"].includes(args[i]) && args[i + 1]) opts[args[i].slice(2)] = args[++i];
   else fail(`unknown or incomplete argument: ${args[i]}`);
 }
@@ -124,6 +130,9 @@ function unmark() {
   for (const el of document.querySelectorAll("[data-agent-login]")) el.removeAttribute("data-agent-login");
 }
 
+// An emailed code may have been requested a few minutes before this run.
+const mailSince = Date.now() - 10 * 60_000;
+
 const base = spawnSync(`${homedir()}/.claude/bin/agent-chrome.sh`, { encoding: "utf8" }).stdout.trim() || "http://127.0.0.1:9222";
 const { webSocketDebuggerUrl } = await (await fetch(`${base}/json/version`)).json();
 const ws = new WebSocket(webSocketDebuggerUrl);
@@ -201,7 +210,8 @@ try {
   const host = normalHost(page.hostname);
   if (!fieldsShowing(before)) fail(`no username, password or one-time-code field is showing on ${page.origin}${page.pathname}`, 3);
 
-  const logins = JSON.parse(op(["item", "list", "--categories", "Login", "--format", "json"]));
+  const codeOnly = !before.user && !before.pass;
+  const logins = opts.emailCode && codeOnly ? [] : JSON.parse(op(["item", "list", "--categories", "Login", "--format", "json"]));
   let candidates = logins.filter((it) => savedFor(it, host));
   if (opts.item) {
     const named = logins.filter((it) => it.id === opts.item || (it.title || "").toLowerCase() === opts.item.toLowerCase());
@@ -215,20 +225,25 @@ try {
   if (opts.account) {
     candidates = candidates.filter((it) => (it.additional_information || "").toLowerCase() === opts.account.toLowerCase());
   }
-  if (!candidates.length) fail(`no 1Password login is saved for ${host}${opts.account ? ` with username ${opts.account}` : ""}`, 2);
-  if (candidates.length > 1) {
+  const fromMail = codeOnly && (opts.emailCode || !candidates.length);
+  if (!candidates.length && !fromMail) fail(`no 1Password login is saved for ${host}${opts.account ? ` with username ${opts.account}` : ""}`, 2);
+  if (candidates.length > 1 && !fromMail) {
     console.log(`Several 1Password logins are saved for ${host}. Run again with --item <id> (or --account <username>):`);
     for (const it of candidates) console.log(`  ${it.id}  "${it.title}"  ${it.additional_information || "-"}  [vault ${it.vault.name}]`);
     process.exit(2);
   }
 
-  const item = candidates[0];
-  const fields = JSON.parse(op(["item", "get", item.id, "--vault", item.vault.id, "--format", "json"])).fields || [];
+  const item = fromMail ? null : candidates[0];
+  const fields = item ? JSON.parse(op(["item", "get", item.id, "--vault", item.vault.id, "--format", "json"])).fields || [] : [];
   const username = fields.find((f) => f.purpose === "USERNAME")?.value || "";
   const password = fields.find((f) => f.purpose === "PASSWORD")?.value || "";
   const hasCode = fields.some((f) => f.type === "OTP");
   let code = "";
-  if ((before.otp || before.split) && hasCode) {
+  let mail = null;
+  if (fromMail || (codeOnly && !hasCode)) {
+    mail = await findEmailCode({ host, since: mailSince, length: before.split || undefined });
+    code = mail.code;
+  } else if ((before.otp || before.split) && hasCode) {
     // A code typed in its last seconds can expire before the site checks it.
     while (30 - (Math.floor(Date.now() / 1000) % 30) < 5) await new Promise((r) => setTimeout(r, 500));
     code = op(["item", "get", item.id, "--vault", item.vault.id, "--otp"]).trim();
@@ -315,7 +330,8 @@ try {
   await send("Emulation.setFocusEmulationEnabled", { enabled: false }, sessionId).catch(() => {});
   await evaluate(unmark).catch(() => {});
 
-  const who = `1Password "${item.title}" (${item.additional_information || "no username"}, vault ${item.vault.name})`;
+  const who = mail ? `an email from ${mail.sender} to ${mail.inbox}`
+    : `1Password "${item.title}" (${item.additional_information || "no username"}, vault ${item.vault.name})`;
   if (!filled.length) fail(`nothing filled on ${host} from ${who}: ${notFilled.join("; ")}`, 3);
   console.log(`Filled ${filled.join(", ")} on ${host} from ${who}${submitted ? ", then pressed Enter" : ""}.`);
   if (notFilled.length) console.log(`Not filled: ${notFilled.join("; ")}.`);
