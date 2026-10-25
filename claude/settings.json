@@ -69,6 +69,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__slack__slack_send_message|mcp__slack__slack_schedule_message",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/slack-send-gate.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [

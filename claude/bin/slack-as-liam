@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Call a Slack API method as Liam, with his user token from Keychain.
+# Posts made this way show as Liam with no "Sent using Claude" tag, which the Slack MCP adds.
+#   slack-as-liam chat.postMessage channel=C0123 text="Hello"
+#   slack-as-liam chat.postMessage channel=C0123 thread_ts=1712345678.123456 text="Reply"
+# Setup: ~/dotfiles/claude/slack/README.md
+set -euo pipefail
+
+if ! token=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null); then
+  echo "slack-as-liam: no token in Keychain (service claude-slack-user-token). See ~/dotfiles/claude/slack/README.md" >&2
+  exit 1
+fi
+
+cd "$HOME"
+SLACK_USER_TOKEN="$token" exec env -u SLACK_BOT_TOKEN slack api --skip-update "$@"

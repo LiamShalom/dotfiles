@@ -1,0 +1,23 @@
+{
+  "display_information": {
+    "name": "Liam CLI",
+    "description": "Lets Liam's local agents post to Slack as Liam."
+  },
+  "oauth_config": {
+    "scopes": {
+      "user": [
+        "chat:write",
+        "reactions:write",
+        "files:write",
+        "im:write",
+        "users:read",
+        "users:read.email"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
