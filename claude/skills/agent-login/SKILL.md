@@ -25,7 +25,8 @@ site, so a login never goes to the wrong site.
 When the page says the site emailed a code, run it with `--email-code` (add `--submit`). It
 waits up to 90 s for the email in Liam's connected Gmail inboxes and types the code, with no
 1Password prompt. It also does this by itself when the page shows only a code box and the
-1Password login for the site has no code generator. It takes a code only from an email sent in
+1Password login saved for the site has no code generator. Pass the flag only on the real site you
+are signing in to: it refuses customer sites on shared platforms (for example `*.vercel.app`). It takes a code only from an email sent in
 the last 10 minutes, from the same site as the page, that Gmail marked as really from that
 sender. `node ~/.claude/bin/agent-mail.mjs status` shows which inboxes are connected. When it
 says no inbox is connected or a grant is broken, ask Liam to run

@@ -79,9 +79,12 @@ const header = (msg, name) => msg.payload?.headers?.find((h) => h.name.toLowerCa
 // topmost Authentication-Results counts: Gmail adds it last, and a sender can forge any below it.
 export function dmarcPassFor(msg, fromDomain) {
   const top = (msg.payload?.headers || []).find((h) => h.name.toLowerCase() === "authentication-results");
-  if (!top || !/^\s*mx\.google\.com\b/i.test(top.value)) return false;
-  const m = top.value.match(/dmarc=pass\b[^;]*header\.from=([^\s;)]+)/i);
-  return Boolean(m && m[1].toLowerCase() === fromDomain);
+  if (!top || !/^\s*mx\.google\.com\s*;/i.test(top.value)) return false;
+  // Comments can quote sender-chosen text (an envelope address), so drop them before parsing.
+  let value = top.value.replace(/"(?:[^"\\]|\\.)*"/g, "\"\"");
+  for (let prev; prev !== value;) [prev, value] = [value, value.replace(/\([^()]*\)/g, " ")];
+  return value.split(";").slice(1).map((part) => part.trim().split(/\s+/)).some(([result, ...props]) =>
+    /^dmarc=pass$/i.test(result) && props.some((p) => p.toLowerCase() === `header.from=${fromDomain}`));
 }
 
 function bodyText(part) {
@@ -138,7 +141,7 @@ export async function findEmailCode({ host, since, length, timeoutMs = 90_000 })
   for (;;) {
     let best = null;
     for (const [address, token] of tokens) {
-      const q = encodeURIComponent(`in:anywhere -in:trash after:${Math.floor(since / 1000)}`);
+      const q = encodeURIComponent(`in:anywhere -in:trash -in:spam after:${Math.floor(since / 1000)}`);
       const { messages = [] } = await gmail(token, `messages?q=${q}&maxResults=20`);
       for (const { id } of messages) {
         if (seen.has(id)) continue;

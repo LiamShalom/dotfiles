@@ -12,7 +12,7 @@
 //
 // A code the site emailed instead comes from Liam's Gmail inboxes through agent-mail.mjs (read-only
 // grant in the Keychain, no approval prompt): pass --email-code, or it is used by itself when the
-// page shows only a code box and 1Password holds no login for the site.
+// page shows only a code box and the site's 1Password login has no code generator.
 //
 // Usage: agent-login.mjs [--tab <targetId>] [--url <text in the tab's URL>]
 //                        [--item <item id or title>] [--account <username>] [--email-code] [--submit]
@@ -225,7 +225,11 @@ try {
   if (opts.account) {
     candidates = candidates.filter((it) => (it.additional_information || "").toLowerCase() === opts.account.toLowerCase());
   }
-  const fromMail = codeOnly && (opts.emailCode || !candidates.length);
+  // Emailed codes go only where asked for (--email-code) or to a site Liam saved a login for, and
+  // never to a customer site on a shared platform, whose emails would come from the platform.
+  const sharedHost = SHARED_HOSTS.some((s) => host === s || host.endsWith(`.${s}`));
+  if (opts.emailCode && sharedHost) fail(`refusing to type an emailed code into ${host}: it is a customer site on a shared platform`);
+  const fromMail = codeOnly && Boolean(opts.emailCode);
   if (!candidates.length && !fromMail) fail(`no 1Password login is saved for ${host}${opts.account ? ` with username ${opts.account}` : ""}`, 2);
   if (candidates.length > 1 && !fromMail) {
     console.log(`Several 1Password logins are saved for ${host}. Run again with --item <id> (or --account <username>):`);
@@ -240,7 +244,7 @@ try {
   const hasCode = fields.some((f) => f.type === "OTP");
   let code = "";
   let mail = null;
-  if (fromMail || (codeOnly && !hasCode)) {
+  if (fromMail || (codeOnly && item && !hasCode && !sharedHost)) {
     mail = await findEmailCode({ host, since: mailSince, length: before.split || undefined });
     code = mail.code;
   } else if ((before.otp || before.split) && hasCode) {
