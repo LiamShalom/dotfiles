@@ -8,7 +8,6 @@
       "user": [
         "chat:write",
         "reactions:write",
-        "files:write",
         "im:write",
         "users:read",
         "users:read.email"

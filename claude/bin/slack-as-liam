@@ -6,6 +6,12 @@
 # Setup: ~/dotfiles/claude/slack/README.md
 set -euo pipefail
 
+# Only the methods needed to send as Liam; anything else (file uploads, admin calls) is refused.
+case "${1:-}" in
+  chat.postMessage|chat.scheduleMessage|chat.update|chat.delete|reactions.add|reactions.remove|conversations.open|users.lookupByEmail|auth.test) ;;
+  *) echo "slack-as-liam: method '${1:-}' is not allowed" >&2; exit 2 ;;
+esac
+
 if ! token=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null); then
   echo "slack-as-liam: no token in Keychain (service claude-slack-user-token). See ~/dotfiles/claude/slack/README.md" >&2
   exit 1
