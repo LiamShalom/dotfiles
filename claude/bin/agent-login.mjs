@@ -99,7 +99,8 @@ function markFields() {
   };
   const texty = (el) => ["text", "tel", "number", "email"].includes(el.type);
   const pass = inputs.find((el) => el.type === "password" && el.autocomplete !== "new-password");
-  const boxes = inputs.filter((el) => texty(el) && el.maxLength === 1);
+  // One box per digit: some code inputs set maxlength=1, others only mark each box one-time-code.
+  const boxes = inputs.filter((el) => texty(el) && (el.maxLength === 1 || el.autocomplete === "one-time-code"));
   const split = boxes.length >= 4 && boxes.length <= 8 ? boxes : [];
   const otp = split.length ? null : inputs.find((el) => texty(el) && el.type !== "email"
     && !/search|promo|coupon|zip|postal|country|referral|invite|gift/.test(words(el))
