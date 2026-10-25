@@ -8,7 +8,8 @@
 // prints a code, a token or a message: agent-login imports findEmailCode and types the code itself.
 //
 // Usage: agent-mail.mjs setup <downloaded OAuth client .json>   store the Desktop OAuth client
-//        agent-mail.mjs connect                                 grant one inbox (run once per inbox)
+//        agent-mail.mjs connect [--print]                       grant one inbox (run once per inbox);
+//                                                               --print prints the consent link instead of opening it
 //        agent-mail.mjs status                                  list inboxes and check each grant
 //        agent-mail.mjs disconnect <address>                    forget one inbox
 import { spawnSync } from "node:child_process";
@@ -84,7 +85,11 @@ export function dmarcPassFor(msg, fromDomain) {
   let value = top.value.replace(/"(?:[^"\\]|\\.)*"/g, "\"\"");
   for (let prev; prev !== value;) [prev, value] = [value, value.replace(/\([^()]*\)/g, " ")];
   return value.split(";").slice(1).map((part) => part.trim().split(/\s+/)).some(([result, ...props]) =>
-    /^dmarc=pass$/i.test(result) && props.some((p) => p.toLowerCase() === `header.from=${fromDomain}`));
+    /^dmarc=pass$/i.test(result) && props.some((p) => {
+      // Gmail can name the parent domain the DMARC record was found on (mail.x.com → x.com).
+      const d = p.toLowerCase().match(/^header\.from=(.+)$/)?.[1];
+      return d && d.includes(".") && (d === fromDomain || fromDomain.endsWith(`.${d}`));
+    }));
 }
 
 function bodyText(part) {
@@ -171,7 +176,7 @@ export async function findEmailCode({ host, since, length, timeoutMs = 90_000 })
   }
 }
 
-async function connect() {
+async function connect(print) {
   const { client_id, client_secret } = client();
   const verifier = randomBytes(32).toString("base64url");
   const state = randomBytes(16).toString("hex");
@@ -190,14 +195,18 @@ async function connect() {
     client_id, redirect_uri: redirect, response_type: "code", scope: SCOPES, state, access_type: "offline", prompt: "consent select_account",
     code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256",
   })}`;
-  // Liam's own browser: Google ends sign-ins in the agent Chrome.
-  spawnSync("open", [url]);
-  console.log("Opened Google's consent page in your default browser. Pick the inbox to connect.");
-  const timer = setTimeout(() => finish(null), 5 * 60_000);
+  if (print) {
+    // For a browser where Liam is already signed in to Google, such as Session Board's pane.
+    console.log(`Open this consent page and pick the inbox to connect:\n${url}`);
+  } else {
+    spawnSync("open", [url]);
+    console.log("Opened Google's consent page in your default browser. Pick the inbox to connect.");
+  }
+  const timer = setTimeout(() => finish(null), 15 * 60_000);
   const code = await done;
   clearTimeout(timer);
   server.close();
-  if (!code) throw new Error("no consent came back in 5 minutes");
+  if (!code) throw new Error("no consent came back in 15 minutes");
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     body: new URLSearchParams({ client_id, client_secret, code, code_verifier: verifier, redirect_uri: redirect, grant_type: "authorization_code" }),
@@ -222,7 +231,7 @@ async function main([command, arg]) {
     keychainWrite(CLIENT_ITEM, "client", JSON.stringify({ client_id: c.client_id, client_secret: c.client_secret }));
     console.log(`Stored the OAuth client ${c.client_id.split("-")[0]}… in the Keychain. You can delete ${arg} now.`);
   } else if (command === "connect") {
-    await connect();
+    await connect(arg === "--print");
   } else if (command === "status") {
     const list = inboxes();
     if (!list.length) console.log("No inbox connected.");
