@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// PostToolUse (Edit|Write|MultiEdit): when an edit to a React UI file adds a lot of on-screen
-// text, tell the agent before it moves on. Text-heavy components are the operator's most
-// repeated design complaint, and the prose rule in CLAUDE.md did not stop them. Runs only
-// for .tsx under app/ or components/ (node starts on every edit and exits at once for other files), and
-// only counts text that the edit adds, so touching a file with existing copy stays silent.
+// PostToolUse (Edit|Write|MultiEdit): when an edit to a UI file adds a lot of on-screen text,
+// tell the agent before it moves on. Text-heavy components are the operator's most repeated
+// design complaint, and the prose rule in CLAUDE.md did not stop them. Covers web .tsx under
+// app/ or components/, iOS .swift in UI folders, and Android .kt (node starts on every edit and
+// exits at once for other files). Only text the edit adds counts, so touching a file with
+// existing copy stays silent.
 import { appendFileSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 
@@ -18,8 +19,14 @@ try {
 }
 const ti = input.tool_input ?? {};
 const file = ti.file_path ?? '';
-if (!/\.tsx$/.test(file) || !/\/(app|components)\//.test(file)) process.exit(0);
+const kind = /\.tsx$/.test(file) && /\/(app|components)\//.test(file)
+  ? 'tsx'
+  : (/\.swift$/.test(file) && /\/(UI|Views?|Components?|Screens?|Widget)\//.test(file)) || (/\.kt$/.test(file) && /\/android\//.test(file))
+    ? 'native'
+    : null;
+if (!kind) process.exit(0);
 if (/(\.test|\.spec|\.stories)\.tsx$|__tests__|fixture|\/app\/dev-/i.test(file)) process.exit(0);
+if (kind === 'native' && /Tests?[./]|\/test\/|\/androidTest\/|Mocks?[./]|\/Previews?\/|Previews?\.swift$|Fixtures?[./]|\/Debug\//.test(file)) process.exit(0);
 
 const pairs =
   input.tool_name === 'Write'
@@ -41,11 +48,35 @@ const runs = (src) => {
   const out = [];
   const lines = src.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*|import )/.test(l));
   const code = lines.join('\n');
-  for (const m of code.matchAll(/>([^<>{}]+)</g)) out.push(m[1]);
-  for (const m of code.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.){12,})\1/g)) {
-    const before = code.slice(Math.max(0, m.index - 12), m.index);
-    if (/className=\s*$|cn\(\s*$/.test(before)) continue;
-    out.push(m[2]);
+  const seen = [];
+  if (kind === 'tsx') {
+    for (const m of code.matchAll(/>([^<>{}]+)</g)) {
+      seen.push(m);
+      out.push(m[1]);
+    }
+    for (const m of code.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.){12,})\1/g)) {
+      seen.push(m);
+      const before = code.slice(Math.max(0, m.index - 12), m.index);
+      if (/className=\s*$|cn\(\s*$/.test(before)) continue;
+      out.push(m[2]);
+    }
+  } else {
+    // Swift and Kotlin: copy is inline string literals (Text("…"), Button("…"), """…""").
+    // Log and assertion messages are not on screen.
+    const logCall = /(print|NSLog|fatalError|assert\w*|precondition\w*|Log\.\w+|\.(debug|info|notice|error|warning|fault|log|trace))\((\s*"[^"]*"\s*,)?\s*$/;
+    const literals = [...code.matchAll(/"""([\s\S]*?)"""/g), ...code.replace(/"""[\s\S]*?"""/g, (t) => ' '.repeat(t.length)).matchAll(/"((?:[^"\\\n]|\\.){12,})"/g)];
+    for (const m of literals) {
+      seen.push(m);
+      const before = code.slice(Math.max(0, m.index - 30), m.index);
+      if (m[0].startsWith('"""') || !logCall.test(before)) out.push(m[1]);
+    }
+  }
+  // An edit inside a multi-line string or JSX paragraph carries no quotes or tags, so the
+  // patterns above miss it; a leftover line of plain prose is that text.
+  let rest = code;
+  for (const m of seen) rest = rest.slice(0, m.index) + ' '.repeat(m[0].length) + rest.slice(m.index + m[0].length);
+  for (const line of rest.split("\n").map((l) => l.replace(/\/\/.*$/, ""))) {
+    if (!/["`=<>{};]|->|^\s*(case|let|var|val|func|fun|return|if|else|guard|const)\b/.test(line)) out.push(line);
   }
   return out.map((s) => s.replace(/\s+/g, ' ').trim()).filter(isProse);
 };
