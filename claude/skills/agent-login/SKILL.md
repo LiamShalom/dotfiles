@@ -44,6 +44,8 @@ Never read the inbox any other way, and never print a code or an email.
 ## Rules
 
 - Sign in only where the task needs it, to Liam's own accounts or the SideShift test accounts.
+  Liam's own social accounts (Instagram, Facebook, TikTok, X, YouTube) are never the account
+  under test: don't connect them to a test user or post through them. Use a test account.
   For SideShift testing, use the Agent-Test vault's test accounts. "SideShift User" is a
   platform admin: use it only when the task needs an admin.
 - Never read a filled field back, print it or save it, and never pull values out of 1Password
