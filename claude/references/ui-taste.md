@@ -24,6 +24,7 @@ Long values get a copy button, not the value. An action that fits as an icon is 
 - 10-25 "message would just become the icon instead of cramming the text"
 - 10-15 "collapse their xp level into just the icon, no words" · 10-05 "bring back the mertcis just with only the icons and not the text"
 - 10-23 "you dont need the small text simply [tiktok logo] TiktOk Spark Ads Connect Tiktok button"
+- 10-26 onboarding call popup, title + bonus checklist + Skip / I've booked over an embedded calendar: "Can we just remove that popup thing, it looks bad". Shipped as the bare calendar with an x
 
 **2. No banners, notice blocks or callouts, yellow above all.** Not for empty states, not for
 caveats, not for "no page selected". Fix the state in the UI itself.
