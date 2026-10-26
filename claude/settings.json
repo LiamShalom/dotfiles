@@ -16,7 +16,7 @@
   },
   "permissions": {
     "allow": [],
-    "defaultMode": "auto"
+    "defaultMode": "bypassPermissions"
   },
   "disabledMcpjsonServers": ["chrome-devtools", "sideshift-firestore", "cloud-sql-postgres-read-replica"],
   "model": "cc/claude-opus-5-5[1m]",
