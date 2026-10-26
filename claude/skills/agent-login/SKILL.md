@@ -43,6 +43,12 @@ Never read the inbox any other way, and never print a code or an email.
 
 ## Rules
 
+- **A sign-in fails once: stop and hand it to Liam.** "Incorrect password", a robot check, a
+  "confirm it's you" or new-device approval, a locked or rate-limited account: do not retry, do
+  not open another context to try again, and do not approve the site's own login prompts from
+  another session. Tell Liam what the page says and hand him the page. Retries look like an
+  attack to the site and get the account blocked (2026-10-26: five scripted Instagram logins
+  locked the new test account).
 - Sign in only where the task needs it, to Liam's own accounts or the SideShift test accounts.
   Liam's own social accounts (Instagram, Facebook, TikTok, X, YouTube) are never the account
   under test: don't connect them to a test user or post through them. Use a test account.
