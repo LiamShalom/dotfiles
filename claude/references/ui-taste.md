@@ -85,7 +85,11 @@ platforms inline, not wrapped to two rows; on mobile the action stays in view.
 **12. Speed is design.** Slow loads and multi-step reveals get rejected even when the UI is right.
 - 10-26 "looks good, just takes too long to load" · "comes back in 3 steps. I dont like that UX"
 
-**13. Give real options when it is new.** For a new screen, two or three different directions,
+**13. Copy says what actually happens.** Name the thing as it is ("Book your onboarding call"),
+not a hype promise or a state the user is not in. A spec's sales copy is not a fact.
+- 10-26 "the youre in isnt true though, its just an onboarding to get them setup and answer questions"
+
+**14. Give real options when it is new.** For a new screen, two or three different directions,
 not a variant of the closest weak pattern.
 - 10-23 "This is awful. Be more creatve. This is why I asked for you to provide options."
 
