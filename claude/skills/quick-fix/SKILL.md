@@ -179,7 +179,9 @@ When you ask, ask everything at once, with what you already found attached.
 
 Work in a new worktree off `origin/main`, branch `fix/<short-description>`, env files
 linked. Write the smallest change that removes the proven cause. Match the file's existing
-style, comment density, and idioms. Reuse existing components and code.
+style, comment density, and idioms. Reuse existing components and code. If the change
+touches what a user sees, read `~/dotfiles/claude/references/ui-taste.md` first, and add to
+it when the operator reacts to the result.
 
 Touch only what the task requires. Unrelated ugly or dead code gets flagged in chat, not
 changed — except an orphan your own fix creates, which you remove.

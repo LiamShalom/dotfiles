@@ -1,0 +1,97 @@
+# Liam's UI taste
+
+Read before designing or changing any SideShift UI. Distilled from ~85 of his reactions to UI
+(2026-09-25 to 2026-10-26). Add to it every time he reacts to UI: dated quote under the
+principle it supports, or a new principle. Approvals count too.
+
+## Before you show anything, check
+
+1. Could a number, logo, icon, chip or the layout say this instead of a sentence? Then cut the sentence.
+2. Is there a banner, notice, callout or yellow box? Delete it.
+3. Does it look like the closest shipped sibling (analytics, messages inbox, campaign cards)?
+4. Is the most important value big and first, and the rest hidden behind a dropdown or hover?
+5. Does any error appear where a prompt, a queue or a link would do the job?
+6. Is it one weak pattern copied, or two or three real directions?
+
+## Principles (strongest first)
+
+**1. Cut text. Show it with a visual, icon or logo.** He reads text-heavy UI as unfinished.
+Long values get a copy button, not the value. An action that fits as an icon is an icon.
+- 10-26 "very text hgeavy components which often arent neccessray"
+- 10-06 "I dont like this wordy UI" · 10-07 "this modal is wayy too wordy"
+- 10-08 "Theyre wait too wordy and hard to follow for creators" (Google Ads creator screens)
+- 10-06 "theres just no point having the actual text I think a copy button is enough since its long"
+- 10-25 "message would just become the icon instead of cramming the text"
+- 10-15 "collapse their xp level into just the icon, no words" · 10-05 "bring back the mertcis just with only the icons and not the text"
+- 10-23 "you dont need the small text simply [tiktok logo] TiktOk Spark Ads Connect Tiktok button"
+
+**2. No banners, notice blocks or callouts, yellow above all.** Not for empty states, not for
+caveats, not for "no page selected". Fix the state in the UI itself.
+- 09-30 "remove any other large notice blocks… These are terrible UI and should not be displayed."
+- 10-05 "this huge yellow box is not helpful" · 10-16 "I dont like the yellow banner when no page selected"
+- 10-15 "remove this banner from appearing all the time" · 10-23 "I still dont like the yellow banner on ads hub"
+
+**3. Match the existing design system and the closest sibling surface.** Analytics is the
+reference for metrics, charts, stat icons (liquid-metal grey) and platform pills. A Figma is
+for content changes, not a new visual language.
+- 09-27 "match the elegance as the rest of the dashboard" · 10-14 "It doesnt fit with the design system for this page"
+- 10-02 "use the same component as the analytics page where the social platforms are pills underneath the chart"
+- 10-20 "your mistake was copying the figma precisely it should be using the same design systme"
+- 10-17 winner rules "uses a different UI from the automation rules whihc needs to be standardized"
+- 10-26 "why does inherited audience have differing UI across platforms"
+
+**4. Visual over tabular. Charts and analytics must look good.** A plain list of numbers where
+Meta and TikTok have charts reads as "awful". Bars fill the width with small gaps; heatmap
+numbers sit inside the squares; platform colours match the platform.
+- 10-20 "This youtube analytics is awful: It should be visual like meta and tiktok"
+- 10-01 "The chart looks comletely awful… ensure it uses the same colors as the platforms are."
+- 10-02 "the bars should be as wide as the timeline allows… with only small gaps inbetween"
+
+**5. Big number first, short cards, secondary data hidden.** He prefers one large number to a
+pill, a short card to a tall one, and "show more" to everything at once.
+- 10-15 "I dontl ike the pill, I like the big number the A had"
+- 10-21 "the profile card is a little bit too long… highlighted more of the neccessary content"
+- 09-30 "simplified to show most important values and then have a dropwdown to show more"
+- 09-30 small grey metric text: "I wish this could just be hidden for the most part"
+
+**6. Logos beat labels.** Platform names come with their logo; a tag can be just platform + logo.
+- 10-02 "tgae should just say the platform and have the logo"
+- 10-06 "I wish it showed logo for the store like shopify and then just had item name"
+- 10-09 "remove the crown emoji and emphasize the ads more using meta, tiktok logos"
+
+**7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
+no emoji, sparkle/AI icons, "run by" pills or invented stats.
+- 10-20 "the run by sideshift pill looks AI generated" · "remove the stupid AI icons then use an actual case study"
+- 10-20 "I dont like the arbitraty numbers though" · 09-29 "make it more flashy including the ads icon"
+
+**8. Fewer controls.** Two direct buttons over a "more actions" menu; an x over a toggle list; a
+secondary link over a second full button; a deep link over a "check" button.
+- 10-21 "I dont like the more actions it can just be contrcat and analytics buttons"
+- 09-27 "instead of toggles… can it just be a small x to remove a component"
+- 10-01 "I like how it was where skip for now was a secondary option, not a whole button"
+
+**9. Prompt or queue, don't error.** If the user can fix it, open the fix.
+- 09-30 "I wish it just opened a popup that prompted user to connect that specific account"
+- 10-22 "it should just queue it instead of showing an error"
+
+**10. Balanced layouts, every width.** No gaps, no stretched web layout, no half-empty pages;
+platforms inline, not wrapped to two rows; on mobile the action stays in view.
+- 09-30 "switiching location with budget would make the review screen feel more full and not leave a gap"
+- 10-22 "all the ad platforms appear inline right now they fall into 2 rows"
+
+**11. Setup lives in settings, not in the main flow.**
+- 10-26 "I dont like having Business name and Logo in the build ad flow… in ad settings -> accounts"
+
+**12. Speed is design.** Slow loads and multi-step reveals get rejected even when the UI is right.
+- 10-26 "looks good, just takes too long to load" · "comes back in 3 steps. I dont like that UX"
+
+**13. Give real options when it is new.** For a new screen, two or three different directions,
+not a variant of the closest weak pattern.
+- 10-23 "This is awful. Be more creatve. This is why I asked for you to provide options."
+
+## What he approved
+
+- 09-29 ads dashboard component: "I really like this design, looks great"
+- 09-28 Getting started card: "good as is"
+- 10-23 platform connect "orbit" direction, with Snapchat as yellow box + white ghost
+- 10-04 demo account: "Looks insanely good"

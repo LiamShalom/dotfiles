@@ -23,9 +23,12 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 1. **Work on the feature branch** in a worktree (operator's worktree rules: link env files,
    clone `node_modules`). This branch is the one `execute` continues on.
 
-2. **Find the reference.** For each surface in the spec, open the closest shipped screen and
-   list the primitives in `components/ui/` and `components/ui/icons/` you will use. A new
-   component composes those primitives and tokens. Creator surfaces (`CREATOR_SURFACES` in
+2. **Read the taste file, then find the reference.** Read
+   `~/dotfiles/claude/references/ui-taste.md` (the operator's design feedback, distilled) and
+   design to it. For each surface in the spec, open the closest shipped screen the operator
+   has approved, note how few words it uses and how it shows state (numbers, chips, icons,
+   layout), and list the primitives in `components/ui/` and `components/ui/icons/` you will
+   use. A new component composes those primitives and tokens. Creator surfaces (`CREATOR_SURFACES` in
    `eslint.config.mjs`) stay off the design system.
 
 3. **Define the data contract first.** Write the props type each component takes: the shape
@@ -53,7 +56,10 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 6. **Check it yourself first.** Open the route in the shared agent Chrome
    (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. Put
    it beside the reference screen. Fix spacing, type, colour and overflow until it matches
-   the product.
+   the product. Then do a copy pass: read every string on screen and delete each one that
+   does not change what the user does next, or that a label, number, icon or the layout
+   already says. No screen should carry more words than its reference. (10-26: "very text
+   heavy components which often arent neccessray".)
 
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
@@ -64,6 +70,11 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    remaining choice behind the switcher; never leave the rejected UI up while you ask
    questions. (10-23: the Ads hub banner stayed up while I asked about rules → "I still
    dont like the yellow banner on ads hub".)
+
+   **Learn from each round.** Every time the operator reacts to UI (rejects, approves, or
+   says what feels off), add it to `ui-taste.md` in the same turn: the dated quote under the
+   principle it supports, or a new principle if none fits. An approval is a lesson too.
+   Commit it to dotfiles. This file is how feedback carries to the next design session.
 
 8. **Write `design.md`** in the feature folder: preview route, components and their props
    types, reused primitives, states, screenshots, and decisions the operator made. Commit the
