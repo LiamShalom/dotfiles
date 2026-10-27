@@ -86,28 +86,51 @@ for (const [oldS, newS] of pairs) {
   const before = new Set(runs(oldS));
   for (const r of runs(newS)) if (!before.has(r)) added.push(r);
 }
-if (!added.length) process.exit(0);
+// A hand-built <button> is how an invented lookalike starts: on 10-27 an "Add creators" card row
+// went into the switcher while the same file already had the brand side's black footer button.
+const count = (src, re) => (src.match(re) ?? []).length;
+const newButtons = kind === 'tsx'
+  ? pairs.reduce((n, [oldS, newS]) => n + Math.max(0, count(newS, /<button\b/g) - count(oldS, /<button\b/g)), 0)
+  : 0;
 
-const total = added.reduce((n, r) => n + words(r).length, 0);
-const longest = added.reduce((a, r) => (words(r).length > words(a).length ? r : a), '');
-const longN = words(longest).length;
-if (longN < LONGEST && total < TOTAL) process.exit(0);
+const notes = [];
+const log = (line) => {
+  try {
+    appendFileSync(`${homedir()}/.claude/logs/ui-copy-check.log`, `${new Date().toISOString()}\t${file}\t${line}\n`);
+  } catch {}
+};
 
-try {
-  appendFileSync(
-    `${homedir()}/.claude/logs/ui-copy-check.log`,
-    `${new Date().toISOString()}\t${file}\ttotal=${total}\tlongest=${longN}\t${longest.slice(0, 160)}\n`,
+if (newButtons > 0) {
+  log(`lookalike buttons=${newButtons}`);
+  notes.push(
+    `UI reuse check: this edit adds ${newButtons} hand-built <button>. Before keeping it, name the shipped ` +
+    `component this action already has elsewhere (rg the brand-side or sibling flow, e.g. a footer "Add Client" ` +
+    `ds-black Button, a parent/child group renderer) and reuse it with the same variant and placement. A new ` +
+    `card or row for an action that exists elsewhere is an invented lookalike (AGENTS.md "Mandatory reuse"). ` +
+    `If nothing equivalent ships, say in one line what you searched.`,
   );
-} catch {}
+}
 
-const quote = longest.length > 140 ? `${longest.slice(0, 140)}…` : longest;
-const msg =
-  `UI copy check: this edit adds ${total} words of on-screen text (longest run ${longN} words: "${quote}"). ` +
-  `Text-heavy components are the operator's most repeated design complaint. Before moving on, cut it: ` +
-  `can a label, number, icon, status chip, or the layout itself say this? Keep only words that change what ` +
-  `the user does next; a definition goes in a short tooltip; no explainer, caveat or "how this works" blocks. ` +
-  `Match the word count of the closest shipped screen. Taste file: ~/dotfiles/claude/references/ui-taste.md. ` +
-  `If every word is needed (a legal notice, a real error, a form label set), keep it and say why in one line.`;
+if (added.length) {
+  const total = added.reduce((n, r) => n + words(r).length, 0);
+  const longest = added.reduce((a, r) => (words(r).length > words(a).length ? r : a), '');
+  const longN = words(longest).length;
+  if (longN >= LONGEST || total >= TOTAL) {
+    log(`total=${total}\tlongest=${longN}\t${longest.slice(0, 160)}`);
+    const quote = longest.length > 140 ? `${longest.slice(0, 140)}…` : longest;
+    notes.push(
+      `UI copy check: this edit adds ${total} words of on-screen text (longest run ${longN} words: "${quote}"). ` +
+      `Text-heavy components are the operator's most repeated design complaint. Before moving on, cut it: ` +
+      `can a label, number, icon, status chip, or the layout itself say this? Keep only words that change what ` +
+      `the user does next; a definition goes in a short tooltip; no explainer, caveat or "how this works" blocks. ` +
+      `Match the word count of the closest shipped screen. ` +
+      `If every word is needed (a legal notice, a real error, a form label set), keep it and say why in one line.`,
+    );
+  }
+}
+
+if (!notes.length) process.exit(0);
+notes.push('Taste file: ~/dotfiles/claude/references/ui-taste.md.');
 process.stdout.write(
-  JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: msg } }),
+  JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: notes.join(' ') } }),
 );
