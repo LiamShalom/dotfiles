@@ -163,6 +163,7 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
   ws.send(JSON.stringify({ id, method, params, ...(sessionId && { sessionId }) }));
 });
 
+let typedSomething = false;
 try {
   const { targetInfos } = await send("Target.getTargets");
   let pages = targetInfos.filter((t) => t.type === "page");
@@ -292,6 +293,7 @@ try {
     const origin = await call(id, "function () { return this.ownerDocument.location.origin; }");
     if (origin !== page.origin) throw new Error(`the field is now on ${origin}, not ${page.origin}; nothing more was typed`);
     await call(id, clearAndFocus);
+    typedSomething = true;
     await send("Input.insertText", { text: value }, sessionId);
     if (await call(id, "function () { return this.value.length; }") === value.length) return true;
     // Some inputs drop typed text (masked or custom fields): set the value and announce the change.
@@ -351,5 +353,11 @@ try {
   if (notFilled.length) console.log(`Not filled: ${notFilled.join("; ")}.`);
   process.exit(0);
 } catch (e) {
+  // Some sites (GitHub's code box, for one) submit by themselves once a value is typed, and the
+  // page is gone before the run finishes.
+  if (typedSomething && /cannot find context|context was destroyed|target navigated|no node with given id/i.test(e.message)) {
+    console.log("Typed into the page, then the page moved on by itself (the site submitted on its own). Look at where it landed.");
+    process.exit(0);
+  }
   fail(e.message);
 }
