@@ -104,7 +104,10 @@ function markFields() {
       ...[...(el.labels || [])].map((label) => label.textContent), ...labelledBy].filter(Boolean).join(" ").toLowerCase();
   };
   const texty = (el) => ["text", "tel", "number", "email"].includes(el.type);
-  const pass = inputs.find((el) => el.type === "password" && el.autocomplete !== "new-password");
+  // A "new-password" box is a sign-up form's, except when it is the only one showing: some login
+  // forms (TikTok for Business) mark theirs that way to stop browser autofill.
+  const passwords = inputs.filter((el) => el.type === "password");
+  const pass = passwords.find((el) => el.autocomplete !== "new-password") || (passwords.length === 1 ? passwords[0] : undefined);
   // One box per digit: some code inputs set maxlength=1, others only mark each box one-time-code.
   const boxes = inputs.filter((el) => texty(el) && (el.maxLength === 1 || el.autocomplete === "one-time-code"));
   const split = boxes.length >= 4 && boxes.length <= 8 ? boxes : [];
