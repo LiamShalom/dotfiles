@@ -96,6 +96,11 @@ not a hype promise or a state the user is not in. A spec's sales copy is not a f
 not a variant of the closest weak pattern.
 - 10-23 "This is awful. Be more creatve. This is why I asked for you to provide options."
 
+**15. Add to an existing control before adding a new row.** Extra things about the selected item
+(other cuts, variants) belong in the control that already switches it, not in a new strip that
+pushes the layout.
+- 10-27 brand edits strip under the Video Reviews player: "I dont like the UI where edits are pushing the video review up. Maybe having them under versions would be more intuitive"
+
 ## What he approved
 
 - 09-29 ads dashboard component: "I really like this design, looks great"
