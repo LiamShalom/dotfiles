@@ -37,7 +37,7 @@ function boardBrowserCheck(command) {
         permissionDecisionReason: 'Do not override CLAUDE_CODE_SESSION_ID for board-browser.mjs: the board then opens the tab outside the pane the operator is looking at. Run it as it is; the tab it opens is the pane\'s tab.',
       }
     : {
-        additionalContext: 'Before you tell the operator the page is in the pane: (1) the tab board-browser.mjs just opened IS the pane\'s tab, even when chrome-devtools list_pages does not show it (find it in http://127.0.0.1:9222/json/list). Never close it as a stray tab; if the page needs a login, sign in that tab where it is (brand-tab.mjs adopt). (2) Screenshot that exact tab (CDP Page.captureScreenshot on its target id) and look at the image. If you cannot, tell the operator you could not confirm it.',
+        additionalContext: 'Before you tell the operator the page is in the pane: (0) say only what board-browser.mjs printed about where it is. "in front of the chat the operator is looking at" means in front of them; a named other chat means they must click that chat in the sidebar; an error means it is not shown. A screenshot of the tab does not prove the pane shows it. (1) the tab board-browser.mjs just opened IS the pane\'s tab, even when chrome-devtools list_pages does not show it (find it in http://127.0.0.1:9222/json/list). Never close it as a stray tab; if the page needs a login, sign in that tab where it is (brand-tab.mjs adopt). (2) Screenshot that exact tab (CDP Page.captureScreenshot on its target id) and look at the image. If you cannot, tell the operator you could not confirm it.',
       }
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', ...out } }))
   process.exit(0)
