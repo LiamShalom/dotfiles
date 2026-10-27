@@ -194,12 +194,15 @@ that is a real design choice, give the operator the options with your pick befor
 the client for 2 minutes and then showed the same error; "no it should just queue it
 instead of showing an error".)
 
-**Before you commit, `rg` for every other copy of the broken pattern** (the same class
-string, hardcoded count, query or guard) and fix each copy in this PR, through one shared
-constant or helper. A copy of the same bug is the bug the operator reported, seen from
-another screen, not a second defect to ask about. (2026-10-22: the 6-column platform row
-was fixed in the ad builder only; the campaign wizard's copy stayed broken, and "no its
-not" was the answer.)
+**Before you commit, run `copy-sweep '<broken pattern>' ['<file also has>']`** (the same
+class string, hardcoded count, query, guard or link-out) and fix each copy it lists in this
+PR, through one shared constant or helper. It searches the whole repo; a search of only the
+folders you are working in is how copies get missed. A copy of the same bug is the bug the
+operator reported, seen from another screen, not a second defect to ask about. (2026-10-22:
+the 6-column platform row was fixed in the ad builder only, "no its not". 2026-10-27: a
+link-out sweep of `components/portfolio` missed the same video tiles in five other creator
+surfaces, and the operator found them from a screenshot.) The merge check asks again when no
+sweep ran in the session.
 
 A second real defect you notice: **fix it, say it, or file it**, in that order. A small
 safe fix rides along as its own commit; anything needing its own deploy clock or decision

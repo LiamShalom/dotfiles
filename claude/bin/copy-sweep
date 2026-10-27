@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# copy-sweep — list every file in the WHOLE repo that has the same broken pattern,
+# grouped by area, so a fix reaches every surface and not only the folder you are in.
+#
+#   copy-sweep '<pattern>' ['<file-also-has>']
+#
+# <pattern>        ripgrep regex for the broken code (e.g. '_blank|window\.open')
+# <file-also-has>  optional regex the file must ALSO contain (e.g. 'thumbnail|postPage')
+#
+# Searches every source root of the repo you are in (app, components, lib, hooks,
+# packages, services, src, Sources), never a subset; tests are left out. Records the
+# run for this session, so the merge check knows a sweep happened.
+#
+# Why: 2026-10-27, portfolio videos. The sweep for target="_blank" ran over
+# components/portfolio only; the same link-out tiles in the Discover creator sheet,
+# the chat profile panel, the creator detail Videos tab and both creator profile grids
+# were missed, and the operator found them. Ledger rows 2026-10-22 and 2026-10-27.
+set -uo pipefail
+
+if [ $# -lt 1 ] || [ -z "${1:-}" ]; then
+	echo "usage: copy-sweep '<pattern>' ['<file-also-has>']" >&2
+	exit 2
+fi
+pattern=$1
+also=${2:-}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+	echo "copy-sweep: run it inside a git repo" >&2
+	exit 2
+}
+cd "$root" || exit 2
+
+roots=()
+for dir in app components lib hooks packages services src Sources contexts providers utils; do
+	[ -d "$dir" ] && roots+=("$dir")
+done
+[ ${#roots[@]} -gt 0 ] || roots=(.)
+
+# git grep, not rg: it is in every repo, and agents' rg is a shell function scripts cannot see.
+files=$(git grep -lE -e "$pattern" -- "${roots[@]}" \
+	':(exclude,glob)**/__tests__/**' ':(exclude,glob)**/*.test.*' ':(exclude,glob)**/*.spec.*' 2>/dev/null)
+if [ -n "$also" ] && [ -n "$files" ]; then
+	files=$(printf '%s\n' "$files" | while IFS= read -r f; do grep -qE -e "$also" -- "$f" && printf '%s\n' "$f"; done)
+fi
+
+mkdir -p "$HOME/.cache/claude-copy-sweep"
+: >"$HOME/.cache/claude-copy-sweep/${CLAUDE_CODE_SESSION_ID:-unknown}"
+
+if [ -z "$files" ]; then
+	echo "No file in ${roots[*]} matches."
+	exit 0
+fi
+count=$(printf '%s\n' "$files" | wc -l | tr -d ' ')
+echo "$count files in ${roots[*]} match. Decide for each: same bug (fix it in this PR) or not (say why)."
+printf '%s\n' "$files" | sort | awk -F/ '{
+	area = (NF > 2) ? $1 "/" $2 : $1
+	if (area != last) { print ""; print area; last = area }
+	print "  " $0
+}'
