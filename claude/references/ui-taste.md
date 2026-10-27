@@ -102,4 +102,5 @@ not a variant of the closest weak pattern.
 - 09-28 Getting started card: "good as is"
 - 10-23 platform connect "orbit" direction, with Snapchat as yellow box + white ghost
 - 10-04 demo account: "Looks insanely good"
+- 10-26 open joining: picked the Launchpoint-style sign step (contract page thumbnail + "View contract" beside a Draw/Type signature) over a no-preview and a sign-on-the-page variant; for post-accept setup picked a "You're in" logo-tile popup + a logo strip on the campaign card over a card of the shared OAuth rows (which carried a yellow guidance box)
 - 10-26 affiliate "On hold" line, web + iOS: lock icon, "On hold" and the amount; when it clears only on hover. Cut from a sentence-long label before he saw it: "merge"
