@@ -40,6 +40,7 @@ for content changes, not a new visual language.
 - 10-20 "your mistake was copying the figma precisely it should be using the same design systme"
 - 10-17 winner rules "uses a different UI from the automation rules whihc needs to be standardized"
 - 10-26 "why does inherited audience have differing UI across platforms"
+- 10-27 guest contract redlining (a non-account guest's page, built on the creator-side stock workspace): "This is very good. I will only say the UI needs some work and I'd appreciate if it used the same design system and components as from the brand side. Make the platforms use the logo etc. Ensure it all is elegant and aligned with the current site's design." A new public page reached from a brand's action gets the business DS and the brand side's components, even when the person on it is creator-like
 
 **4. Visual over tabular. Charts and analytics must look good.** A plain list of numbers where
 Meta and TikTok have charts reads as "awful". Bars fill the width with small gaps; heatmap
@@ -61,6 +62,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 - 10-02 "tgae should just say the platform and have the logo"
 - 10-06 "I wish it showed logo for the store like shopify and then just had item name"
 - 10-09 "remove the crown emoji and emphasize the ads more using meta, tiktok logos"
+- 10-27 guest redlining terms panel (TikTok / Instagram as plain black text pills): "Make the platforms use the logo etc."
 
 **7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
 no emoji, sparkle/AI icons, "run by" pills or invented stats.
