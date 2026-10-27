@@ -54,6 +54,8 @@ pill, a short card to a tall one, and "show more" to everything at once.
 - 10-21 "the profile card is a little bit too long… highlighted more of the neccessary content"
 - 09-30 "simplified to show most important values and then have a dropwdown to show more"
 - 09-30 small grey metric text: "I wish this could just be hidden for the most part"
+- 10-26 creator referral page: "Gain inspiration from robinhood who puts a big number and encourages people to get a ton of referrals in order to meet that" (one aspirational number, then a milestone ladder)
+- 10-26 $74.75 a month per brand: "can you round the numbers up. starter should be 75", then "make those the actual values" (round numbers, and the payout changed to match rather than the page rounding)
 
 **6. Logos beat labels.** Platform names come with their logo; a tag can be just platform + logo.
 - 10-02 "tgae should just say the platform and have the logo"
