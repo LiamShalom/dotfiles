@@ -18,6 +18,12 @@ lead='^[[:space:]]*([({!][[:space:]]*)*(([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*|en
 to_file='(^|[[:space:]])(-o|--out-file)([[:space:]]+|=)[^-[:space:]]'
 to_dev='(^|[[:space:]])(-o|--out-file)([[:space:]]+|=)/dev/'
 
+# Split at `$(` `<(` `>(` with bash itself and at ; & | ` with tr: the same on BSD and GNU systems.
+# A bare ( stays, since item names such as "Google (liam)" contain one.
+split=${cmd//'$('/$'\n'}
+split=${split//'<('/$'\n'}
+split=${split//'>('/$'\n'}
+
 deny=0
 while IFS= read -r part; do
   # Quotes would hide a path such as "/dev/stdout" from the checks below.
@@ -34,9 +40,7 @@ while IFS= read -r part; do
   # Only this part's stdout sent to /dev/null keeps it out; 2>/dev/null hides errors, not secrets.
   printf '%s' "$part" | grep -Eq '(^|[^0-9&])1?>[[:space:]]*/dev/null' && continue
   deny=1
-# Split at `$(` with bash itself and at ; & | ` with tr: the same on BSD and GNU systems. A bare
-# ( stays, since item names such as "Google (liam)" contain one.
-done < <(printf '%s\n' "${cmd//\$(/$'\n'}" | tr ';&|`' '\n\n\n\n')
+done < <(printf '%s\n' "$split" | tr ';&|`' '\n\n\n\n')
 [ "$deny" = 1 ] || exit 0
 
 cat <<'JSON'
