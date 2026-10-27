@@ -92,6 +92,7 @@ platforms inline, not wrapped to two rows; on mobile the action stays in view.
 **13. Copy says what actually happens.** Name the thing as it is ("Book your onboarding call"),
 not a hype promise or a state the user is not in. A spec's sales copy is not a fact.
 - 10-26 "the youre in isnt true though, its just an onboarding to get them setup and answer questions"
+- 10-27 open-joining brand popup ("Creators now join when you accept them", shown as a flow diagram, a before/after or a corner card): "It needs to communicate the fact that they can still keep their old flow but now they dont need to resend the campaign invite. Also ther UI needs to be improved". A change announcement names the one step the user stops doing, in their words (the campaign invite), and says the rest stays the same
 
 **14. Give real options when it is new.** For a new screen, two or three different directions,
 not a variant of the closest weak pattern.
