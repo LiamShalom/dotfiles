@@ -34,8 +34,9 @@ while IFS= read -r part; do
   # Only this part's stdout sent to /dev/null keeps it out; 2>/dev/null hides errors, not secrets.
   printf '%s' "$part" | grep -Eq '(^|[^0-9&])1?>[[:space:]]*/dev/null' && continue
   deny=1
-# tr splits the same way on BSD and GNU systems; `$(` splits at its `(`.
-done < <(printf '%s\n' "$cmd" | tr ';&|`(' '\n\n\n\n\n')
+# Split at `$(` with bash itself and at ; & | ` with tr: the same on BSD and GNU systems. A bare
+# ( stays, since item names such as "Google (liam)" contain one.
+done < <(printf '%s\n' "${cmd//\$(/$'\n'}" | tr ';&|`' '\n\n\n\n')
 [ "$deny" = 1 ] || exit 0
 
 cat <<'JSON'
