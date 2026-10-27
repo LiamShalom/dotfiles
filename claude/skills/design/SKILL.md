@@ -53,6 +53,13 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    scope the real page uses (`.design-system-scope` for business pages) so DS styles apply.
    Interactions work locally (open modal, switch tab, submit shows inline error).
 
+   **A section of an existing page is shown inside that page.** When the new UI is a part of a
+   shipped screen (a tab, a card, a section of the profile), the operator reviews it in place:
+   wire it into the real page as soon as a direction is chosen (real data where it exists, empty
+   states where the backend is not built yet), and say up front that the standalone preview is
+   only for choosing between directions. (10-27: the profile accounts and best-posts preview →
+   "this isnt the entire profile".)
+
 6. **Check it yourself first.** Open the route in the shared agent Chrome
    (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. Put
    it beside the reference screen. Fix spacing, type, colour and overflow until it matches
