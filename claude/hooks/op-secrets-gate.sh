@@ -20,6 +20,8 @@ to_dev='(^|[[:space:]])(-o|--out-file)([[:space:]]+|=)/dev/'
 
 deny=0
 while IFS= read -r part; do
+  # Quotes would hide a path such as "/dev/stdout" from the checks below.
+  part=$(printf '%s' "$part" | tr -d "\"'")
   prints=0
   if printf '%s' "$part" | grep -Eq "${lead}item[[:space:]]+(get|edit|create)([[:space:]]|\$)"; then
     printf '%s' "$part" | grep -Eq -- '--format[ =]+json|--reveal' && prints=1
@@ -32,7 +34,8 @@ while IFS= read -r part; do
   # Only this part's stdout sent to /dev/null keeps it out; 2>/dev/null hides errors, not secrets.
   printf '%s' "$part" | grep -Eq '(^|[^0-9&])1?>[[:space:]]*/dev/null' && continue
   deny=1
-done < <(printf '%s\n' "$cmd" | sed -E 's/\$\(/\n/g; s/`/\n/g; s/[;&|]+/\n/g')
+# tr splits the same way on BSD and GNU systems; `$(` splits at its `(`.
+done < <(printf '%s\n' "$cmd" | tr ';&|`(' '\n\n\n\n\n')
 [ "$deny" = 1 ] || exit 0
 
 cat <<'JSON'
