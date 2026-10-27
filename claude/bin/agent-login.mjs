@@ -4,11 +4,12 @@
 //
 // It finds the 1Password Login saved for the tab's host, then types whichever of the username,
 // password and one-time code fields the page shows. Run it again at each step of a sign-in that
-// spans several pages. 1Password asks Liam to approve a new use (Touch ID or Authorize), so a
-// session cannot read the vault on its own. Values go from `op` straight into the page, never to
-// stdout, argv or disk; the script prints only which fields it filled. A login is only ever typed
-// into an https page on a host saved on that login (or a subdomain of one), and only while the
-// page keeps the origin it had when the run started.
+// spans several pages. Logins come from the "Agent Logins" and "Agent-Test" vaults through a
+// read-only 1Password service account whose token is in the login Keychain, so there is no prompt;
+// without the token, 1Password asks Liam to approve each new use. Values go from `op` straight
+// into the page, never to stdout, argv or disk; the script prints only which fields it filled. A
+// login is only ever typed into an https page on a host saved on that login (or a subdomain of
+// one), and only while the page keeps the origin it had when the run started.
 //
 // A code the site emailed instead comes from Liam's Gmail inboxes through agent-mail.mjs (read-only
 // grant in the Keychain, no approval prompt): pass --email-code, or it is used by itself when the
@@ -21,7 +22,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { findEmailCode } from "./agent-mail.mjs";
+import { findEmailCode, keychainGet } from "./agent-mail.mjs";
 
 function fail(message, code = 1) {
   console.error(`agent-login: ${message}`);
@@ -65,8 +66,13 @@ function hostMatches(pageHost, itemHost) {
 
 const savedFor = (item, host) => itemHosts(item).some((h) => hostMatches(host, h));
 
+// The read-only "Agent Logins" service account (vaults Agent Logins + Agent-Test) reads with no
+// prompt. Without its token in the Keychain, `op` falls back to asking Liam in the 1Password app.
+const serviceToken = keychainGet("agent-login-op-service-account", "token");
+const opEnv = serviceToken ? { ...process.env, OP_SERVICE_ACCOUNT_TOKEN: serviceToken } : process.env;
+
 function op(opArgs) {
-  const r = spawnSync("op", opArgs, { encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync("op", opArgs, { encoding: "utf8", env: opEnv, timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
   if (r.error?.code === "ETIMEDOUT" || /authorization (timeout|prompt dismissed)/i.test(r.stderr || "")) {
     fail("1Password needs Liam's approval: ask Liam to approve the 1Password prompt on the Mac, then run this again", 4);
   }
@@ -212,7 +218,10 @@ try {
   if (!fieldsShowing(before)) fail(`no username, password or one-time-code field is showing on ${page.origin}${page.pathname}`, 3);
 
   const codeOnly = !before.user && !before.pass;
-  const logins = opts.emailCode && codeOnly ? [] : JSON.parse(op(["item", "list", "--categories", "Login", "--format", "json"]));
+  // A service account must name a vault on every list (without --vault, `op` hangs).
+  const vaultArgs = () => serviceToken ? JSON.parse(op(["vault", "list", "--format", "json"])).map((v) => ["--vault", v.id]) : [[]];
+  const logins = opts.emailCode && codeOnly ? []
+    : vaultArgs().flatMap((v) => JSON.parse(op(["item", "list", "--categories", "Login", "--format", "json", ...v])));
   let candidates = logins.filter((it) => savedFor(it, host));
   if (opts.item) {
     const named = logins.filter((it) => it.id === opts.item || (it.title || "").toLowerCase() === opts.item.toLowerCase());

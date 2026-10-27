@@ -35,7 +35,7 @@ function keychainWrite(service, account, value) {
   if (r.status !== 0 || /error/i.test(r.stderr || "")) throw new Error(`Keychain refused the write: ${(r.stderr || "").trim()}`);
 }
 
-const keychainGet = (service, account) => {
+export const keychainGet = (service, account) => {
   const raw = keychainRead(service, account);
   return raw ? Buffer.from(raw, "base64").toString("utf8") : "";
 };

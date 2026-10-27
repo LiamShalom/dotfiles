@@ -216,7 +216,7 @@ window in it: its tabs never mix with another chat's.
   never close the browser or anyone else's tabs.
 - **When a step needs me in the browser** (a sign-in, a code, 2FA, OAuth consent), first use the
   `agent-login` skill if 1Password has a login for the site: it types the login into your tab
-  after I approve 1Password's prompt. When it can't, hand the step to me
+  with no prompt (1Password vaults Agent Logins and Agent-Test). When it can't, hand the step to me
   in Session Board's browser pane: `node ~/session-board/scripts/board-browser.mjs <https-url>
   "<what I need to do>"`. It opens the page as a tab in your chat's window and notifies me, so
   what I do there is what you see afterwards. Tell me in chat what to do, wait

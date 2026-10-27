@@ -1,13 +1,15 @@
 ---
 name: agent-login
-description: "Sign in to a website as Liam from the agent browser with a login saved in 1Password: `node ~/.claude/bin/agent-login.mjs` types the username, password and two-step code into your tab after Liam approves the 1Password prompt, and types codes a site emailed to Liam's Gmail (--email-code), and never shows you the values. Use it before you hand a sign-in to Liam, whenever a page in your agent-Chrome tab asks for a username, email, password or authenticator code for one of Liam's accounts or a SideShift test account."
+description: "Sign in to a website as Liam from the agent browser with a login saved in 1Password: `node ~/.claude/bin/agent-login.mjs` types the username, password and two-step code into your tab with no prompt (a read-only 1Password service account), and types codes a site emailed to Liam's Gmail (--email-code), and never shows you the values. Use it before you hand a sign-in to Liam, whenever a page in your agent-Chrome tab asks for a username, email, password or authenticator code for one of Liam's accounts or a SideShift test account."
 ---
 
 # Agent login
 
 Liam's logins and two-step codes are in 1Password. This tool signs you in as Liam without
-showing you either: it reads the login through the 1Password app, which asks Liam to approve,
-and types it straight into your tab.
+showing you either: it reads the login through a read-only 1Password service account (token in
+the login Keychain) and types it straight into your tab. Liam is not asked. The account reads two
+vaults: **Agent Logins** (Liam's own logins with two-step codes) and **Agent-Test** (SideShift test
+accounts). A login in any other vault is out of reach; only Liam decides what goes into Agent Logins.
 
 ## Run it
 
@@ -38,7 +40,7 @@ Never read the inbox any other way, and never print a code or an email.
 | 0 | Filled; it names the fields | Check that the page moved on. |
 | 2 | Several logins or tabs match; it lists them | Run again with `--item <id>` or `--account <username>`. If the task does not say which account, ask Liam. |
 | 3 | No sign-in field is showing, or 1Password holds no value for it | Bring the field up (close a cookie banner, click "Log in") and run again, or hand the step to Liam. |
-| 4 | Waiting for Liam's approval | Tell Liam in chat to approve the 1Password prompt on the Mac, then run it again. |
+| 4 | Waiting for Liam's approval (only when the service-account token is missing from the Keychain) | Tell Liam in chat that the token is missing and to approve the 1Password prompt on the Mac, then run it again. |
 | 1 | Error, for example the login is saved for another site, or no emailed code arrived | Read the message. Never add a website to an item unless Liam says that site is right. |
 
 ## Rules
@@ -61,4 +63,6 @@ Never read the inbox any other way, and never print a code or an email.
 - Hand the step to Liam in Session Board's pane when the tool cannot do it: passkeys, a Google
   sign-in that Google refuses in this browser, codes sent by text message, sign-in links sent by
   email (only codes are read), and OAuth consent.
-- An approval lasts about 10 minutes. When Liam is away, exit 4 means wait; do not work around it.
+- No prompt does not mean no limits: sign in only where the task needs it, and never use the
+  service-account token for anything but this tool. If exit 4 appears, the token is gone; tell
+  Liam, do not work around it.
