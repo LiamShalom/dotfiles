@@ -112,3 +112,4 @@ pushes the layout.
 - 10-26 affiliate "On hold" line, web + iOS: lock icon, "On hold" and the amount; when it clears only on hover. Cut from a sentence-long label before he saw it: "merge"
 - 10-27 brand "Add edits" dialog: picked the ad builder's existing upload zone (dashed box, Upload button, file rows with %) over thumbnail tiles (my pick) and no-dialog upload into the version menu. Reuse of a shipped pattern beat a new visual.
 - 10-27 Ad Settings with 8 sections (pill row overflowing the modal): his idea, "make ad settings its own tab"; picked a Settings tab on the Ads page with the grouped sidebar from account Settings over a tile grid with big numbers and over keeping the modal with 4 grouped pills. Again the shipped pattern won.
+  Then, seeing it built: "having 2 navbars is bad UI" (page tab bar + section sidebar on one screen). Never stack a second nav under/beside a page's tab bar; one nav visible at a time.
