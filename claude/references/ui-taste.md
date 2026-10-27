@@ -81,6 +81,7 @@ secondary link over a second full button; a deep link over a "check" button.
 platforms inline, not wrapped to two rows; on mobile the action stays in view.
 - 09-30 "switiching location with budget would make the review screen feel more full and not leave a gap"
 - 10-22 "all the ad platforms appear inline right now they fall into 2 rows"
+- 10-27 Billing plan card at 390 px, four buttons wrapping as 1 + 2 + 1 (Cancel Plan alone, Change Plan alone on a third row): "This UI should be fixed". Check every button row at 390 before showing it; uneven wraps read as broken
 
 **11. Setup lives in settings, not in the main flow.**
 - 10-26 "I dont like having Business name and Logo in the build ad flow… in ad settings -> accounts"
