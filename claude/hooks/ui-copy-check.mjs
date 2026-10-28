@@ -93,6 +93,16 @@ const newButtons = kind === 'tsx'
   ? pairs.reduce((n, [oldS, newS]) => n + Math.max(0, count(newS, /<button\b/g) - count(oldS, /<button\b/g)), 0)
   : 0;
 
+// The business design system is employer-side only (AGENTS.md); a creator screen has its own kit. On 10-28 the
+// talent manager's invite popup, opened from the creator app's menu but kept in components/talent/, was built with
+// DsModal + ds-black buttons + CredentialBox because it mirrored an admin popup.
+const creatorSurface = kind === 'tsx'
+  && /\/app\/\(creator\)\/|\/app\/\(setup\)\/registration\/|\/components\/(creator-[\w-]+|training|portfolio|profile|influencer|talent|campaign-join|campaign-invite)\/|\/components\/layout\/creator-|\/components\/kyc\/residence-/.test(file);
+const BRAND_ONLY = /<DsModal\b|<DsCard\b|<CredentialBox\b|variant="ds-[\w-]+"|size="ds-[\w-]+"/g;
+const newBrand = creatorSurface
+  ? pairs.reduce((n, [oldS, newS]) => n + Math.max(0, count(newS, BRAND_ONLY) - count(oldS, BRAND_ONLY)), 0)
+  : 0;
+
 const notes = [];
 const log = (line) => {
   try {
@@ -100,13 +110,29 @@ const log = (line) => {
   } catch {}
 };
 
+if (newBrand > 0) {
+  log(`brand-ds-on-creator n=${newBrand}`);
+  notes.push(
+    `Creator surface check: this file is a creator screen, and the edit adds ${newBrand} business design-system ` +
+    `piece(s) (DsModal, DsCard, CredentialBox, ds-* variant or size). The business DS is employer-side only ` +
+    `(AGENTS.md). Use the creator kit: components/campaign-invite/creator-buttons.ts (CREATOR_SIGNING_MODAL_CLASS, ` +
+    `CREATOR_MODAL_TITLE_CLASS, CREATOR_PRIMARY_/SECONDARY_BUTTON_*, CREATOR_INPUT_CLASS, CREATOR_MODAL_FOOTER_CLASS) ` +
+    `with CREATOR_PALETTE_VARS; reference components/modals/accept-campaign-invite-modal.tsx. A brand-side popup it ` +
+    `mirrors gives the content, not the look.`,
+  );
+}
+
 if (newButtons > 0) {
   log(`lookalike buttons=${newButtons}`);
   notes.push(
     `UI reuse check: this edit adds ${newButtons} hand-built <button>. Before keeping it, name the shipped ` +
     `component this action already has elsewhere (rg the brand-side or sibling flow, e.g. a footer "Add Client" ` +
-    `ds-black Button, a parent/child group renderer) and reuse it with the same variant and placement. A new ` +
-    `card or row for an action that exists elsewhere is an invented lookalike (AGENTS.md "Mandatory reuse"). ` +
+    `ds-black Button, a parent/child group renderer) and reuse it with the same variant and placement. ` +
+    (creatorSurface
+      ? `This is a creator screen: the shipped component is the creator kit's pill (creator-buttons.ts classes on a ` +
+        `<button>, as the accept-invite modal does), never a brand ds-* Button. `
+      : '') +
+    `A new card or row for an action that exists elsewhere is an invented lookalike (AGENTS.md "Mandatory reuse"). ` +
     `If nothing equivalent ships, say in one line what you searched.`,
   );
 }
