@@ -63,6 +63,9 @@ let recorded = null; // { file, context }: where the chat's window is recorded
 let copied = new Map(); // cookie -> the value copied into the chat's window
 let shared = new Map(); // cookie -> the value copied back from the chat's window to the shared profile
 let hadTab = false; // whether the chat's window had a tab when its sign-ins were last copied back
+let seenPages = ""; // the window's pages and their URLs as its sign-ins were last checked
+let rereads = 0; // checks still due after the window's pages changed
+let lastRead = 0; // when the window's cookies were last read
 
 // Agents sign in to these as test users and as other people, so a sign-in there stays in the chat, as
 // one on a server reached by IP address does.
@@ -269,6 +272,7 @@ function openChatWindow() {
 				copied = new Map();
 				shared = new Map();
 				hadTab = false;
+				seenPages = "";
 				await copyCookies(send, browserContextId).catch(() => undefined);
 				chat = opened = { send, context: browserContextId };
 				record();
@@ -332,15 +336,26 @@ const keptInChat = (domain) => {
 // Copies sign-ins made in the chat's window back to the shared profile, so the next chat starts signed
 // in too: every cookie the window set or changed itself, outside the sites kept in the chat. A cookie
 // the window deleted, as on a sign-out, stays in the shared profile.
+// The window holds all of the shared profile's cookies, and the browser builds each answer (~700 KB; in
+// Session Board, its main process), so they are read as the window's pages open, close or navigate, as
+// a sign-in nearly always does, once more on the next check for what a new page set as it loaded, and
+// otherwise every 2 minutes.
 async function shareSignIns(always = false) {
 	const { send, context } = chat;
 	if (!always) {
 		const { targetInfos } = await send("Target.getTargets");
-		const hasTab = targetInfos.some((t) => t.type === "page" && t.browserContextId === context);
+		const pages = targetInfos.filter((t) => t.type === "page" && t.browserContextId === context);
 		// A window sets cookies only while it has a tab; one more pass catches what its last tab set.
-		if (!hasTab && !hadTab) return;
-		hadTab = hasTab;
+		if (!pages.length && !hadTab) return;
+		hadTab = pages.length > 0;
+		const seen = pages.map((t) => `${t.targetId} ${t.url}`).sort().join("\n");
+		if (seen !== seenPages) {
+			seenPages = seen;
+			rereads = 1;
+		} else if (rereads > 0) rereads--;
+		else if (Date.now() - lastRead < 2 * 60_000) return;
 	}
+	lastRead = Date.now();
 	readUnshared();
 	const { cookies } = await send("Storage.getCookies", { browserContextId: context });
 	const params = cookies
