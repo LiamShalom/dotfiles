@@ -20,4 +20,14 @@ if { [[ $prompt =~ $lead ]] && ! [[ $prompt =~ $benign ]]; } || [[ $prompt =~ $s
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/corrections-flagged.log"
   echo "This message may correct something you did earlier. If it does: fix the thing first, then run the in-session step of the \`correct\` skill (was this already a rule? if so it is a repeat, so move it up a level). If it is a new request or a product bug report, ignore this note."
 fi
+
+# Bringing one platform's design to another: the first build of #7581 (2026-10-27) cloned the
+# iOS chrome onto the creator web instead of moving its design choices onto the web's own kit.
+port_from='(^|[^a-z])(ios|iphone|android|native|mobile app)([^a-z]|$)'
+port_to='(^|[^a-z])(web|webapp|website)([^a-z]|$)'
+port_ask='(^|[^a-z])(match|parity|same as|mirror|as well|port|bring|migrate)([^a-z]|$)'
+if [[ $prompt =~ $port_from ]] && [[ $prompt =~ $port_to ]] && [[ $prompt =~ $port_ask ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/platform-port-nudge.log"
+  echo "If this asks to bring one platform's design to another (iOS app to web, or the reverse): carry over the design choices (structure, sections, content, behaviour) and build them from the target's own components, nav, type and colours. Do not rebuild the source platform's chrome (tab bars, glass, side menus, its font). Keep the nav to five groups or fewer, with tabs inside pages, so it never scrolls."
+fi
 exit 0

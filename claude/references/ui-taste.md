@@ -33,14 +33,15 @@ caveats, not for "no page selected". Fix the state in the UI itself.
 - 10-15 "remove this banner from appearing all the time" · 10-23 "I still dont like the yellow banner on ads hub"
 
 **3. Match the existing design system and the closest sibling surface.** Analytics is the
-reference for metrics, charts, stat icons (liquid-metal grey) and platform pills. A Figma is
-for content changes, not a new visual language.
+reference for metrics, charts, stat icons (liquid-metal grey) and platform pills. A Figma, or
+the other platform's app (iOS to web), is for content and structure, not a new visual language.
 - 09-27 "match the elegance as the rest of the dashboard" · 10-14 "It doesnt fit with the design system for this page"
 - 10-02 "use the same component as the analytics page where the social platforms are pills underneath the chart"
 - 10-20 "your mistake was copying the figma precisely it should be using the same design systme"
 - 10-17 winner rules "uses a different UI from the automation rules whihc needs to be standardized"
 - 10-26 "why does inherited audience have differing UI across platforms"
 - 10-27 guest contract redlining (a non-account guest's page, built on the creator-side stock workspace): "This is very good. I will only say the UI needs some work and I'd appreciate if it used the same design system and components as from the brand side. Make the platforms use the logo etc. Ensure it all is elegant and aligned with the current site's design." A new public page reached from a brand's action gets the business DS and the brand side's components, even when the person on it is creator-like
+- 10-27 creator web redesign (#7581), first build cloned the iOS chrome onto the web (glass headers, floating tab bar, side menu, rounded font): "We lost the UI from the original creator side web" · "Im mainly wanting you to take the design choices made on the ios and migrate them over while keeping the UI kit and nav from the original web version" · "keep the larger groups and simply have tabs within so the navbar doesnt become scrollable". Picked: five nav groups on the original sidebar and bottom bar, the rest as tabs inside pages
 
 **4. Visual over tabular. Charts and analytics must look good.** A plain list of numbers where
 Meta and TikTok have charts reads as "awful". Bars fill the width with small gaps; heatmap
