@@ -116,16 +116,22 @@ async function openBackgroundTab(port, url) {
 
 // The chat a connection comes from (see the top): the nearest Claude Code process among the client's
 // ancestors, by the ~/.claude/sessions/<pid>.json each one keeps, named by its pid and start so a
-// reused pid names no other chat. Null for a tool no chat runs, or a client not found in 3 s.
+// reused pid names no other chat. Null for a tool no chat runs, a client not found in 3 s, or a
+// socket more than one process holds.
 const SESSIONS = `${homedir()}/.claude/sessions`;
 function chatOf(socket) {
 	const port = socket.remotePort;
 	return new Promise((resolve) => {
-		// The connection's two ends: this proxy's, and the client's.
-		execFile("/usr/sbin/lsof", ["-nP", `-iTCP@127.0.0.1:${port}`, "-sTCP:ESTABLISHED", "-Fp"], { timeout: 3000 }, (_, ends) => {
-			const pids = String(ends ?? "").split("\n").filter((line) => line.startsWith("p")).map((line) => Number(line.slice(1)));
-			const client = pids.find((pid) => pid !== process.pid);
-			if (!client) return resolve(null);
+		execFile("/usr/sbin/lsof", ["-nP", `-iTCP@127.0.0.1:${port}`, "-sTCP:ESTABLISHED", "-Fpn"], { timeout: 3000 }, (_, sockets) => {
+			// The client: whoever holds this very connection's other end.
+			const holders = new Set();
+			let pid = 0;
+			for (const line of String(sockets ?? "").split("\n")) {
+				if (line.startsWith("p")) pid = Number(line.slice(1));
+				else if (line === `n127.0.0.1:${port}->127.0.0.1:${LISTEN}`) holders.add(pid);
+			}
+			if (holders.size !== 1) return resolve(null);
+			const [client] = holders;
 			execFile("/bin/ps", ["-axo", "pid=,ppid="], { timeout: 3000, maxBuffer: 16 * 1024 * 1024 }, (_, table) => {
 				const parent = new Map();
 				for (const line of String(table ?? "").split("\n")) {
@@ -145,8 +151,9 @@ function chatOf(socket) {
 }
 
 // The path of a connection to Session Board, naming the client's chat. A client cannot name one itself.
+// Throws for a path that is no URL path.
 function withChat(path, chat) {
-	const url = new URL(path, `http://${HOST}`);
+	const url = new URL(`http://${HOST}${path}`);
 	url.searchParams.delete("chat");
 	if (chat) url.searchParams.set("chat", chat);
 	return url.pathname + url.search;
@@ -436,10 +443,17 @@ server.on("upgrade", async (req, socket, head) => {
 	socket.on("error", () => socket.destroy());
 	const [port, chat] = await Promise.all([backend(), chatOf(socket)]);
 	if (socket.destroyed) return;
-	const upstream = new WebSocket(`ws://${HOST}:${port}${port === CHROME ? req.url : withChat(req.url, chat)}`, {
-		perMessageDeflate: false,
-		maxPayload: MAX_PAYLOAD,
-	});
+	// A path that is no URL would throw here, and an error this handler does not catch ends the proxy.
+	let upstream;
+	try {
+		upstream = new WebSocket(`ws://${HOST}:${port}${port === CHROME ? req.url : withChat(req.url, chat)}`, {
+			perMessageDeflate: false,
+			maxPayload: MAX_PAYLOAD,
+		});
+	} catch {
+		socket.destroy();
+		return;
+	}
 	upstream.once("error", () => socket.destroy());
 	upstream.once("open", () => {
 		wss.handleUpgrade(req, socket, head, (client) => {
