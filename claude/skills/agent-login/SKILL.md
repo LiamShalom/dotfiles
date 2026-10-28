@@ -60,9 +60,13 @@ Never read the inbox any other way, and never print a code or an email.
   with `op` yourself. The tool is the only path.
 - Most of Liam's 1Password logins hold a username and a two-step code but no password. When the
   tool reports "password (none saved in 1Password)", hand that step to Liam.
-- Hand the step to Liam in Session Board's pane when the tool cannot do it: passkeys, a Google
-  sign-in that Google refuses in this browser, codes sent by text message, sign-in links sent by
-  email (only codes are read), and OAuth consent.
+- A passkey prompt is not a dead end: click "Try another way" and pick the authenticator option
+  (on Google, `[data-challengetype="6"]`, "Get a verification code from the Google Authenticator
+  app"), then run the tool again for the code. This gets agents into Google Cloud console, which
+  always asks for a passkey (proven 10-28).
+- Hand the step to Liam in Session Board's pane when the tool cannot do it: a passkey with no
+  other way, a Google sign-in that Google refuses in this browser, picture puzzles (TikTok), codes
+  sent by text message, sign-in links sent by email (only codes are read), and OAuth consent.
 - No prompt does not mean no limits: sign in only where the task needs it, and never use the
   service-account token for anything but this tool. If exit 4 appears, the token is gone; tell
   Liam, do not work around it.
