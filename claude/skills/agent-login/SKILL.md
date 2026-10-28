@@ -67,6 +67,9 @@ Never read the inbox any other way, and never print a code or an email.
 - Hand the step to Liam in Session Board's pane when the tool cannot do it: a passkey with no
   other way, a Google sign-in that Google refuses in this browser, picture puzzles (TikTok), codes
   sent by text message, sign-in links sent by email (only codes are read), and OAuth consent.
+- An OAuth connect as an account Liam is already signed in to in his own browser (Arc), such as
+  another person's Facebook: do not sign that account in here (it sends him a device approval).
+  Give him the click-by-click steps for Arc instead, with what to pick on each screen (10-28).
 - No prompt does not mean no limits: sign in only where the task needs it, and never use the
   service-account token for anything but this tool. If exit 4 appears, the token is gone; tell
   Liam, do not work around it.
