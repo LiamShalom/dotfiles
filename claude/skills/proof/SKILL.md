@@ -92,7 +92,7 @@ Baseline runs are capture-only: same journeys, same shot names, but shots land i
 
 ### 7. Ship the proof pack
 
-Commit the whole folder with the PR:
+The pack lives in the worktree. Commit only its text files (`run.mjs`, `report.mjs`, `viewports.mjs`, `report.json`, `REPORT.md`). **Never commit screenshots, recordings, `replay.gif` or `REPORT.html`** — the repo `.gitignore` excludes them, and never `git add -f` them; every squash merge would put them on `main` for good. The published REPORT.html artifact carries all the media.
 
 ```
 proof/<feature>/
@@ -111,14 +111,14 @@ proof/<feature>/
   shots/viewports/   # one per size
 ```
 
-Paste REPORT.md's TLDR block (verdict line + promises table) into the PR description. The reviewer should be able to judge the feature from the proof pack without checking out the branch.
+Paste REPORT.md's TLDR block (verdict line + promises table) and the published REPORT.html artifact link into the PR description. The reviewer should be able to judge the feature from that link without checking out the branch.
 
-**Commit the ENTIRE pack — never .gitignore any of it.** `videos/*.webm` and `REPORT.html` are evidence, not build output: the webms are a few hundred KB each and REPORT.html is the only place a reviewer can watch the run. "Regenerate locally from replay.json" is a lie the moment the run happened in an ephemeral environment — the recordings cannot be regenerated, only re-run. If pack size genuinely worries you, shorten journeys; do not drop artifacts. A REPORT.md whose proof-page link 404s in the PR is a broken proof.
+**Publish before the worktree goes.** The media is not in git, so the published artifact is the only lasting copy of the run. Publish REPORT.html before you hand back or clean up the worktree.
 
 **Always deliver a viewable proof URL in the chat — publish it, don't host it.** Your final message after a run must lead with a link the user can actually open, and never substitute a PR link (GitHub renders REPORT.md but NOT REPORT.html; a PR link is not a proof link). REPORT.html is a single self-contained file (all video/screenshots embedded), so the durable way to deliver it is to **publish it as a hosted artifact**, in this order of preference:
 
 1. **Publish REPORT.html as a shareable artifact** whenever a publish/artifact capability exists in your environment (e.g. the Artifact tool) — this yields a durable URL that opens anywhere, for anyone, with nothing running. This is the default. Lead with it.
-2. **Otherwise link the committed file**: `[REPORT.html](proof/<feature>/REPORT.html)` when the pack is on the user's machine and they can open it directly.
+2. **Otherwise link the local file**: `[REPORT.html](proof/<feature>/REPORT.html)` when the pack is on the user's machine and they can open it directly.
 3. **A localhost URL is a last resort, never the deliverable.** A `localhost:<port>` link only resolves on the exact machine running that exact server, right now — it dies the moment the server stops and means nothing on a cloud/ephemeral run. Use localhost *only* to feed a preview panel that technically requires it, and even then also hand over a durable link (1 or 2). Do not spin up a server and paste its URL as "the proof."
 
 If the pack only exists on a branch/remote (cloud run, worktree), do NOT stop at a PR or localhost link — publish REPORT.html as an artifact (it embeds all its media precisely so it stays viewable detached from the repo) before ending the turn.
@@ -133,7 +133,7 @@ If the pack only exists on a branch/remote (cloud run, worktree), do NOT stop at
 4. **Deterministic reruns.** Prefix + purge test users; never depend on data an earlier run left behind; pin theme/locale via `localStorage` init scripts so screenshots are stable. Replay artifacts (`videos/`, `replay.json`, `replay.gif`, and the player portion of `REPORT.html`) are context, not claims — they're exempt from byte-stability since timestamps and visible clocks differ per run; pin the app clock too if you want them stable.
 5. **The suite exits non-zero on any failure** — wire it into CI or a pre-merge checklist if you want, but at minimum run it at review and commit the green report.
 6. **100% or not done.** A journey suite at 24/26 is a task at 0%. Fix the harness or fix the feature — the report never merges red.
-7. **The pack ships whole, and the chat gets a published URL.** Every generated artifact — `videos/` and `REPORT.html` included — is committed; nothing in the pack is ever `.gitignore`d. The run's final chat message leads with an actually-openable link to the proof page — **publish the self-contained REPORT.html as a hosted artifact** rather than serving it on localhost (localhost dies with the server and is meaningless off-machine). A PR link or a bare localhost link does not count as delivering the proof.
+7. **Media never goes in git, and the chat gets a published URL.** Screenshots, videos, `replay.gif` and `REPORT.html` stay uncommitted; the published artifact carries them. The run's final chat message leads with an actually-openable link to the proof page — **publish the self-contained REPORT.html as a hosted artifact** rather than serving it on localhost (localhost dies with the server and is meaningless off-machine). A PR link or a bare localhost link does not count as delivering the proof.
 
 ## Gotchas that have burned real reviews
 
