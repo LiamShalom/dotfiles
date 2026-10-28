@@ -24,6 +24,13 @@
 //     on that client. Clients that attach to pages themselves
 //     (chrome-devtools-mcp, Session Board, CDP scripts) still reach every tab.
 //
+//   - Session Board learns which chat each connection comes from (`?chat=` on
+//     the connection it makes there): the Claude Code process the client runs
+//     under. It shows a chat's tools only the pages of the browser contexts
+//     that chat made, its window and its isolated contexts, and the tabs it
+//     opened elsewhere. Without that, every chat's chrome-devtools-mcp attached
+//     to every page in the board and received all of their events.
+//
 // Everything else passes through unchanged. The JSON endpoints are rewritten
 // to name this port, so clients that read webSocketDebuggerUrl stay on the
 // proxy.
@@ -55,6 +62,8 @@
 // agent-chrome.sh then starts the new version on the port.
 //
 // Usage:  agent-chrome-proxy.mjs <listen-port> <chrome-port>
+import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { createRequire } from "node:module";
@@ -103,6 +112,44 @@ async function openBackgroundTab(port, url) {
 	ws.close();
 	const list = JSON.parse((await chromeHttp(port, "/json/list")).body);
 	return list.find((t) => t.id === targetId) ?? { id: targetId };
+}
+
+// The chat a connection comes from (see the top): the nearest Claude Code process among the client's
+// ancestors, by the ~/.claude/sessions/<pid>.json each one keeps, named by its pid and start so a
+// reused pid names no other chat. Null for a tool no chat runs, or a client not found in 3 s.
+const SESSIONS = `${homedir()}/.claude/sessions`;
+function chatOf(socket) {
+	const port = socket.remotePort;
+	return new Promise((resolve) => {
+		// The connection's two ends: this proxy's, and the client's.
+		execFile("/usr/sbin/lsof", ["-nP", `-iTCP@127.0.0.1:${port}`, "-sTCP:ESTABLISHED", "-Fp"], { timeout: 3000 }, (_, ends) => {
+			const pids = String(ends ?? "").split("\n").filter((line) => line.startsWith("p")).map((line) => Number(line.slice(1)));
+			const client = pids.find((pid) => pid !== process.pid);
+			if (!client) return resolve(null);
+			execFile("/bin/ps", ["-axo", "pid=,ppid="], { timeout: 3000, maxBuffer: 16 * 1024 * 1024 }, (_, table) => {
+				const parent = new Map();
+				for (const line of String(table ?? "").split("\n")) {
+					const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+					if (pid) parent.set(pid, ppid);
+				}
+				for (let pid = client, hops = 0; pid > 1 && hops < 64; pid = parent.get(pid), hops++) {
+					try {
+						const { startedAt } = JSON.parse(readFileSync(`${SESSIONS}/${pid}.json`, "utf8"));
+						return resolve(`${pid}.${startedAt}`);
+					} catch {}
+				}
+				resolve(null);
+			});
+		});
+	});
+}
+
+// The path of a connection to Session Board, naming the client's chat. A client cannot name one itself.
+function withChat(path, chat) {
+	const url = new URL(path, `http://${HOST}`);
+	url.searchParams.delete("chat");
+	if (chat) url.searchParams.set("chat", chat);
+	return url.pathname + url.search;
 }
 
 // Keeps a client that auto-attaches to pages browser-wide to the pages it opened (see the top).
@@ -387,9 +434,9 @@ server.on("upgrade", async (req, socket, head) => {
 	// Nothing listens for the socket's errors until the upgrade completes, and picking a backend can
 	// wait up to 45 s for Session Board. An unhandled socket error would end the proxy for everyone.
 	socket.on("error", () => socket.destroy());
-	const port = await backend();
+	const [port, chat] = await Promise.all([backend(), chatOf(socket)]);
 	if (socket.destroyed) return;
-	const upstream = new WebSocket(`ws://${HOST}:${port}${req.url}`, {
+	const upstream = new WebSocket(`ws://${HOST}:${port}${port === CHROME ? req.url : withChat(req.url, chat)}`, {
 		perMessageDeflate: false,
 		maxPayload: MAX_PAYLOAD,
 	});
