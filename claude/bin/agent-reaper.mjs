@@ -15,7 +15,7 @@
 //                never touched, and neither is a Next server outside a git
 //                checkout (the shiftpool gateway every session talks through).
 //   Chrome tabs  Close tabs in the shared agent Chrome whose page has not
-//                loaded or changed URL for TAB_IDLE_HOURS (6).
+//                loaded or changed URL for TAB_IDLE_HOURS (2).
 //   orphans      Kill a Claude Code background-task shell whose session is
 //                gone (its parent is launchd: `claude stop`, a recompact
 //                handoff or a crash leaves it running), and a node-pty helper
@@ -53,7 +53,7 @@ const SIM_APP_MS = env("SIM_APP_HOURS", 4) * 3600e3;
 const SIM_CLONE_MS = 5 * 60e3;
 const DEV_MAX_KB = env("DEV_MAX_GB", 12) * 1024 * 1024;
 const DEV_IDLE_MS = env("DEV_IDLE_HOURS", 2) * 3600e3;
-const TAB_IDLE_MS = env("TAB_IDLE_HOURS", 6) * 3600e3;
+const TAB_IDLE_MS = env("TAB_IDLE_HOURS", 2) * 3600e3;
 const ORPHAN_MS = env("ORPHAN_MIN", 30) * 60e3;
 const CONTAINER_IDLE_MS = env("CONTAINER_IDLE_HOURS", 24) * 3600e3;
 const CONTAINER_ACTIVE_BYTES = 16 * 1024;
@@ -527,7 +527,7 @@ async function main() {
 	for (const t of chrome?.tabs ?? []) {
 		const prev = state.tabs?.[t.id];
 		// A tab first seen now counts from its page load, so old tabs are not
-		// granted a fresh 6 hours. A URL change (client-side navigation) is use.
+		// granted a fresh idle limit. A URL change (client-side navigation) is use.
 		const st = (next.tabs[t.id] = !prev ? { url: t.url, changed: t.loadedAt ?? now } : prev.url !== t.url ? { url: t.url, changed: now } : { ...prev });
 		const label = `agent Chrome tab "${t.title.slice(0, 60)}" (${t.url.slice(0, 80)})`;
 		const idle = now - Math.max(st.changed, t.loadedAt ?? now);
