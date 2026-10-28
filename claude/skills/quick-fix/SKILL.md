@@ -27,6 +27,13 @@ needs any of these:
 - A Postgres schema migration (its own PR first, through `/ship-migration`).
 - Anything that spends real money.
 
+**Before you tell the operator the fix "needs a feature" or offer to build one,** search for
+it as already built: `gh pr list --state open --search "<feature terms>"` and
+`git branch -a --list '*<term>*'`, using the feature's words (the provider's own name for it,
+such as "Smart+"), not the bug's. Sibling sessions often have it on a draft PR the same day.
+If one exists, the job is to validate and land that PR. (2026-10-28: Dr Melaxin's hidden Smart+
+campaigns; I offered to spec Smart+ launching while #7653 had built it that morning.)
+
 If unsure, treat it as large. A large change still gets built, tested and proven, but you
 **stop before merge** and bring it to the operator (see Report). If it is too big to build
 well without a spec, say so and suggest `brainstorm`.
