@@ -45,8 +45,11 @@ const SHARED_HOSTS = ["vercel.app", "github.io", "netlify.app", "herokuapp.com",
   "workers.dev", "onrender.com", "fly.dev", "railway.app", "ngrok.io", "ngrok-free.app", "glitch.me", "surge.sh",
   "myshopify.com", "wixsite.com", "webflow.io", "framer.app", "replit.app"];
 // SideShift's own Vercel previews (team side-shift). Their emailed codes come from sideshift.app, and
-// Liam allowed reading them (10-29).
+// Liam allowed reading them (10-29). The name alone proves nothing (a team called "x-side-shift" could
+// own a matching host), so Vercel must confirm the deployment is in the side-shift team.
 const SIDESHIFT_PREVIEW = /^sideshift-[a-z0-9-]+-side-shift\.vercel\.app$/;
+const isSideshiftPreview = (host) => SIDESHIFT_PREVIEW.test(host)
+  && spawnSync("vercel", ["inspect", host, "--scope", "side-shift"], { encoding: "utf8", timeout: 60_000 }).status === 0;
 
 const normalHost = (host) => host.toLowerCase().replace(/\.$/, "");
 
@@ -244,7 +247,7 @@ try {
   }
   // Emailed codes go only where asked for (--email-code) or to a site Liam saved a login for, and
   // never to a customer site on a shared platform, whose emails would come from the platform.
-  const sideshiftPreview = SIDESHIFT_PREVIEW.test(host);
+  const sideshiftPreview = opts.emailCode && isSideshiftPreview(host);
   const sharedHost = !sideshiftPreview && SHARED_HOSTS.some((s) => host === s || host.endsWith(`.${s}`));
   if (opts.emailCode && sharedHost) fail(`refusing to type an emailed code into ${host}: it is a customer site on a shared platform`);
   const fromMail = codeOnly && Boolean(opts.emailCode);
