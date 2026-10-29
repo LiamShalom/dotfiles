@@ -60,10 +60,16 @@ Appendix; the execute step turns it into `claude/bin/ask-rate`.
    likely meaning and keeps building when a wrong guess costs only branch code. It asks first
    when a wrong guess means a large rebuild (more than about one feature's worth of work), or
    would reach customers, production data, money or another person.
-3. **Model rollout: phase it, measure first (Liam, 2026-10-29).** Week 1 adds the rules,
-   precedent and hook on the current models and records a baseline. Week 2 moves
-   `execute` and `quick-fix` sessions to Sonnet. Opus is kept for diagnosis, design and
-   brainstorm. Liam's correction rate is the quality signal, and a rise rolls Week 2 back.
+3. **Opus orchestrates, Sonnet does the work (Liam, 2026-10-29).** The main session stays on
+   Opus. It keeps the plan, the decisions, the precedent reading and the final verification.
+   It sends every build step (code edits, tests, mechanical refactors, verification recipes,
+   docs) to Agent-tool subagents with `model: sonnet`, and sends find-and-read work to `haiku`,
+   as AGENTS.md "Token economy" already describes. This starts on day one. The `model`
+   parameter on the Agent tool exists today, so nothing new has to be built for routing.
+   The measurement still guards it: the baseline is the Opus-only week of 2026-10-22 → 10-29.
+   If Liam's corrections per 100 turns rise more than 25% over at least 150 human turns, the
+   build steps that failed move back to Opus subagents. Rejected: Sonnet as the main session.
+   Judgment, ask/decide calls and the final check stay with the model that does them best.
 4. **UI options no longer block.** This reconciles decision 1 with ledger row 2026-10-23
    (options for new screens). The agent still builds 2–3 directions, then builds its pick on the
    preview with the others behind the switcher and keeps going. Liam's approval is still needed
@@ -73,7 +79,7 @@ Appendix; the execute step turns it into `claude/bin/ask-rate`.
    - Rejected: CLAUDE.md prose only. It is the cheapest option, but the ledger proves it fails.
    - Rejected for now: a Haiku "Liam stand-in" that answers asks before they reach him. Each
      ask would cost an extra agent, and it would produce confident wrong guesses on exactly the
-     product-meaning asks that need Liam. Revisit after the Week 2 numbers.
+     product-meaning asks that need Liam. Revisit after two weeks of `ask-rate` numbers.
 
 ## Behavior
 
@@ -128,13 +134,18 @@ Appendix; the execute step turns it into `claude/bin/ask-rate`.
 - Baseline (2026-10-22 → 10-29, Opus): 23 asks per 100 human turns; 102/440 plain accepts of
   pick-asks. The corrections baseline is computed in the first run.
 
-**Week 2 switch**
-- `execute` and `quick-fix` start their build work on Sonnet. The exact mechanism (skill
-  frontmatter `model:`, or the skill telling the main session to delegate every build step to
-  `model: sonnet` agents) is checked with the Claude Code docs during execute. The mechanism
-  that works is used.
-- The switch is rolled back when Sonnet sessions show more corrections per 100 turns than the
-  Week 1 Opus baseline by more than 25% over at least 150 human turns.
+**Orchestration (Opus main, Sonnet workers)**
+- `execute`, `quick-fix`, `ship-it` and `bugfix` say this explicitly at their build step: the
+  Opus main session writes a complete brief and launches `model: sonnet` subagents for the
+  work, then checks one claim or runs the test itself before it relies on the result.
+- Each brief contains: the goal, the exact files, what was ruled out, what "done" means, and
+  the `decisions.md` lines that apply. It also contains the authority rule: the subagent decides
+  inside the brief and reports each decision. It returns to Opus only on a must-ask or a
+  blocker. A Sonnet subagent never asks Liam directly.
+- When a Sonnet result is wrong, Opus redoes that step one tier up (an Opus subagent), not
+  again on Sonnet (AGENTS.md rule).
+- `ask-rate` also counts, from the transcripts, the Agent calls per model per session, so the
+  share of work that Sonnet does can be seen.
 
 ## Party matrix
 
@@ -161,7 +172,8 @@ No database, no migration. Everything is files in `~/dotfiles/claude` (symlinked
 - Edit `claude/skills/correct/SKILL.md` weekly step: run `ask-rate`, and append precedents.
 - Edit `execute`, `quick-fix`, `brainstorm` and `design` SKILL.md: read `decisions.md` at the
   first decision point. `design` step 7: build the pick, don't wait (Decision 4).
-- Week 2: change the model routing for `execute` / `quick-fix`.
+- Edit the build step of `execute`, `quick-fix`, `ship-it` and `bugfix`: Opus orchestrates,
+  and `model: sonnet` subagents build, with the brief contents above.
 - Append a ledger row: "agents ask what they could decide", level 2, enforced by the hook.
 
 ## UI surfaces
@@ -171,7 +183,7 @@ None. No product UI.
 ## Out of scope
 
 - Fine-tuning or any model-weight training.
-- A Haiku stand-in that answers asks for Liam (revisit after Week 2).
+- A Haiku stand-in that answers asks for Liam (revisit after two weeks of numbers).
 - Changing what counts as large UI or a large feature.
 - Codex sessions (`~/.codex/AGENTS.md`). This can follow if the numbers hold.
 
@@ -183,8 +195,10 @@ None. No product UI.
 - **Merging medium features without Liam broadens what can reach production unseen.**
   Mitigation: `merge-reach-check.sh` still asks its questions at the first merge, and proof is
   still required. Owner: Liam, who chose it on 2026-10-29.
-- **The Week 2 model mechanism is not verified yet.** Owner: execute agent, via Context7 /
-  `claude-code-guide`, before Week 2.
+- **More subagents means more ~50K-token system prompts.** Delegating a few tool calls costs
+  more than doing them. Mitigation: the AGENTS.md threshold applies (delegate when a step
+  keeps more than ~20K tokens out of the main context, or when steps run in parallel; 1–3 at
+  a time). Owner: execute agent, who writes the threshold into the skills' build step.
 
 ## Appendix: measurement script used for the baseline
 
