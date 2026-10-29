@@ -44,6 +44,9 @@ const SHARED_HOSTS = ["vercel.app", "github.io", "netlify.app", "herokuapp.com",
   "firebaseapp.com", "appspot.com", "cloudfront.net", "amazonaws.com", "azurewebsites.net", "blogspot.com",
   "workers.dev", "onrender.com", "fly.dev", "railway.app", "ngrok.io", "ngrok-free.app", "glitch.me", "surge.sh",
   "myshopify.com", "wixsite.com", "webflow.io", "framer.app", "replit.app"];
+// SideShift's own Vercel previews (team side-shift). Their emailed codes come from sideshift.app, and
+// Liam allowed reading them (10-29).
+const SIDESHIFT_PREVIEW = /^sideshift-[a-z0-9-]+-side-shift\.vercel\.app$/;
 
 const normalHost = (host) => host.toLowerCase().replace(/\.$/, "");
 
@@ -241,7 +244,8 @@ try {
   }
   // Emailed codes go only where asked for (--email-code) or to a site Liam saved a login for, and
   // never to a customer site on a shared platform, whose emails would come from the platform.
-  const sharedHost = SHARED_HOSTS.some((s) => host === s || host.endsWith(`.${s}`));
+  const sideshiftPreview = SIDESHIFT_PREVIEW.test(host);
+  const sharedHost = !sideshiftPreview && SHARED_HOSTS.some((s) => host === s || host.endsWith(`.${s}`));
   if (opts.emailCode && sharedHost) fail(`refusing to type an emailed code into ${host}: it is a customer site on a shared platform`);
   const fromMail = codeOnly && Boolean(opts.emailCode);
   if (!candidates.length && !fromMail) fail(`no 1Password login is saved for ${host}${opts.account ? ` with username ${opts.account}` : ""}`, 2);
@@ -259,7 +263,7 @@ try {
   let code = "";
   let mail = null;
   if (fromMail || (codeOnly && item && !hasCode && !sharedHost)) {
-    mail = await findEmailCode({ host, since: mailSince, length: before.split || undefined });
+    mail = await findEmailCode({ host: sideshiftPreview ? "app.sideshift.app" : host, since: mailSince, length: before.split || undefined });
     code = mail.code;
   } else if ((before.otp || before.split) && hasCode) {
     // A code typed in its last seconds can expire before the site checks it.
