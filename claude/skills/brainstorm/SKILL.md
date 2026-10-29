@@ -98,4 +98,7 @@ Only items the operator agreed to leave open, each with an owner.
   allowed; delete it after and record the answer in the spec.
 - No feature flags in the spec unless the operator gives a specific reason.
 - No explainer notice blocks in proposed UI.
+- A new provider permission goes into the existing connect (OAuth) flow that already asks
+  for that provider's permissions, never a separate "Allow" button or consent screen. Only
+  an off switch may sit outside it.
 - Say what you guessed. A guess in the Context section is marked as a guess.
