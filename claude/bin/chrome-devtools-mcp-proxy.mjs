@@ -40,7 +40,7 @@
 // Usage:  chrome-devtools-mcp-proxy.mjs <command> [args...]
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
 const [command, ...args] = process.argv.slice(2);
@@ -456,17 +456,25 @@ async function newChatPage(msg) {
 }
 
 // Other chats' windows stay out of this chat's page lists. chrome-devtools-mcp names a tab's
-// context only when it knew that context, so a tab is checked against Chrome by its URL.
+// context only when it knew that context, so a tab is checked against Chrome by its URL. A tab in a
+// context that is no chat's window stays: a private tab Session Board opened for this chat
+// (board-browser --private), which only this chat can reach there.
 async function withoutOtherChats(text) {
 	const lines = text.split("\n");
 	if (!chat || !lines.some((l) => PAGE_LINE.test(l))) return text;
 	const mine = new Set(); // URLs of tabs in this chat's window
 	const shared = new Set(); // URLs of tabs in the default context
-	const others = new Set(); // URLs of tabs in other contexts
+	const others = new Set(); // URLs of tabs in other chats' windows
+	const windows = new Set();
+	try {
+		for (const name of readdirSync(chatsDir)) windows.add(readText(`${chatsDir}/${name}`)?.trim());
+	} catch {}
 	const { defaultBrowserContextId } = await chat.send("Target.getBrowserContexts");
 	for (const t of (await chat.send("Target.getTargets")).targetInfos) {
 		if (t.type !== "page") continue;
-		(t.browserContextId === chat.context ? mine : t.browserContextId === defaultBrowserContextId ? shared : others).add(t.url);
+		if (t.browserContextId === chat.context) mine.add(t.url);
+		else if (t.browserContextId === defaultBrowserContextId) shared.add(t.url);
+		else if (windows.has(t.browserContextId)) others.add(t.url);
 	}
 	return lines
 		.flatMap((l) => {
@@ -476,7 +484,7 @@ async function withoutOtherChats(text) {
 			if (context && ownContexts.has(context)) return [l];
 			// chrome-devtools-mcp gives the chat's window a generated name; the chat knows it as its own.
 			if (mine.has(url)) return [l.replace(/ isolatedContext=\S+$/, "")];
-			return !context && (shared.has(url) || !others.has(url)) ? [l] : [];
+			return !others.has(url) || (!context && shared.has(url)) ? [l] : [];
 		})
 		.join("\n");
 }

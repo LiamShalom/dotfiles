@@ -211,11 +211,13 @@ window in it: its tabs never mix with another chat's.
 - **A second login is an isolated context, not a second browser:** `new_page` with
   `isolatedContext: "<name>"`, or `Target.createBrowserContext` / `browser.createBrowserContext()`
   in a script. A named context shares no cookies with anything else, and it closes when the
-  connection that made it closes. When I must sign in with another account in your chat's
-  window (a hand-off with a test account), first add the site to
-  `~/.cache/agent-chrome/unshared/$CLAUDE_CODE_SESSION_ID` (one per line, e.g. `tiktok.com`) and
-  delete the window's copies of its cookies; otherwise that sign-in replaces my own for every
-  later chat.
+  connection that made it closes. When I must sign in with another account (a hand-off with a
+  test account), hand it off with `board-browser --private <url> "<what to do>"`: it opens in a
+  signed-out context of its own that only your chat reaches (list_pages shows it), and its
+  sign-ins go when its last tab closes. Only if the sign-in must land in your chat's window
+  itself, first add the site to `~/.cache/agent-chrome/unshared/$CLAUDE_CODE_SESSION_ID` (one per
+  line, e.g. `tiktok.com`) and delete the window's copies of its cookies; otherwise that sign-in
+  replaces my own for every later chat.
 - **Other sessions' tabs are in the same browser.** Act only on the `pageId` your own
   `new_page` returned, never a tab you didn't open. Close your tabs and contexts when done;
   never close the browser or anyone else's tabs.
