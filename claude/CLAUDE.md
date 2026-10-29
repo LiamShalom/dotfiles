@@ -21,8 +21,13 @@ you made — not a transcript of the code.
   identifier I have to go grep for.
 - **Talk about behavior, not implementation**, unless I ask for the implementation. What
   changes for a user? What breaks if this is wrong? What did I not know before you started?
-- **Say what you're unsure about.** If you guessed at how a subsystem works, tell me it was a
-  guess — it's usually the guess that turns out to be the bug.
+- **Never answer with a guess or an assumption.** When I ask why something happens or whether
+  something works, investigate until you can prove the answer (run it, read the logs, query the
+  data, reproduce it) and come back with a confident, evidenced one. A ranked list of "likely
+  causes" is not an answer. Ask me a question only when the missing fact lives outside what you
+  can reach, such as a URL or an account only I know, and say what you already checked. If you
+  truly cannot prove it after a full investigation, name exactly what blocked you and the one
+  step I need to do; do not hand me a hypothesis in its place.
 - **Being brief is still good** — brief and conceptual, not brief and cryptic. Cutting words is
   fine; cutting the reasoning is not. Bullets and code where they genuinely help, prose where
   the point is an explanation.
