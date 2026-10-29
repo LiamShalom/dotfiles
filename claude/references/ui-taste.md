@@ -110,6 +110,14 @@ not a variant of the closest weak pattern.
 pushes the layout.
 - 10-27 brand edits strip under the Video Reviews player: "I dont like the UI where edits are pushing the video review up. Maybe having them under versions would be more intuitive"
 
+**16. A choice must show its effect.** A setting whose result never appears on screen reads as not
+built, even when it works end to end. When a control changes what a user will get, the nearest
+preview redraws to match.
+- 10-29 Meta "Header identities" dropdown (Both / Creator only / Dynamic, live since August, but the
+  phone preview showed the creator alone for all three): "I just want to implement it, I havent seen
+  it in practiuce in the UI". Picked: the preview draws each header, Dynamic flips between its two
+  versions, over option cards and over a new default
+
 ## What he approved
 
 - 09-29 ads dashboard component: "I really like this design, looks great"
