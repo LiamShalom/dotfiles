@@ -27,6 +27,7 @@ LOCK="$PROFILE.lock"
 PROXY="$HOME/.claude/bin/agent-chrome-proxy.mjs"
 PROXY_DEPS="$HOME/.cache/agent-chrome/cdp-proxy"
 PROXY_LOG="$HOME/.claude/logs/agent-chrome-proxy.log"
+EXTENSIONS="$HOME/.cache/agent-chrome/extensions"
 
 # The proxy answers /agent-chrome-proxy at once, while /json/version waits for Session Board when it
 # restarts. An older proxy knows only /json/version.
@@ -82,12 +83,28 @@ if ! chrome_up; then
 		--export-tagged-pdf --force-color-profile=srgb --generate-pdf-document-outline \
 		--metrics-recording-only --password-store=basic --use-mock-keychain \
 		--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints,WebUIReloadButton,WebUIOmniboxPopup,WebUIOmniboxAimPopup,ProcessPerSiteUpToMainFrameThreshold,IsolateSandboxedIframes \
-		--enable-features=PdfOopif --disable-extensions --hide-crash-restore-bubble \
+		--enable-features=PdfOopif --hide-crash-restore-bubble \
 		>/dev/null 2>&1 </dev/null &
 	for _ in $(seq 1 75); do
 		chrome_up && break
 		sleep 0.2
 	done
+	# Chrome 137+ ignores --load-extension, so each unpacked extension folder is loaded over DevTools on every
+	# start. 1Password (Web Store ID kept by the manifest "key") answers passkey prompts through the desktop app.
+	if chrome_up && [ -d "$EXTENSIONS" ]; then
+		for dir in "$EXTENSIONS"/*/; do
+			[ -f "$dir/manifest.json" ] || continue
+			node -e '
+				const [url, path] = process.argv.slice(1);
+				(async () => {
+					const { webSocketDebuggerUrl } = await (await fetch(url + "/json/version")).json();
+					const ws = new WebSocket(webSocketDebuggerUrl);
+					ws.onopen = () => ws.send(JSON.stringify({ id: 1, method: "Extensions.loadUnpacked", params: { path } }));
+					ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.error) console.error("agent-chrome: extension", path, m.error.message); ws.close(); };
+				})();
+			' "http://127.0.0.1:$CHROME_PORT" "${dir%/}" >&2 || true
+		done
+	fi
 fi
 
 if chrome_up && ! up; then
