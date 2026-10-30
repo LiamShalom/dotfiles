@@ -65,6 +65,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash ~/.claude/hooks/no-printed-tokens.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "bash ~/.claude/hooks/heavy-gate.sh",
             "timeout": 10
           }
