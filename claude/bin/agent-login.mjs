@@ -225,6 +225,9 @@ try {
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(page.hostname);
   if (page.protocol !== "https:" && !local) fail(`refusing to type a login into ${page.origin}: the page is not https`);
   const host = normalHost(page.hostname);
+  // Previews and local servers: board-browser signs the tab in as a test account, so no saved login is needed.
+  if (!opts.emailCode && (local || /^sideshift-.*-side-shift\.vercel\.app$/.test(host)))
+    fail(`${host} is a SideShift preview or local server: do not ask Liam. Run node ~/session-board/scripts/board-browser.mjs ${page.origin}${page.pathname} "<what to check>" (add --as creator for creator screens); it signs the tab in as a test account`);
   if (!fieldsShowing(before)) fail(`no username, password or one-time-code field is showing on ${page.origin}${page.pathname}`, 3);
 
   const codeOnly = !before.user && !before.pass;

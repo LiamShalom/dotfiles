@@ -61,7 +61,7 @@ Never read the inbox any other way, and never print a code or an email.
 | 2 | Several logins or tabs match; it lists them | Run again with `--item <id>` or `--account <username>`. If the task does not say which account, ask Liam. |
 | 3 | No sign-in field is showing, or 1Password holds no value for it | Bring the field up (close a cookie banner, click "Log in") and run again, or hand the step to Liam. |
 | 4 | Waiting for Liam's approval (only when the service-account token is missing from the Keychain) | Tell Liam in chat that the token is missing and to approve the 1Password prompt on the Mac, then run it again. |
-| 1 | Error, for example the login is saved for another site, or no emailed code arrived | Read the message. Never add a website to an item unless Liam says that site is right. |
+| 1 | Error, for example the login is saved for another site, or no emailed code arrived | Read the message. Never add a website to an item unless Liam says that site is right. On a SideShift preview or local server the script refuses: sign in with `board-browser.mjs` (it signs in a test account), never ask Liam. |
 
 ## Rules
 
