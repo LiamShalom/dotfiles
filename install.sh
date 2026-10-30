@@ -79,6 +79,7 @@ LINKS=(
 	"claude/bin/heavy:.claude/bin/heavy"
 	"claude/bin/agent-login.mjs:.claude/bin/agent-login.mjs"
 	"claude/bin/agent-mail.mjs:.claude/bin/agent-mail.mjs"
+	"claude/bin/agent-sms.mjs:.claude/bin/agent-sms.mjs"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
 	"codex/hooks.json:.codex/hooks.json"
