@@ -244,7 +244,10 @@ suites, builds and whole-repo typecheck or lint wait for one of two slots (`~/.c
 
 ## Codex session names and browser use
 
-These preferences apply when running in Codex.
+These preferences apply when running in Codex. Use Codex browser tabs wherever the rules
+above or a skill call for a Session Board pane: reviews, sign-ins, files, and simulator or
+emulator handoffs. This section takes precedence over the shared agent Chrome tools,
+`board-browser.mjs`, and external-browser fallback instructions when running in Codex.
 
 - Name sessions with short, simple names that capture the larger project or feature being
   built. Keep the name stable as individual edits and fixes evolve. Preserve user-chosen names.
@@ -254,6 +257,26 @@ These preferences apply when running in Codex.
 - Check existing in-app browser tabs before opening a new one. Reuse a relevant tab and
   navigate it as needed; open another tab only when there is no suitable tab or the task needs
   separate pages open at the same time.
+- **UI approval:** before stopping for my approval, show the changed page in a visible native
+  browser tab. If login or data setup makes it hard to reach, show the before/after screenshots
+  or proof report there. Say what changed and what I am approving. A link or path in chat
+  alone is not enough.
+- **Sign-in and consent handoffs:** try the `agent-login` skill first when saved credentials
+  can handle the step. If I must enter a code, complete 2FA, or give consent, show the exact
+  page in a native browser tab, say what I need to do, and wait until I say I am done. Resume
+  in that same tab. Keep test accounts separate from my personal accounts; use an isolated
+  context when supported, and report a blocker if the required isolation is unavailable.
+- **Files:** show generated review pages, screenshots, PDFs, reports, and folders in native
+  browser tabs using a supported preview. Do not stop at a path in chat. If the browser cannot
+  display the file, report that limitation instead of opening another browser or app.
+- **Simulators and emulators:** show the changed screen through a supported mirror in a native
+  browser tab. Keep the device running until I say I am done. If the native browser cannot
+  show it, report the blocker; do not use the floating mini screen preview.
+- **Tab ownership and cleanup:** act only on tabs owned by this chat or explicitly handed to
+  it. Leave other chats' and my tabs alone. Keep routine automation in background tabs;
+  make a tab visible when it needs my review or input. Close tabs and isolated contexts you
+  created when done, except while I am still reviewing or completing a handoff. Never close
+  the browser itself.
 - Keep Codex-related browser windows, popups, authorization dialogs, and previews on the
   same display as the main Codex window. Do not open or move them onto another display and
   interrupt the user's work there. If window placement cannot be controlled, report the
