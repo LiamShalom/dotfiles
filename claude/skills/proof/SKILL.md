@@ -92,6 +92,8 @@ Baseline runs are capture-only: same journeys, same shot names, but shots land i
 
 ### 7. Ship the proof pack
 
+Before recommending a merge, run the pack's explicit pre-merge readiness check when it provides one (for example, the report generator's `--require-ready`). Missing evidence for a changed execution path must fail that check. A preview fallback does not cover its worker path: exercise the actual worker and stored effects in isolation before merge. Keep post-deploy smoke checks separate; do not ask to release as the way to finish ordinary testing.
+
 The pack lives in the worktree. Commit only its text files (`run.mjs`, `report.mjs`, `viewports.mjs`, `report.json`, `REPORT.md`). **Never commit screenshots, recordings, `replay.gif` or `REPORT.html`** — the repo `.gitignore` excludes them, and never `git add -f` them; every squash merge would put them on `main` for good. The published REPORT.html artifact carries all the media.
 
 ```
