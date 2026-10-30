@@ -30,9 +30,16 @@ test('a one-letter site name must stand alone as a word', () => {
   assert.equal(codeForSite('Your Robinhood code is 551234', 'x.com'), '');
 });
 
-test('reads Google G- codes and spaced site names', () => {
+test('reads Google G- codes', () => {
   assert.equal(codeForSite('G-731904 is your Google verification code.', 'accounts.google.com'), '731904');
-  assert.equal(codeForSite('Your Side Shift login code: 300912', 'app.sideshift.app'), '300912');
+});
+
+test('a site named after a generic or squashed word gets no code', () => {
+  const google = 'G-731904 is your Google verification code.';
+  assert.equal(codeForSite(google, 'verification.com'), '');
+  assert.equal(codeForSite(google, 'code.app'), '');
+  assert.equal(codeForSite(google, 'yourgoogle.com'), '');
+  assert.equal(codeForSite('Your Side Shift login code: 300912', 'app.sideshift.app'), '');
 });
 
 test('a domain-bound line decides by its domain', () => {

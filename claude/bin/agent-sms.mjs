@@ -49,18 +49,19 @@ export function decodeAttributedBody(buf) {
 
 const textOf = (row) => row.text ?? (row.body ? decodeAttributedBody(Buffer.from(row.body, "hex")) : "");
 
+const GENERIC = /^(code|codes|verify|verification|verified|confirm|confirmation|login|log|signin|sign|account|accounts|auth|authenticate|authentication|otp|pin|passcode|password|secure|security|one|time|onetime|your|you|is|use|the|text|sms|message|msg|reply|stop|help|app|my|id|token|access|number|phone|mobile|alert|notice)$/i;
+
 // The code a text holds for `host`, or "" when the text does not belong to that site.
 export function codeForSite(text, host, length) {
   const want = site(host);
   // Domain-bound line (WebOTP): "@example.com #123456", the last line of the text.
   const bound = text.match(/@([a-z0-9.-]+\.[a-z]{2,})\s+#([A-Za-z0-9]{4,10})\s*$/i);
   if (bound) return site(bound[1]) === want && (!length || bound[2].length === length) ? bound[2] : "";
-  // The site's name as a whole word ("x" must not match any word with an x in it); a longer name
-  // also counts written with spaces or dots ("Side Shift").
+  // The site's name as a whole word ("x" must not match any word with an x in it). A site named
+  // after a word every code text uses ("code.app", "verification.com") would match any site's text.
   const brand = want.split(".")[0];
-  const named = new RegExp(`(^|[^a-z0-9])${brand.replace(/-/g, "[- ]?")}($|[^a-z0-9])`, "i").test(text)
-    || (brand.length >= 5 && text.toLowerCase().replace(/[^a-z0-9]/g, "").includes(brand.replace(/-/g, "")));
-  if (!named) return "";
+  if (GENERIC.test(brand)) return "";
+  if (!new RegExp(`(^|[^a-z0-9])${brand}($|[^a-z0-9])`, "i").test(text)) return "";
   // Google writes "G-123456"; the dash would otherwise hide the code.
   return extractCode("", text.replace(/\bG-(\d{4,8})\b/g, " $1"), length);
 }
