@@ -82,6 +82,10 @@ export function site(host) {
   return labels.slice(-n).join(".");
 }
 
+// Mail is sender-controlled: drop terminal escapes and bidi overrides before printing it.
+const clean = (s, oneLine) => (oneLine ? s.replace(/[\r\n]+/g, " ") : s.replace(/\r\n?/g, "\n"))
+  .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f‪-‮⁦-⁩]/g, "�");
+
 const header = (msg, name) => msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
 
 // The sender passed DMARC for its From domain, as judged by Gmail's own receiving server. Only the
@@ -254,14 +258,14 @@ async function main([command, arg, ...rest]) {
     for (const { id } of messages) {
       const msg = await gmail(token, `messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`);
       const unread = msg.labelIds?.includes("UNREAD") ? " [unread]" : "";
-      console.log(`${id}  ${new Date(Number(msg.internalDate)).toISOString().slice(0, 16)}${unread}\n  From: ${header(msg, "From")}\n  Subject: ${header(msg, "Subject")}\n  ${msg.snippet || ""}\n`);
+      console.log(`${id}  ${new Date(Number(msg.internalDate)).toISOString().slice(0, 16)}${unread}\n  From: ${clean(header(msg, "From"), true)}\n  Subject: ${clean(header(msg, "Subject"), true)}\n  ${clean(msg.snippet || "", true)}\n`);
     }
     if (!messages.length) console.log(`No messages match "${query}".`);
   } else if (command === "show") {
     if (!arg || !rest[0]) throw new Error("usage: agent-mail.mjs show <address> <message id>");
     const msg = await gmail(await accessToken(arg.toLowerCase()), `messages/${encodeURIComponent(rest[0])}?format=full`);
-    for (const h of ["From", "To", "Date", "Subject"]) console.log(`${h}: ${header(msg, h)}`);
-    console.log(`\n${bodyText(msg.payload).replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim()}`);
+    for (const h of ["From", "To", "Date", "Subject"]) console.log(`${h}: ${clean(header(msg, h), true)}`);
+    console.log(`\n${clean(bodyText(msg.payload)).replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim()}`);
   } else if (command === "status") {
     const list = inboxes();
     if (!list.length) console.log("No inbox connected.");
