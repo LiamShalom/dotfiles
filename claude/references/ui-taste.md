@@ -37,6 +37,7 @@ caveats, not for "no page selected". Fix the state in the UI itself.
 **3. Match the existing design system and the closest sibling surface.** Analytics is the
 reference for metrics, charts, stat icons (liquid-metal grey) and platform pills. A Figma, or
 the other platform's app (iOS to web), is for content and structure, not a new visual language.
+- 10-30 Meta copy suggestions: "Make it feel like sidekick inspired. Use the existing compolnents for the bhutton etc". Use Sidekick's shared artifact surface and existing DS buttons for inline copy suggestions, with divider rows instead of nested cards.
 - 09-27 "match the elegance as the rest of the dashboard" · 10-14 "It doesnt fit with the design system for this page"
 - 10-02 "use the same component as the analytics page where the social platforms are pills underneath the chart"
 - 10-20 "your mistake was copying the figma precisely it should be using the same design systme"
