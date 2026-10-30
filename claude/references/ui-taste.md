@@ -64,6 +64,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 - 10-26 $74.75 a month per brand: "can you round the numbers up. starter should be 75", then "make those the actual values" (round numbers, and the payout changed to match rather than the page rounding)
 
 **6. Logos beat labels.** Platform names come with their logo; a tag can be just platform + logo.
+- 10-30 SideShift job-link previews: rejected the initial title-card, pay-first kinetic and blue dither samples; asked to use the SideShift logo plane in the next concepts.
 - 10-02 "tgae should just say the platform and have the logo"
 - 10-06 "I wish it showed logo for the store like shopify and then just had item name"
 - 10-09 "remove the crown emoji and emphasize the ads more using meta, tiktok logos"
