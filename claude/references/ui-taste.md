@@ -73,6 +73,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 
 **7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
 no emoji, sparkle/AI icons, "run by" pills or invented stats.
+- 10-30 shared job previews: approved liquid-metal C with the SideShift plane; asked for more motion and a prominent hiring-brand identity.
 - 10-20 "the run by sideshift pill looks AI generated" · "remove the stupid AI icons then use an actual case study"
 - 10-20 "I dont like the arbitraty numbers though" · 09-29 "make it more flashy including the ads icon"
 
