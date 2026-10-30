@@ -69,6 +69,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 - 10-06 "I wish it showed logo for the store like shopify and then just had item name"
 - 10-09 "remove the crown emoji and emphasize the ads more using meta, tiktok logos"
 - 10-27 guest redlining terms panel (TikTok / Instagram as plain black text pills): "Make the platforms use the logo etc."
+- 10-30 link previews, round 2: "I really like this liquid metal look" (beveled chrome plane banking on dark slate #14191F, hiring brand logo + "is hiring", big UGC Creator / $150) and "B and C are great" (a scrolling wall of creator videos; platform logos orbiting the plane). Next round fused them: chrome orbit, chrome feed wall, plane mirroring the videos.
 - 10-28 same panel, restyled with the wizard's logo chips but still limited to the campaign's 2 platforms: "why are you only showing 2 platforms it should show all 6". Reusing a shipped picker means its options too: a platform picker lists every platform the wizard lists, with the current ones selected
 
 **7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
