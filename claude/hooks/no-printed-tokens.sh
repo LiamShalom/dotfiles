@@ -1,12 +1,22 @@
 #!/bin/bash
 # Refuses a Bash call that prints a Google access or identity token to the transcript.
-# Capturing one inside $(...) for another command is allowed.
+# A token captured inside $(...) and passed to a command that does not print it is allowed.
+# Fails closed: any token call left after removing those captures is blocked.
 cmd=$(jq -r '.tool_input.command // ""')
-if ! printf '%s' "$cmd" | grep -Eq 'print-(access|identity)-token'; then
+token='print-(access|identity)-token'
+if ! printf '%s' "$cmd" | grep -Eq "$token"; then
   exit 0
 fi
-if printf '%s' "$cmd" | grep -Eq '\$\([^)]*print-(access|identity)-token'; then
-  exit 0
+block() {
+  echo "Blocked: this prints a live Google token into the transcript. Capture it inside \$(...) for the command that needs it (for example curl -H \"Authorization: Bearer \$(gcloud auth print-access-token)\"), or check identity with 'gcloud auth list'." >&2
+  exit 2
+}
+# A capture handed to a printing command still prints it.
+if printf '%s' "$cmd" | grep -Eq "(echo|printf|cat|tee|print)[^|;&]*\\\$\([^)]*$token"; then
+  block
 fi
-echo "Blocked: this prints a live Google token into the transcript. Capture it inside \$(...) for the command that needs it, or check identity with 'gcloud auth list' / 'gcloud config get account'." >&2
-exit 2
+rest=$(printf '%s' "$cmd" | sed -E "s/\\\$\([^)]*$token[^)]*\)//g")
+if printf '%s' "$rest" | grep -Eq "$token"; then
+  block
+fi
+exit 0
