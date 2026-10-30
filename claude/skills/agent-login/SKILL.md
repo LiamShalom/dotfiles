@@ -11,6 +11,26 @@ the login Keychain) and types it straight into your tab. Liam is not asked. The 
 vaults: **Agent Logins** (Liam's own logins with two-step codes) and **Agent-Test** (SideShift test
 accounts). A login in any other vault is out of reach; only Liam decides what goes into Agent Logins.
 
+## Safari in iOS Simulator
+
+Use `agent-login-safari-simulator.mjs` from `cua_repl` before handing a simulator login to
+Liam. It fills one observed username, password or code field from 1Password through the
+real native UI. Pass the exact simulator UDID, window name, HTTPS origin, observed mirror
+coordinates, item and account. It verifies the local mirror, Safari foreground app, selected
+Simulator window and actual expanded Safari URL before loading credentials. It returns only
+filled/missing metadata and does not submit. Never fake a browser tab or call the shared
+credential resolver directly.
+
+Google: enter the saved password, then use Try another way and Google Authenticator when
+offered. Refresh coordinates after Safari expands its browser controls. Submit the filled
+code before capturing a screenshot or accessibility tree. A provider refusal still follows
+the one-failed-sign-in rule below.
+
+If the task authorizes creating missing test accounts, a missing vault item is not a handoff.
+Create the provider account through its real signup UI, keep its unique credentials in
+Agent-Test, and verify the finished profile. Record provider security gates separately;
+never describe a saved password item alone as a created provider account.
+
 ## Run it
 
 1. Open the sign-in page in your own tab (your chat's window in the agent Chrome).
