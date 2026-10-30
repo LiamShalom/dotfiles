@@ -11,6 +11,10 @@ the login Keychain) and types it straight into your tab. Liam is not asked. The 
 vaults: **Agent Logins** (Liam's own logins with two-step codes) and **Agent-Test** (SideShift test
 accounts). A login in any other vault is out of reach; only Liam decides what goes into Agent Logins.
 
+## SideShift test accounts in Codex
+
+For SideShift previews or production, use [Codex test login](references/codex-test-login.md) with the business or creator test account. This takes precedence over the Session Board fallback below when running in Codex.
+
 ## Safari in iOS Simulator
 
 Use `agent-login-safari-simulator.mjs` from `cua_repl` before handing a simulator login to
