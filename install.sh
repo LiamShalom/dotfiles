@@ -61,6 +61,7 @@ LINKS=(
 	"claude/rules:.claude/rules"
 	"claude/hooks:.claude/hooks"
 	"claude/skills:.claude/skills"
+	"claude/skills:.agents/skills"
 	"claude/mods:.claude/mods"
 	# ~/.claude/bin is linked per-file, not as a directory: it also holds
 	# codeagent-wrapper, a 5.7M binary that is deliberately not in this repo.
