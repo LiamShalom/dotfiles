@@ -58,7 +58,7 @@ numbers sit inside the squares; platform colours match the platform.
 
 **5. Big number first, short cards, secondary data hidden.** He prefers one large number to a
 pill, a short card to a tall one, and "show more" to everything at once.
-- 10-30 Meta copy suggestions: "only needs to generate a couple". Show at most two eligible choices per field, with no expanding list or Load more action.
+- 10-30 Meta copy suggestions: "only needs to generate a couple", clarified as "actually generate new copy based on their existing ads". Generate exactly two primary texts and two headlines; retain both options after selection, with no Load more.
 - 10-15 "I dontl ike the pill, I like the big number the A had"
 - 10-21 "the profile card is a little bit too long… highlighted more of the neccessary content"
 - 09-30 "simplified to show most important values and then have a dropwdown to show more"
