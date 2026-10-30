@@ -25,6 +25,9 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
 ## Steps
 
 1. **Plan.** Write `plan.md` in the feature folder:
+   - For credential setup, inspect env-file names with `node ~/dotfiles/claude/bin/env-names.mjs <path>`.
+     It returns variable names only. Resolve values through the existing credential helper;
+     never print an env file, even when an earlier description says it contains only references.
    - Goal, architecture in three sentences, and the PR units. A Postgres migration is its own
      PR first (`ship-migration`); an internal-dashboard tab uses `paired-admin-tab`.
      Everything else is one PR.
