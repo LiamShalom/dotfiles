@@ -45,3 +45,27 @@ test('does not expose an input error containing the secret', async () => {
   f.app.typeText = async () => { throw new Error('fake-secret'); };
   await assert.rejects(loginInSimulator(f.app, f.mirror, settings, f.load), error => error.message === 'Native login stopped during input; inspect the page');
 });
+test('expands and verifies Safari Private Browsing address before loading a login', async () => {
+  const capsule = snapshot(settings.windowName, 'accounts.google.com — Private');
+  const f = fixture([capsule, snapshot(), capsule]);
+  const result = await loginInSimulator(f.app, f.mirror, settings, f.load);
+  assert.deepEqual(result.filled, ['password']);
+  assert.equal(f.loaded(), 1);
+});
+test('private label does not allow a lookalike hostname', async () => {
+  const f = fixture([snapshot(settings.windowName, 'accounts.google.com.example.org — Private')]);
+  await assert.rejects(loginInSimulator(f.app, f.mirror, settings, f.load), /expected HTTPS origin/);
+  assert.equal(f.loaded(), 0);
+});
+test('accepts the actual native accessibility private annotation', async () => {
+  const capsule = snapshot(settings.windowName, '\u200eaccounts.google.com, private');
+  const f = fixture([capsule, snapshot(), capsule]);
+  const result = await loginInSimulator(f.app, f.mirror, settings, f.load);
+  assert.deepEqual(result.filled, ['password']);
+});
+test('verifies the full URL when Safari hides the www prefix', async () => {
+  const capsule = snapshot(settings.windowName, 'instagram.com, private');
+  const f = fixture([capsule, snapshot(settings.windowName, 'https://www.instagram.com/accounts/emailsignup/'), capsule]);
+  const result = await loginInSimulator(f.app, f.mirror, { ...settings, origin: 'https://www.instagram.com' }, f.load);
+  assert.deepEqual(result.filled, ['password']);
+});

@@ -2,7 +2,7 @@
 import { LoginError, resolveLogin } from './agent-login-core.mjs';
 
 class SimulatorLoginError extends Error {}
-const clean = value => value.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '');
+const clean = value => value.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/(?:\s+—\s+Private|,\s*private)$/i, '');
 
 function inspect(state, windowName) {
   if (!state.startsWith(`Window: "${windowName}", App: Simulator.`)) {
@@ -17,7 +17,7 @@ function inspect(state, windowName) {
 function assertOrigin(value, expected, full = false) {
   if (value.startsWith('https://')) {
     try { if (new URL(value).origin === expected.origin) return; } catch {}
-  } else if (!full && value === expected.hostname) return;
+  } else if (!full && [expected.hostname, expected.hostname.replace(/^www\./, '')].includes(value)) return;
   throw new SimulatorLoginError('Safari is not on the expected HTTPS origin; login stopped');
 }
 
