@@ -69,6 +69,9 @@ Never read the inbox any other way, and never print a code or an email.
 
 ## Rules
 
+- If the operator authorizes continuation after a provider requires its mobile app, inspect
+  the available native app or phone mirror before a manual handoff. Keep the same test
+  account, do not repeat rejected browser logins, and report the observed device or provider block.
 - **A sign-in fails once: stop and hand it to Liam.** "Incorrect password", a robot check, a
   "confirm it's you" or new-device approval, a locked or rate-limited account: do not retry, do
   not open another context to try again, and do not approve the site's own login prompts from
