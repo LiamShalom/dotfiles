@@ -172,6 +172,11 @@ Exact commands for each technique: `references/evidence-recipes.md`.
 
 ## Phase 4 — Ask, but only when it changes what you'd do
 
+Before recommending a workaround that changes the record type or flow, check the original
+goal through its downstream result. For tracking tied to a paid contract, verify both post
+reporting and Payouts on the same contract. A tracking-only replacement is not a complete
+workaround for paid deliverables. State any lost behavior before recommending it.
+
 Default to continuing. Ask only when proceeding would mean guessing at something the
 reporter knows and you can't observe:
 
