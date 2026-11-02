@@ -34,6 +34,10 @@ caveats, not for "no page selected". Fix the state in the UI itself.
 - 10-05 "this huge yellow box is not helpful" · 10-16 "I dont like the yellow banner when no page selected"
 - 10-15 "remove this banner from appearing all the time" · 10-23 "I still dont like the yellow banner on ads hub"
 
+- 10-30 Build Ads picker, latest preference: put spend (purple) or Ready (green) on the left under the creator beside the video; keep the Launched badge on the right.
+
+- 10-30 Build Ads Setup: hide the campaign budget summary for an existing campaign; show it only for a new campaign.
+
 **3. Match the existing design system and the closest sibling surface.** Analytics is the
 reference for metrics, charts, stat icons (liquid-metal grey) and platform pills. A Figma, or
 the other platform's app (iOS to web), is for content and structure, not a new visual language.
@@ -68,11 +72,11 @@ pill, a short card to a tall one, and "show more" to everything at once.
 
 **6. Logos beat labels.** Platform names come with their logo; a tag can be just platform + logo.
 - 10-30 SideShift job-link previews: rejected the initial title-card, pay-first kinetic and blue dither samples; asked to use the SideShift logo plane in the next concepts.
+- 10-30 link previews, round 2: "I really like this liquid metal look" (beveled chrome plane banking on dark slate #14191F, hiring brand logo + "is hiring", big UGC Creator / $150) and "B and C are great" (a scrolling wall of creator videos; platform logos orbiting the plane). Next round fused them: chrome orbit, chrome feed wall, plane mirroring the videos.
 - 10-02 "tgae should just say the platform and have the logo"
 - 10-06 "I wish it showed logo for the store like shopify and then just had item name"
 - 10-09 "remove the crown emoji and emphasize the ads more using meta, tiktok logos"
 - 10-27 guest redlining terms panel (TikTok / Instagram as plain black text pills): "Make the platforms use the logo etc."
-- 10-30 link previews, round 2: "I really like this liquid metal look" (beveled chrome plane banking on dark slate #14191F, hiring brand logo + "is hiring", big UGC Creator / $150) and "B and C are great" (a scrolling wall of creator videos; platform logos orbiting the plane). Next round fused them: chrome orbit, chrome feed wall, plane mirroring the videos.
 - 10-28 same panel, restyled with the wizard's logo chips but still limited to the campaign's 2 platforms: "why are you only showing 2 platforms it should show all 6". Reusing a shipped picker means its options too: a platform picker lists every platform the wizard lists, with the current ones selected
 
 **7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
@@ -148,3 +152,5 @@ preview redraws to match.
 - 10-27 profile accounts, the "Brands that can see your YouTube stats" box (title + brand line + Remove) nested under a connected row: "this UI is awful, can you remove that it doesnt need to show". Never nest a secondary card inside a list row; a row is one line of the account, and anything else stays off it or lives one tap away
 - 10-27 creator "Connect your accounts" popup (a struck typed handle "Waiting" → signed-in TikTok row "Added", three Read more lines): "I dont like this design." Next: the You're in popup's logo tiles (shipped pattern) instead of an invented before/after
   Then on the logo-tile version: "the read more should include better insights, bot detection, include the fact that it doesnt mess up their account alg since some creators are scraed of that". A Read more answers the user's real fears and gains (reach, proof), not how the feature works
+- 11-02 Comment-to-DM campaign settings ("very overwheming and unusable": ~14 controls + 6 help lines at once): picked A, four fields (platform logo chips, keyword chips, reply, link + "Add UTM") beside a live DM preview, rest in More options, over a rules list (B) and a step flow (C). A settings form with an outcome gets a preview of that outcome, and its help text moves into it
+- 10-30 AppLovin generated end card (the full-screen image after an in-game ad video): picked A, the cover frame blurred behind logo + headline + brand-colour button, over B (sharp creator frame on top, brand panel below; my pick, "the creator face sells") and C (brand-colour poster with a tilted video still). "A, go ahead an build this out then we can iterate". For a generated ad asset he chose the standard, clean in-app pattern over the creator-forward one; the connect modal, builder fields and phone preview built from shipped parts passed without comment
