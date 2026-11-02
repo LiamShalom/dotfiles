@@ -11,6 +11,10 @@ the login Keychain) and types it straight into your tab. Liam is not asked. The 
 vaults: **Agent Logins** (Liam's own logins with two-step codes) and **Agent-Test** (SideShift test
 accounts). A login in any other vault is out of reach; only Liam decides what goes into Agent Logins.
 
+When the operator names an existing brand profile, keep that profile as the identity target.
+Check its existing grants and saved login before considering signup. A missing or rejected
+unrelated QA login is not a reason to replace the requested brand profile with a new account.
+
 ## SideShift test accounts in Codex
 
 For SideShift previews or production, use [Codex test login](references/codex-test-login.md) with the business or creator test account. This takes precedence over the Session Board fallback below when running in Codex.
