@@ -117,6 +117,7 @@ not a hype promise or a state the user is not in. A spec's sales copy is not a f
 **14. Give real options when it is new.** For a new screen, two or three different directions,
 not a variant of the closest weak pattern.
 - 10-23 "This is awful. Be more creatve. This is why I asked for you to provide options."
+- 11-02 plan welcome: "This is awful too, designb a couple of options and presenmt too me" after the selected guided concept was rebuilt as three gray DS cards. Component reuse does not fix a weak composition. Compare new layouts when options are requested again; preserve the useful content, not the rejected card grid.
 
 **15. Add to an existing control before adding a new row.** Extra things about the selected item
 (other cuts, variants) belong in the control that already switches it, not in a new strip that

@@ -43,6 +43,13 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    (10-23: one trial checkout copied from the Get started cards → "This is awful… This is
    why I asked for you to provide options.")
 
+   **After a rejected selected direction, check the latest request.** If the operator asks
+   for options again, reopen the layout decision: build at least two different compositions
+   behind the preview switcher and show them side by side before another selection. An
+   earlier direction choice does not waive this step. Reusing the kit alone is not a new
+   composition. (11-02 plan welcome: the selected guided view became three gray cards →
+   "This is awful too, designb a couple of options and presenmt too me".)
+
    **Then build the components** in their final location, with props only (no fetching inside
    presentational components). Cover every state: loading, empty, error, populated, long
    content, disabled-because-busy, and each role's variant from the party matrix.
