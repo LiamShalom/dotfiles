@@ -134,6 +134,8 @@ preview redraws to match.
 
 ## What he approved
 
+- 11-02 plan-start welcome, final logo pass: "Looks good". Approved A with the dark plan sidebar, campaign name, brief, invitation count, brand logo and action-specific icons; requested actual plan-start wiring and a Starter / Growth / Scale comparison.
+
 - 11-02 plan welcome refinement: "This looks better tho" after adding the campaign name, brief and invite count with action-specific icons. Asked for the brand logo beside the campaign identity; keep the selected split layout.
 
 - 11-02 plan welcome: "A is great" (dark plan sidebar beside a plain action list). Keep that composition. "It could use details from the campaign and the icons could be more specific to the actions": make the campaign name, brief and invite count the content, with search, editing and video-review icons.
