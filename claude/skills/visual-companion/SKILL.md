@@ -41,6 +41,13 @@ The server watches a directory for HTML files and serves the newest one to the b
 
 ## Starting a Session
 
+For SideShift product UI, route through the `design` skill before writing a screen. Read
+`~/dotfiles/claude/references/ui-taste.md` and `unslop.md`, identify the shared components,
+and render those React components on a development preview route. Use this companion for
+diagrams, wireframes, and comparison framing; do not substitute hand-built HTML lookalikes
+for product UI. The comparison should embed or link to the real preview. A chosen direction
+stays chosen when the operator rejects its visual finish.
+
 ```bash
 # --open auto-opens their browser on
 # the first screen; --project-dir persists mockups and enables same-port restart.

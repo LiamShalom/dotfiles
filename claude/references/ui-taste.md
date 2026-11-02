@@ -81,6 +81,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 
 **7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
 no emoji, sparkle/AI icons, "run by" pills or invented stats.
+- 11-02 plan-start welcome: "I like B, but it looks like slop". Keep the selected guided direction; replace the standalone HTML's fabricated miniature screens, pastel card treatments, and repeated descriptions with the real product kit before the next review.
 - 10-31 Meta copy suggestions: “they shouldnt say written by sidekick”. Use the shared Sidekick visual components without an authorship label; keep the generated copy and its actions first.
 - 10-30 shared job previews: approved liquid-metal C with the SideShift plane; asked for more motion and a prominent hiring-brand identity.
 - 10-20 "the run by sideshift pill looks AI generated" · "remove the stupid AI icons then use an actual case study"
