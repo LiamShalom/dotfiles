@@ -72,7 +72,7 @@ mkdir -p "$state"
 : >"$mark"
 
 questions="1. Which real accounts does this change reach? List every account whose emails, notices, cancellations, charges or access change, from live data (Stripe, Postgres, Firestore), not from a derived flag. For a cron, billing or email change, the blast-radius skill finds the list.
-2. Did the operator approve each of them? Approval for the case that prompted the change does not cover other accounts. If any account is not covered, stop and ask, with the list.
+2. Did the operator approve each of them? Approval for the case that prompted the change does not cover other accounts. For each account, quote the operator's own words that name it; your reading of a word like \"either\" or \"them\" is not approval. If any account is not covered, stop and ask, with the list. (2026-11-02: #8261 removed the operator from 49 channels on a reading of \"either\"; he wanted to stay.)
 3. Does the diff put a modal, popup, sheet, new screen or new component where there was none, or change what a click on a visible element does? Then it is large UI unless the operator saw it and chose it: you choosing between ways to read the request does not count. Open the preview in Session Board and stop. (2026-10-27: #7422 merged a video popup; the operator wanted the video to play in place.)"
 count=three
 if [ ! -e "$HOME/.cache/claude-copy-sweep/$session" ]; then
