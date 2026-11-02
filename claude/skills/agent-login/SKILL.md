@@ -15,6 +15,17 @@ accounts). A login in any other vault is out of reach; only Liam decides what go
 
 For SideShift previews or production, use [Codex test login](references/codex-test-login.md) with the business or creator test account. This takes precedence over the Session Board fallback below when running in Codex.
 
+For a SideShift preview, a saved-site mismatch is a login-helper limitation, not a failed
+sign-in or a reason to hand it to Liam. If the task needs the staff account, or the Keychain
+wrapper is unavailable, use `agent-login-codex-preview.mjs` and its
+`loginSideShiftPreviewInCodex(tab, options)` function with the same observed fields and
+`item` options as `loginInCodex`. It verifies the deployment in Vercel's `side-shift` team,
+then uses the saved `app.sideshift.app` login through the native adapter. Use `SideShift User`
+only for staff tasks and `SideShift Test Creator` for creator tasks. No vault website changes
+or new approval are needed for an authorized test on that verified preview. An actual
+provider refusal still follows the one-failed-sign-in rule.
+
+
 ## Safari in iOS Simulator
 
 Use `agent-login-safari-simulator.mjs` from `cua_repl` before handing a simulator login to
