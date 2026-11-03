@@ -77,6 +77,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 - 10-02 "tgae should just say the platform and have the logo"
 - 10-06 "I wish it showed logo for the store like shopify and then just had item name"
 - 10-09 "remove the crown emoji and emphasize the ads more using meta, tiktok logos"
+- 11-03 New contract draft card (term changes in the agreement sidebar): picked B, redline rows (label, old struck, new bold), over the shipped before → after pill rows and a copy of the terms card with changes in green (my pick): "B, but dont need the platform names, just logo". A platform change is logos only, added ringed green, removed faded and ringed red
 - 10-27 guest redlining terms panel (TikTok / Instagram as plain black text pills): "Make the platforms use the logo etc."
 - 10-28 same panel, restyled with the wizard's logo chips but still limited to the campaign's 2 platforms: "why are you only showing 2 platforms it should show all 6". Reusing a shipped picker means its options too: a platform picker lists every platform the wizard lists, with the current ones selected
 
