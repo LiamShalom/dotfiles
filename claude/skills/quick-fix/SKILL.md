@@ -298,6 +298,8 @@ Merge yourself when **all** of these hold:
   passing. Wait for late checks: `gh-approve` can merge before they report.
 - The size check still says small.
 
+Before invoking the merge script, run `~/dotfiles/claude/bin/pr-checks-green <pr>`. It refuses pending, failed, cancelled, timed-out, unknown and empty results. Do not infer success from an empty pending/failure filter or rely on required checks alone. A nonzero result blocks merge.
+
 Merge with `/pr-approve`: `.claude/skills/pr-approve/scripts/gh-approve <pr> --merge`.
 Never `gh pr merge --admin`. Run it after the final push; a later push can dismiss the
 approval. Then confirm the production deploy reaches READY; on `git_info_fail`, run
