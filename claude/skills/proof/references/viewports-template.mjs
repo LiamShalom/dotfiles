@@ -19,7 +19,8 @@ const SIZES = [
   ['1280x800', 1280, 800], // desktop
 ];
 
-const browser = await chromium.launch();
+// Attach to the shared agent Chrome; never launch one.
+const browser = await chromium.connectOverCDP(process.env.AGENT_CHROME || 'http://127.0.0.1:9222');
 let fails = 0;
 for (const [label, width, height] of SIZES) {
   const ctx = await browser.newContext({ viewport: { width, height } });

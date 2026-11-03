@@ -19,11 +19,16 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
+// Attach to the shared agent Chrome (never launch one); close() then only drops the contexts made here.
+async function agentChrome() {
+  const { chromium } = await import(process.env.PLAYWRIGHT_CORE || 'playwright');
+  return chromium.connectOverCDP(process.env.AGENT_CHROME || 'http://127.0.0.1:9222');
+}
+
 async function embedImages(folder, rels, maxWidth = 640, quality = 0.72) {
   try {
-    const { chromium } = await import('playwright');
-    const browser = await chromium.launch();
-    const page = await browser.newPage();
+    const browser = await agentChrome();
+    const page = await (await browser.newContext()).newPage();
     const map = {};
     for (const rel of rels) {
       const b64 = fs.readFileSync(path.join(folder, rel)).toString('base64');
@@ -61,9 +66,8 @@ const CUR_W = 18; // cursor width in the app's own pixel space (see --cur)
 
 /** Render the two cursor glyphs to transparent PNGs, sized for this viewport. */
 async function cursorPNGs(dir, vw) {
-  const { chromium } = await import('playwright');
-  const b = await chromium.launch();
-  const page = await b.newPage({ viewport: { width: 64, height: 64 }, deviceScaleFactor: 4 });
+  const b = await agentChrome();
+  const page = await (await b.newContext({ viewport: { width: 64, height: 64 }, deviceScaleFactor: 4 })).newPage();
   const out = {};
   const glyphs = {
     arrow: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 17 25" width="W"><path d="M2.5 2.5 2.5 19.6 6.9 15.7 9.6 22.3 12.4 21.1 9.8 14.7 15.1 14.5Z" fill="#fff" stroke="#fff" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/><path d="M2.5 2.5 2.5 19.6 6.9 15.7 9.6 22.3 12.4 21.1 9.8 14.7 15.1 14.5Z" fill="#1d1d1f" stroke="#1d1d1f" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`,

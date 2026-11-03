@@ -541,7 +541,8 @@ async function main() {
   } catch (e) {
     console.log('(cleanup) skipped:', String(e).slice(0, 80));
   }
-  browser = await chromium.launch();
+  // Attach to the shared agent Chrome; never launch one. close() then only drops this run's contexts.
+  browser = await chromium.connectOverCDP(process.env.AGENT_CHROME || 'http://127.0.0.1:9222');
   for (const name of ONLY || Object.keys(JOURNEYS)) {
     if (!JOURNEYS[name]) {
       console.log(`(skip) unknown journey ${name}`);
