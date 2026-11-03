@@ -23,9 +23,12 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 1. **Work on the feature branch** in a worktree (operator's worktree rules: link env files,
    clone `node_modules`). This branch is the one `execute` continues on.
 
-2. **Read the taste file, then find the reference.** Read
+2. **Read the taste file and the craft standard, then find the reference.** Read
    `~/dotfiles/claude/references/ui-taste.md` (the operator's design feedback, distilled) and
-   design to it. For each surface in the spec, open the closest shipped screen the operator
+   `~/dotfiles/claude/references/unslop.md` (the craft standard: nine passes and the signs of
+   AI-looking UI), and design to both; taste wins where they differ. Write the three
+   direction lines from `unslop.md` (job, moment, signature) into `design.md` before you
+   build. For each surface in the spec, open the closest shipped screen the operator
    has approved, note how few words it uses and how it shows state (numbers, chips, icons,
    layout), and list the primitives in `components/ui/` and `components/ui/icons/` you will
    use. A new component composes those primitives and tokens. Creator surfaces (`CREATOR_SURFACES` in
@@ -62,11 +65,13 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 
 6. **Check it yourself first.** Open the route in the shared agent Chrome
    (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. Put
-   it beside the reference screen. Fix spacing, type, colour and overflow until it matches
-   the product. Then do a copy pass: read every string on screen and delete each one that
-   does not change what the user does next, or that a label, number, icon or the layout
-   already says. No screen should carry more words than its reference. (10-26: "very text
-   heavy components which often arent neccessray".)
+   it beside the reference screen. Go through the "Signs of slop" table in `unslop.md` and
+   list every sign you see, then run its nine passes in order (spacing, colour, icons, copy,
+   type, layout, details, visuals, motion) across the whole screen until the list is empty
+   and its checklist and template check pass. In the copy pass, also read every string on
+   screen and delete each one that does not change what the user does next, or that a
+   label, number, icon or the layout already says. No screen should carry more words than
+   its reference. (10-26: "very text heavy components which often arent neccessray".)
 
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
