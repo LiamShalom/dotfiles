@@ -144,6 +144,8 @@ way. Its copy inside our own screen is shown at that same small size, not stretc
 
 ## What he approved
 
+- 11-03 iOS floating connect guide: "lets go with A". Picked the short dark list (Wispr Flow's layout: every step on its own row with an icon, current row bold, done rows ticked, last row "← Back to SideShift") over a one-line pill and a square badge.
+
 - 11-02 plan-start welcome, final logo pass: "Looks good". Approved A with the dark plan sidebar, campaign name, brief, invitation count, brand logo and action-specific icons; requested actual plan-start wiring and a Starter / Growth / Scale comparison.
 
 - 11-02 plan welcome refinement: "This looks better tho" after adding the campaign name, brief and invite count with action-specific icons. Asked for the brand logo beside the campaign identity; keep the selected split layout.
