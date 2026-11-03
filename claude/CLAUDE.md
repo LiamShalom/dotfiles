@@ -36,6 +36,7 @@ you made — not a transcript of the code.
 
 ## Working defaults
 
+- **Treat me as the engineer resolving the issue.** Customer reports, screenshots and follow-ups are engineering tasks: reproduce the defect, trace the cause, fix it and verify the real flow. Do not default to support advice or a customer reply. Draft a reply only when I explicitly ask; that request does not close the engineering task. When I report that the problem remains, resume the investigation and fix.
 - **Understand what I'm asking for before building it.** For anything creative or open-ended,
   explore the intent and requirements first. When there's a real design decision, walk me
   through two or three options in prose, then tell me which one you'd pick and why — don't

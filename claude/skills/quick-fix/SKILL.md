@@ -72,6 +72,8 @@ and go get the number.
 
 ## Phase 1 — Intake
 
+**Route the request as engineering work.** The operator is a software engineer, not the affected customer. A pasted complaint or screenshot starts an investigation and fix. An explicit request for a summary or reply changes that response only; keep the unresolved defect open. On a follow-up such as "he did but still getting this", return to Phase 3 with the new evidence. Before ending, check that the answer contains a verified fix or a concrete blocker, rather than only a suggested customer reply.
+
 Pull everything the report already contains before asking the reporter for anything.
 
 **Jam.dev link** → use the Jam MCP (`mcp__Jam__getDetails`, then `getConsoleLogs`,
