@@ -49,6 +49,14 @@ docs/features/YYYY-MM-DD-<slug>/
 
 4. **Propose two or three approaches** in prose, with costs and risks. Say which you would
    pick and why. Disagree with the operator when you think the plan is wrong.
+   Before you do, write the ask's distinctive part in one line (the thing that makes it this
+   idea and not a simpler one: "floats over the other app"). Every approach you offer must keep
+   it, at least on the platforms where it is possible. If research says it is impossible
+   somewhere, search for the platform's own way to do it before dropping it, and if an
+   approach still drops it, say so in the question and ask whether the reduced version is
+   what they want. (11-03 connect guide: "a floating step by step guide" became a connect
+   sheet; desktop Chrome's Document Picture-in-Picture was missed → "this isnt at all what I
+   was thinking".)
 
 5. **Write the spec** to `docs/features/YYYY-MM-DD-<slug>/spec.md` with the template below.
    Then review it yourself: no TBDs, no contradictions, every requirement has one meaning,
