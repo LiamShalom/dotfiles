@@ -84,6 +84,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "WebFetch|mcp__notion__notion-fetch|mcp__chrome-devtools__navigate_page|mcp__chrome-devtools__new_page",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/notion-site-read.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
