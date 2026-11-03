@@ -145,6 +145,13 @@ way. Its copy inside our own screen is shown at that same small size, not stretc
 - 11-03 same card, after it ticked steps and turned green on approval: "The video can stay constant though.
   No need for it to update". A floating guide is a fixed list of steps; state belongs on our own screen
 
+**18. A control added inside a compact surface takes that surface's size, not the form's.** A popover,
+menu or chip editor has its own scale (12–14px text, 24–32px controls). New fields inside it are one
+short line at that scale, never the page form's labelled 40px field.
+- 11-03 hashtag popover (calendar for posting days), Entry limit added as a WizardField label + two
+  40px boxes (number, "per creator each month" select) under the calendar: "the UI is wayyyy too large".
+  Rebuilt as one 32px line: "Max entries [5] [in total ▾]"
+
 ## What he approved
 
 - 11-03 iOS floating connect guide: "lets go with A". Picked the short dark list (Wispr Flow's layout: every step on its own row with an icon, current row bold, done rows ticked, last row "← Back to SideShift") over a one-line pill and a square badge.

@@ -63,7 +63,11 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
    the parts that touch shared code, and prove the fact each is safe because of. Check for
    duplicated UI or logic, flags, explainer notices, stray fixtures and dead code from your
    own change. UI in the diff must pass the checklist in
-   `docs/frontend/unslop.md`.
+   `docs/frontend/unslop.md` and `~/dotfiles/claude/references/ui-taste.md` (read it now,
+   even if you read it at design time). A control added inside an existing popover, menu,
+   chip or card uses that host's scale: compare its height and text size with the host's
+   own controls, not the page form's. If the host grew much taller or now needs to scroll,
+   the addition is too big: shrink it before you go on.
 
 7. **Open one PR** (not draft) with the final behavior, rollout order and links. Follow
    `docs/agents/vercel-deployments.md` for title markers.
