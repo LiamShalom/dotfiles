@@ -50,6 +50,8 @@ Team **Sideshift**, project **AI Issues** for agent-filed issues.
 
 ## Resolving a name to an id
 
+For withdrawal reports tied to Plutus or an integration, resolve both the supplied email and its `+1` alias (for example, `name@gmail.com` and `name+1@gmail.com`). Integration payments use a separate `EmbedUser` wallet; do not conclude that a withdrawal is missing from the ordinary account history alone.
+
 Support reports arrive as names ("CheaterBuster", "Noel Moore"); almost every
 investigation step needs an id.
 
