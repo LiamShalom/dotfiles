@@ -119,6 +119,8 @@ not a variant of the closest weak pattern.
 - 10-23 "This is awful. Be more creatve. This is why I asked for you to provide options."
 - 11-02 plan welcome: "This is awful too, designb a couple of options and presenmt too me" after the selected guided concept was rebuilt as three gray DS cards. Component reuse does not fix a weak composition. Compare new layouts when options are requested again; preserve the useful content, not the rejected card grid.
 
+- 11-03 connect step guide: three connect-sheet directions (a card anchored to Connect, steps in the row, a guide popup) for what he had described as a Wispr-style floating card: "This isnt at all what I was thinking, this is a connect but I was looking for a floating step bey step guide". The options must all be the thing he named (here: floating, free of the page). Three variants of a different thing are not options.
+
 **15. Add to an existing control before adding a new row.** Extra things about the selected item
 (other cuts, variants) belong in the control that already switches it, not in a new strip that
 pushes the layout.
