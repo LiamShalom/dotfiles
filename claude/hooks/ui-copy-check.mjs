@@ -103,7 +103,7 @@ const newBrand = creatorSurface
   ? pairs.reduce((n, [oldS, newS]) => n + Math.max(0, count(newS, BRAND_ONLY) - count(oldS, BRAND_ONLY)), 0)
   : 0;
 
-// Signs of AI-looking UI (references/unslop.md, adapted from heydamir/unslop, CC BY 4.0). Only signs
+// Signs of AI-looking UI (sideshift-monorepo docs/frontend/unslop.md, adapted from heydamir/unslop, CC BY 4.0). Only signs
 // the edit adds count, so copying a file that already has them stays silent.
 const stripComments = (s) => s.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
 const offGrid = (src) =>
@@ -152,7 +152,7 @@ if (slopHits.length) {
   log(`slop ${list}`);
   notes.push(
     `Unslop check: this edit adds signs of AI-looking UI: ${list}. Fix them before moving on, using the pass ` +
-    `named in ~/dotfiles/claude/references/unslop.md ("Signs of slop"): neutral --ds-* surfaces with one accent, ` +
+    `named in docs/frontend/unslop.md ("Signs of slop"): neutral --ds-* surfaces with one accent, ` +
     `solid text, no glows, no emoji (line icon or platform logo), sentence case, DS type weights, 4px grid, named ` +
     `transition properties, plain copy with no "!" or hype. Approved exceptions: liquid metal / blue gradient on a ` +
     `hero moment, type-button-metal, type-number. If one is deliberate, say why in one line.`,
