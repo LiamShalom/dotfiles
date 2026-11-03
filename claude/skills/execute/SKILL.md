@@ -62,7 +62,8 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
 6. **Self-review the whole diff.** Run `/code-review` on the branch, then `blast-radius` on
    the parts that touch shared code, and prove the fact each is safe because of. Check for
    duplicated UI or logic, flags, explainer notices, stray fixtures and dead code from your
-   own change.
+   own change. UI in the diff must pass the checklist in
+   `~/dotfiles/claude/references/unslop.md`.
 
 7. **Open one PR** (not draft) with the final behavior, rollout order and links. Follow
    `docs/agents/vercel-deployments.md` for title markers.

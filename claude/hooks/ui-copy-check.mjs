@@ -103,6 +103,31 @@ const newBrand = creatorSurface
   ? pairs.reduce((n, [oldS, newS]) => n + Math.max(0, count(newS, BRAND_ONLY) - count(oldS, BRAND_ONLY)), 0)
   : 0;
 
+// Signs of AI-looking UI (references/unslop.md, adapted from heydamir/unslop, CC BY 4.0). Only signs
+// the edit adds count, so copying a file that already has them stays silent.
+const stripComments = (s) => s.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+const offGrid = (src) =>
+  [...src.matchAll(/(?:^|[\s"'`:])-?(?:p[xytrbl]?|m[xytrbl]?|gap(?:-[xy])?|space-[xy])-\[(\d+(?:\.\d+)?)px\]/g)]
+    .filter((m) => Number(m[1]) > 2 && Number(m[1]) % 2 !== 0).length;
+const SLOP = [
+  ['gradient text', (s) => count(s, /\bbg-clip-text\b|WebkitBackgroundClip/g) - count(s, /type-button-metal/g)],
+  ['purple/violet/pink hue gradient', (s) => count(s, /\b(?:from|via|to)-(?:purple|violet|fuchsia|pink|indigo)-\d{2,3}\b/g)],
+  ['coloured glow shadow', (s) => count(s, /(?:drop-)?shadow-\[0_0_[^\]]*(?:rgba?\((?!0,\s*0,\s*0)|#(?!000))|\bshadow-(?:purple|violet|fuchsia|pink|indigo|blue|cyan)-\d{2,3}\b/g)],
+  ['looping motion (animate-ping/bounce)', (s) => count(s, /\banimate-(?:ping|bounce)\b/g)],
+  ['transition-all', (s) => count(s, /\btransition-all\b/g)],
+  ['hover:scale up', (s) => count(s, /\bhover:scale-(?:10[1-9]|1[1-9]\d)\b/g)],
+  ['800/900 weight', (s) => count(s, /\bfont-(?:extrabold|black)\b/g)],
+  ['UPPERCASE tracked label', (s) => count(s, /\buppercase\b[^"'`\n]*\btracking-(?:wide|wider|widest|\[0?\.\d+em\])/g)],
+  ['off-grid spacing (odd px)', offGrid],
+  ['emoji in UI', (s) => count(s.replace(/[©®™]/g, ''), /\p{Extended_Pictographic}/gu)],
+  ['exclamation in UI text', (s) => count(s, />[^<>{}]*[A-Za-z][^<>{}]*[a-z)]![\s\p{Extended_Pictographic}️]*</gu) + count(s, /(["'`])[A-Z][^"'`\n]{0,80}[a-z)]![\s\p{Extended_Pictographic}️]*\1/gu)],
+  ['hype or greeting copy', (s) => count(s, /\b(?:supercharge\w*|seamless(?:ly)?|effortless(?:ly)?|magic(?:al)?|revolutioni[sz]\w*|game-?chang\w*|AI-powered|Welcome back)\b/gi)],
+];
+const slopHits = SLOP
+  .filter(([label]) => kind === 'tsx' || /emoji|exclamation|hype/.test(label))
+  .map(([label, fn]) => [label, pairs.reduce((n, [oldS, newS]) => n + Math.max(0, fn(stripComments(newS)) - fn(stripComments(oldS))), 0)])
+  .filter(([, n]) => n > 0);
+
 const notes = [];
 const log = (line) => {
   try {
@@ -119,6 +144,18 @@ if (newBrand > 0) {
     `CREATOR_MODAL_TITLE_CLASS, CREATOR_PRIMARY_/SECONDARY_BUTTON_*, CREATOR_INPUT_CLASS, CREATOR_MODAL_FOOTER_CLASS) ` +
     `with CREATOR_PALETTE_VARS; reference components/modals/accept-campaign-invite-modal.tsx. A brand-side popup it ` +
     `mirrors gives the content, not the look.`,
+  );
+}
+
+if (slopHits.length) {
+  const list = slopHits.map(([label, n]) => `${label} ×${n}`).join(', ');
+  log(`slop ${list}`);
+  notes.push(
+    `Unslop check: this edit adds signs of AI-looking UI: ${list}. Fix them before moving on, using the pass ` +
+    `named in ~/dotfiles/claude/references/unslop.md ("Signs of slop"): neutral --ds-* surfaces with one accent, ` +
+    `solid text, no glows, no emoji (line icon or platform logo), sentence case, DS type weights, 4px grid, named ` +
+    `transition properties, plain copy with no "!" or hype. Approved exceptions: liquid metal / blue gradient on a ` +
+    `hero moment, type-button-metal, type-number. If one is deliberate, say why in one line.`,
   );
 }
 

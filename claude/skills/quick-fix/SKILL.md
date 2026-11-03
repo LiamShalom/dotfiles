@@ -200,7 +200,10 @@ Work in a new worktree off `origin/main`, branch `fix/<short-description>`, env 
 linked. Write the smallest change that removes the proven cause. Match the file's existing
 style, comment density, and idioms. Reuse existing components and code. If the change
 touches what a user sees, read `~/dotfiles/claude/references/ui-taste.md` first, and add to
-it when the operator reacts to the result.
+it when the operator reacts to the result. New or changed UI must also pass the checklist in
+`~/dotfiles/claude/references/unslop.md` (no emoji, glows, hue gradients, gradient text,
+greeting or hype copy, off-grid spacing, looping motion). Fix only the signs in the lines you
+touch; list other slop you see on that screen in chat.
 
 Touch only what the task requires. Unrelated ugly or dead code gets flagged in chat, not
 changed — except an orphan your own fix creates, which you remove.
