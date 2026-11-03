@@ -25,7 +25,7 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 
 2. **Read the taste file and the craft standard, then find the reference.** Read
    `~/dotfiles/claude/references/ui-taste.md` (the operator's design feedback, distilled) and
-   `~/dotfiles/claude/references/unslop.md` (the craft standard: nine passes and the signs of
+   `docs/frontend/unslop.md` (the craft standard: nine passes and the signs of
    AI-looking UI), and design to both; taste wins where they differ. Write the three
    direction lines from `unslop.md` (job, moment, signature) into `design.md` before you
    build. For each surface in the spec, open the closest shipped screen the operator
