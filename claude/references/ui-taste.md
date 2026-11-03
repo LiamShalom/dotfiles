@@ -135,6 +135,13 @@ preview redraws to match.
   it in practiuce in the UI". Picked: the preview draws each header, Dynamic flips between its two
   versions, over option cards and over a new default
 
+**17. A floating guide is small and movable, never a banner.** A card that rides over another app
+is as small as its text allows (a short list like Wispr Flow's), and the user drags it out of the
+way. Its copy inside our own screen is shown at that same small size, not stretched to full width.
+- 11-03 iOS connect guide, a full-width dark strip (logo, step tiles, one big line, progress bar)
+  shown inline at full width and floating at 450 pt on the iPad: "Its wayyy to big, it needs to be a
+  small component that can be dragged around and positioned in the same way that whisper flow had"
+
 ## What he approved
 
 - 11-02 plan-start welcome, final logo pass: "Looks good". Approved A with the dark plan sidebar, campaign name, brief, invitation count, brand logo and action-specific icons; requested actual plan-start wiring and a Starter / Growth / Scale comparison.
