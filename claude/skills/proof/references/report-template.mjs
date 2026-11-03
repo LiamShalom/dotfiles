@@ -213,7 +213,7 @@ function bakeTrack({ folder, track, events, glyphs, ffmpeg, fps = 25 }) {
   try {
     execSync(
       `ffmpeg -y -v error -i "${webm}" -i "${glyphs.arrow}" -i "${glyphs.hand}" ` +
-        `-filter_complex_script "${graphFile}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -crf 22 -an "${out}"`,
+        `-/filter_complex "${graphFile}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -crf 22 -an "${out}"`,
       { stdio: 'pipe' }
     );
   } catch (e) {
