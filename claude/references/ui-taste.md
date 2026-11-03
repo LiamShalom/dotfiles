@@ -141,6 +141,8 @@ way. Its copy inside our own screen is shown at that same small size, not stretc
 - 11-03 iOS connect guide, a full-width dark strip (logo, step tiles, one big line, progress bar)
   shown inline at full width and floating at 450 pt on the iPad: "Its wayyy to big, it needs to be a
   small component that can be dragged around and positioned in the same way that whisper flow had"
+- 11-03 same card, after it ticked steps and turned green on approval: "The video can stay constant though.
+  No need for it to update". A floating guide is a fixed list of steps; state belongs on our own screen
 
 ## What he approved
 
