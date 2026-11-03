@@ -187,6 +187,13 @@ reporter knows and you can't observe:
 
 When you ask, ask everything at once, with what you already found attached.
 
+**An access refusal ("you don't have access") is not proof that the permission is right.**
+Before you hide an entry point to match a server gate, decide which permission the feature
+should follow: the one for the data it acts on (a post's video edits follow Posts access, not
+Ads). If the server gate and that permission differ, fix the server gate. Hiding the entry
+point only fits when the feature truly belongs to that other permission. (2026-11-03: Ad cuts
+were hidden from members without Ads access; the operator wanted Posts access to be enough.)
+
 ## Phase 5 — Fix
 
 Work in a new worktree off `origin/main`, branch `fix/<short-description>`, env files
