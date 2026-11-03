@@ -151,6 +151,10 @@ short line at that scale, never the page form's labelled 40px field.
 - 11-03 hashtag popover (calendar for posting days), Entry limit added as a WizardField label + two
   40px boxes (number, "per creator each month" select) under the calendar: "the UI is wayyyy too large".
   Rebuilt as one 32px line: "Max entries [5] [in total ▾]"
+- 11-03 then: "when setting a hashtag just in the UI have the max # inline with the text as an optional
+  setting not something to change later". An optional setting of a thing being added goes on the
+  same line as the thing's input, set at add time, not in an editor opened afterwards. Built as a
+  "Max #" box inside the hashtag input; the per month / per platform choices left the UI
 
 ## What he approved
 
