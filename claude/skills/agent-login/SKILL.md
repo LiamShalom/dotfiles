@@ -50,6 +50,15 @@ Create the provider account through its real signup UI, keep its unique credenti
 Agent-Test, and verify the finished profile. Record provider security gates separately;
 never describe a saved password item alone as a created provider account.
 
+## Find a saved QA login before asking for its name
+
+For a test login whose item name is unknown, run
+`node ~/dotfiles/claude/bin/agent-login-discover.mjs https://<site> Agent-Test`.
+This lists matching item names, IDs and saved websites only. It does not read usernames,
+passwords, codes or item fields. Select the QA item from this result, then use the login
+adapter for your browser. Ask for an item name only after this lookup is empty or ambiguous; report
+an actual vault-access error separately. Never choose a personal login for a test.
+
 ## Run it
 
 1. Open the sign-in page in your own tab (your chat's window in the agent Chrome).
