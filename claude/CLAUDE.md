@@ -237,8 +237,10 @@ window in it: its tabs never mix with another chat's.
 Many agents share this Mac's memory, so a hook (`~/.claude/hooks/heavy-gate.sh`) rewrites heavy
 commands before they run: Vitest runs on the default config get `--maxWorkers=4`, and full test
 suites, builds and whole-repo typecheck or lint wait for one of two slots (`~/.claude/bin/heavy`).
+A `next build` (40-60 GB here) runs one at a time and waits for 45% of memory to be free; other
+heavy jobs wait for 20%. The agent preflight (`scripts/agent-preflight.mjs`) takes a slot too.
 
-- **"heavy: all 2 slots are busy" means wait, not fail.** Don't work around the queue or the
+- **"heavy: all 2 slots are busy" or "only N% of memory is free" means wait, not fail.** Don't work around the queue or the
   worker cap (no `--maxWorkers` overrides, no `bash -c` wrappers) unless I ask.
 - **While iterating, run the specific test files you changed.** Targeted runs skip the queue;
   save the full suite for the final check.

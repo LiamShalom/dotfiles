@@ -10,6 +10,11 @@
 //  - Heavy jobs (a Vitest run with no file filter, build, whole-project
 //    typecheck or lint) are wrapped in ~/.claude/bin/heavy, which queues them
 //    so only two run at once machine-wide.
+//  - `xcodebuild` builds and tests queue in their own pool of two. Test runs
+//    get -parallel-testing-enabled NO: the SideShift test scheme is marked
+//    parallelizable, so each run otherwise boots one simulator clone per
+//    worker ("Clone 1..5 of x-ads-202", 1.5-3 GB each). Runs that choose their
+//    own parallel-testing flags are left alone.
 //
 // Prints the rewritten command, or nothing when the command is left alone.
 // Usage: heavy-classify.mjs <command> [cwd]
@@ -25,9 +30,11 @@ const VITEST_VALUE_FLAGS = new Set([
 	"--environment", "--dir", "--root", "-r", "--shard", "--exclude", "--pool", "--mode", "--bail", "--retry",
 	"--testTimeout", "--hookTimeout", "--maxConcurrency", "--sequence.seed", "--inspect-brk", "--inspect",
 ]);
+const XCODE_BUILD_ACTIONS = new Set(["build", "build-for-testing", "analyze", "archive", "test", "test-without-building", "docbuild", "install", "installsrc"]);
+const XCODE_INFO_FLAGS = /^-(list|showBuildSettings|showsdks|showdestinations|showTestPlans|showBuildTimingSummary|version|help|usage|resolvePackageDependencies|exportArchive|exportLocalizations|importLocalizations|downloadPlatform|downloadAllPlatforms|runFirstLaunch|checkFirstLaunchStatus)$/;
 
 // Split into segments at && || ; | & and newlines outside quotes, keeping offsets.
-function segments(cmd) {
+export function segments(cmd) {
 	const out = [];
 	let start = 0, q = null;
 	for (let i = 0; i < cmd.length; i++) {
@@ -54,7 +61,7 @@ function segments(cmd) {
 }
 
 // Words of one segment with their offsets; quotes are removed from the text.
-function words(cmd, from, to) {
+export function words(cmd, from, to) {
 	const out = [];
 	let i = from;
 	while (i < to) {
@@ -74,14 +81,15 @@ function words(cmd, from, to) {
 	return out;
 }
 
-function scriptIsVitest(cwd, name) {
+function scriptMatches(cwd, name, re) {
 	try {
 		const pkg = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8"));
-		return /^\s*vitest(\s|$)/.test(pkg.scripts?.[name] ?? "");
+		return re.test(pkg.scripts?.[name] ?? "");
 	} catch {
 		return false;
 	}
 }
+const scriptIsVitest = (cwd, name) => scriptMatches(cwd, name, /^\s*vitest(\s|$)/);
 
 // Returns { heavy, insert: [{at, text}] } for one segment.
 function analyse(cmd, seg, cwd, hasCd) {
@@ -98,6 +106,10 @@ function analyse(cmd, seg, cwd, hasCd) {
 		at = 1;
 		while (at < w.length && w[at].text.startsWith("-")) at++;
 		if (at >= w.length) return none;
+		prog = w[at].text;
+	} else if (prog === "xcrun") {
+		at = w.findIndex((x) => x.text === "xcodebuild");
+		if (at < 0) return none;
 		prog = w[at].text;
 	} else if (["npm", "pnpm", "yarn"].includes(prog) && w[1]?.text === "exec") {
 		at = 2;
@@ -143,7 +155,10 @@ function analyse(cmd, seg, cwd, hasCd) {
 		if (w[1]?.text === "test" || w[1]?.text === "t") { script = "test"; scriptWord = w[1]; }
 		else if (w[1]?.text === "run" || w[1]?.text === "run-script") { script = w[2]?.text; scriptWord = w[2]; }
 		if (!script) return none;
-		if (HEAVY_SCRIPTS.has(script)) return { heavy: true, insert: [] };
+		if (HEAVY_SCRIPTS.has(script)) {
+			const nextBuild = !hasCd && scriptMatches(cwd, script, /(^|[\s"'])next build(?![\w:-])/);
+			return { heavy: true, pool: nextBuild ? "build" : null, insert: [] };
+		}
 		if (!VITEST_SCRIPTS.has(script)) return none;
 		const dd = w.findIndex((x) => x.text === "--");
 		const extra = dd >= 0 ? w.slice(dd + 1) : [];
@@ -158,7 +173,24 @@ function analyse(cmd, seg, cwd, hasCd) {
 		return { heavy: !positional, insert };
 	}
 
-	if (base === "next" && args[0]?.text === "build") return { heavy: true, insert: [] };
+	if (base === "xcodebuild") {
+		if (flag(XCODE_INFO_FLAGS)) return none;
+		const actions = args.map((a) => a.text).filter((t) => XCODE_BUILD_ACTIONS.has(t));
+		// No action means `build`; `clean` alone is cheap.
+		if (!actions.length && args.some((a) => a.text === "clean")) return none;
+		const insert = [];
+		const testing = actions.includes("test") || actions.includes("test-without-building");
+		if (testing && !flag(/^-(parallel-testing-enabled|parallel-testing-worker-count|maximum-parallel-testing-workers)$/)) {
+			insert.push({ at: w[at].end, text: " -parallel-testing-enabled NO" });
+		}
+		return { heavy: true, pool: "xcode", insert };
+	}
+
+	if (base === "next" && args[0]?.text === "build") return { heavy: true, pool: "build", insert: [] };
+
+	// The monorepo preflight runs the test typecheck, ESLint and Vitest itself,
+	// out of the hook's sight.
+	if (base === "node" && /(^|\/)agent-preflight\.mjs$/.test(args[0]?.text ?? "")) return { heavy: true, insert: [] };
 
 	if (base === "tsc" || base === "tsc6") {
 		if (flag(/^(--version|-v|--help|-h|--init|--watch|-w)$/)) return none;
@@ -179,11 +211,12 @@ export function classify(cmd, cwd = process.cwd()) {
 	if (cmd.includes(".claude/bin/heavy")) return null;
 	const segs = segments(cmd);
 	const hasCd = segs.some((s) => /^\s*cd(\s|$)/.test(cmd.slice(s.start, s.end)));
-	let heavy = false;
+	let heavy = false, pool = null;
 	const inserts = [];
 	for (const s of segs) {
 		const r = analyse(cmd, s, cwd, hasCd);
 		heavy ||= r.heavy;
+		if (r.heavy && r.pool) pool = r.pool;
 		inserts.push(...r.insert);
 	}
 	if (!heavy && !inserts.length) return null;
@@ -192,7 +225,11 @@ export function classify(cmd, cwd = process.cwd()) {
 	if (!heavy) return out;
 	const shell = existsSync("/bin/zsh") ? "/bin/zsh" : "/bin/bash";
 	const home = process.env.HOME;
-	return `${home}/.claude/bin/heavy ${shell} -c '${out.replace(/'/g, `'\\''`)}'`;
+	// A build holds the one build slot and then a normal slot, so it also counts
+	// against the two heavy jobs.
+	const gate = pool === "build" ? `${home}/.claude/bin/heavy --pool build ${home}/.claude/bin/heavy`
+		: `${home}/.claude/bin/heavy${pool ? ` --pool ${pool}` : ""}`;
+	return `${gate} ${shell} -c '${out.replace(/'/g, `'\\''`)}'`;
 }
 
 // Run as a script (via the ~/.claude/hooks symlink, so compare real paths).

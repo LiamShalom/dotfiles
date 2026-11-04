@@ -9,10 +9,51 @@
 # exits, even if it crashes. If the slots cannot be used at all (a sandbox
 # that blocks /tmp), the command runs unqueued rather than not at all.
 #
-# Usage:  heavy <command> [args...]        HEAVY_SLOTS=2 by default
+# --pool keeps a separate set of slots: iOS builds and tests (`--pool xcode`)
+# queue among themselves, so a long UI test run never holds up a Vitest suite.
+#
+# Usage:  heavy [--pool NAME] <command> [args...]
+#         HEAVY_SLOTS=2 by default; the xcode pool uses HEAVY_XCODE_SLOTS=2
 set -uo pipefail
 
+POOL="slot"
 SLOTS="${HEAVY_SLOTS:-2}"
+WHAT="test suites or builds"
+# A job starts only while the kernel reports at least this much memory free
+# (kern.memorystatus_level, percent). Slots alone count jobs, not gigabytes:
+# on 2026-11-04 a `next build` (~45 GB) beside three full typechecks
+# (6-12 GB each) filled all 128 GB.
+MIN_FREE="${HEAVY_MIN_FREE_PCT:-20}"
+if [ "${1:-}" = "--pool" ]; then
+	POOL="$2"
+	shift 2
+	if [ "$POOL" = "xcode" ]; then
+		SLOTS="${HEAVY_XCODE_SLOTS:-2}"
+		WHAT="iOS builds or tests"
+	elif [ "$POOL" = "build" ]; then
+		# A Next production build peaks at 40-60 GB here: one at a time, and
+		# only with room for it. The classifier also takes a normal slot after.
+		SLOTS="${HEAVY_BUILD_SLOTS:-1}"
+		WHAT="a next build"
+		MIN_FREE="${HEAVY_BUILD_MIN_FREE_PCT:-45}"
+	fi
+fi
+
+# Wait for free memory, at most MEM_WAIT seconds; after that run anyway, so a
+# machine that stays full never blocks every agent for good.
+MEM_WAIT="${HEAVY_MEM_WAIT_SECS:-900}"
+waited=0
+while :; do
+	free=$(sysctl -n kern.memorystatus_level 2>/dev/null) || break
+	[ -n "$free" ] && [ "$free" -lt "$MIN_FREE" ] || break
+	if [ "$waited" -ge "$MEM_WAIT" ]; then
+		echo "heavy: memory still ${free}% free after ${MEM_WAIT}s; running anyway" >&2
+		break
+	fi
+	[ "$waited" -eq 0 ] && echo "heavy: only ${free}% of memory is free (need ${MIN_FREE}% for $WHAT); waiting..." >&2
+	sleep 10
+	waited=$((waited + 10))
+done
 DIR="/tmp/agent-heavy-$(id -u)"
 started="$DIR/started.$$"
 
@@ -28,7 +69,7 @@ while :; do
 		rm -f "$started"
 		# lockf exits 75 when the slot is busy; the marker file tells that apart
 		# from the job itself exiting 75.
-		lockf -s -t 0 "$DIR/slot.$i" /bin/sh -c ': > "$1"; shift; exec "$@"' sh "$started" "$@"
+		lockf -s -t 0 "$DIR/$POOL.$i" /bin/sh -c ': > "$1"; shift; exec "$@"' sh "$started" "$@"
 		rc=$?
 		if [ -e "$started" ]; then
 			rm -f "$started"
@@ -39,7 +80,7 @@ while :; do
 		[ "$rc" -eq 75 ] || unqueued "$@"
 	done
 	if [ "$notified" -eq 0 ]; then
-		echo "heavy: all $SLOTS slots are busy (other agents are running test suites or builds); waiting for one..." >&2
+		echo "heavy: all $SLOTS slots are busy (other agents are running $WHAT); waiting for one..." >&2
 		notified=1
 	fi
 	sleep 5

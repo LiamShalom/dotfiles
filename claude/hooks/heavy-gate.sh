@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # heavy-gate.sh — PreToolUse hook on Bash for Claude Code and Codex. Caps
-# Vitest workers and queues heavy jobs (see heavy-classify.mjs and bin/heavy).
-# Commands that are not heavy pass through untouched.
+# Vitest workers and queues heavy jobs (see heavy-classify.mjs and bin/heavy),
+# and refuses a new dev server when the machine already runs its
+# share (launch-gate.mjs). Other commands pass through untouched.
 #
 # Claude Code replaces the whole tool input with updatedInput, so every
 # original field is copied and only `command` changes. Codex applies a
@@ -12,10 +13,37 @@
 input=$(cat)
 cmd=$(jq -r '.tool_input.command | if type == "string" then . else empty end' <<<"$input" 2>/dev/null)
 [ -n "$cmd" ] || exit 0
+log="/tmp/agent-heavy-$(id -u)/hook.log"
 
-# Cheap filter first: almost every command never names a heavy tool.
+# Cheap filters first: almost every command never names one of these tools.
 case "$cmd" in
-	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint*) ;;
+	*next\ dev* | *run\ dev* | *pnpm\ dev* | *yarn\ dev* | *bun\ dev*)
+		reason=$(node "$HOME/.claude/hooks/launch-gate.mjs" "$cmd" 2>/dev/null)
+		if [ -n "$reason" ]; then
+			mkdir -p "$(dirname "$log")"
+			printf '%s %s\n  refused: %s\n' "$(date '+%F %T')" "${1:-claude}" "$cmd" >>"$log"
+			jq -nc --arg r "$reason" '{hookSpecificOutput: {hookEventName: "PreToolUse",
+				permissionDecision: "deny", permissionDecisionReason: $r}}'
+			exit 0
+		fi
+		;;
+esac
+
+# A command that names an iOS simulator or Android device records which session used it last, so
+# Session Board shows it in the session's pane. sim-owner.mjs runs in the background: the command
+# never waits for it.
+case "$cmd" in
+	*simctl* | *xcodebuild* | *adb\ * | *emulator\ *)
+		owner="$HOME/session-board/scripts/sim-owner.mjs"
+		session=$(jq -r '.session_id // empty' <<<"$input" 2>/dev/null)
+		if [ "${1:-}" != "--codex" ] && [ -n "$session" ] && [ -f "$owner" ]; then
+			(node "$owner" "$session" "$cmd" >/dev/null 2>&1 &)
+		fi
+		;;
+esac
+
+case "$cmd" in
+	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint* | *xcodebuild* | *agent-preflight*) ;;
 	*) exit 0 ;;
 esac
 
@@ -23,7 +51,6 @@ cwd=$(jq -r '.cwd // empty' <<<"$input")
 new=$(node "$HOME/.claude/hooks/heavy-classify.mjs" "$cmd" "${cwd:-$PWD}" 2>/dev/null) || exit 0
 [ -n "$new" ] || exit 0
 
-log="/tmp/agent-heavy-$(id -u)/hook.log"
 mkdir -p "$(dirname "$log")"
 printf '%s %s\n  before: %s\n  after:  %s\n' "$(date '+%F %T')" "${1:-claude}" "$cmd" "$new" >>"$log"
 
