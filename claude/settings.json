@@ -72,6 +72,11 @@
             "type": "command",
             "command": "bash ~/.claude/hooks/heavy-gate.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/iphone-only-sim.sh",
+            "timeout": 10
           }
         ]
       },
