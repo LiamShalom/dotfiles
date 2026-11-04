@@ -24,11 +24,13 @@ fi
 # Bringing one platform's design to another: the first build of #7581 (2026-10-27) cloned the
 # iOS chrome onto the creator web instead of moving its design choices onto the web's own kit.
 port_from='(^|[^a-z])(ios|iphone|android|native|mobile app)([^a-z]|$)'
-port_to='(^|[^a-z])(web|webapp|website)([^a-z]|$)'
-port_ask='(^|[^a-z])(match|parity|same as|mirror|as well|port|bring|migrate)([^a-z]|$)'
+# 2026-11-04: "replicate the mobile view of the brand portfolio side but on ios" named no "web" and
+# used "replicate", so this missed it; the iOS copy then kept the web's narrow-column wrap.
+port_to='(^|[^a-z])(web|webapp|website|mobile view|brand side|brand view)([^a-z]|$)'
+port_ask='(^|[^a-z])(match|parity|same as|mirror|as well|port|bring|migrate|replicate|recreate|copy)([^a-z]|$)'
 if [[ $prompt =~ $port_from ]] && [[ $prompt =~ $port_to ]] && [[ $prompt =~ $port_ask ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/platform-port-nudge.log"
-  echo "If this asks to bring one platform's design to another (iOS app to web, or the reverse): carry over the design choices (structure, sections, content, behaviour) and build them from the target's own components, nav, type and colours. Do not rebuild the source platform's chrome (tab bars, glass, side menus, its font). Keep the nav to five groups or fewer, with tabs inside pages, so it never scrolls."
+  echo "If this asks to bring one platform's design to another (iOS app to web, or the reverse): carry over the design choices (structure, sections, content, behaviour) and build them from the target's own components, nav, type and colours. Do not rebuild the source platform's chrome (tab bars, glass, side menus, its font). Copy what each row shows, not how it wraps at the source's width: lay rows out for the target's space, with no empty gap beside a wrapped line. Keep the nav to five groups or fewer, with tabs inside pages, so it never scrolls."
 fi
 
 # Judging which features or gaps are worth building: on 2026-11-04 an ads teardown review ranked
