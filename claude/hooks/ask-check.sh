@@ -16,6 +16,9 @@
 # 10-28 the progress bar covering the title on the new iOS languages step was captioned "Not this feature" and left;
 # "this UI should be fixed" (a repeat of the 10-20 "these are all relevant" gaps lesson, learning ledger).
 # The injected text shows in the transcript on every flagged turn, so it stays a few lines; the incidents above stay here.
+# A passing check ends on the message's own last line, never a bare "Scope checked.": Claude Code classifies the
+# session from its final message, and on 11-04 "Scope checked." read as "continuing", so a session parked on a merge
+# poll sat in Session Board's Working column instead of reaching Liam.
 # Runs at every turn end in every session, so it stays at one jq call: no grep, no node.
 # Headless runs (claude -p: compaction, reviews, the weekly pass) report as `sdk-*` and are skipped: their final
 # message is a result another program reads, and a continuation would replace it.
@@ -30,10 +33,10 @@ jq -c 'if .stop_hook_active then empty else
   | ($m | test("approv[a-z]*[^.\\n]{0,80}\\b(screen|ui|design|layout|page|modal|flow)\\b|\\b(screen|ui|design|layout|page|modal|flow)\\b[^.\\n]{0,80}approv"; "i")) as $uiApproval
   | ($m | test("\\boptions?\\b|\\bdirections\\b"; "i")) as $options
   | ($m | test("not (this|part of this|from this|in this) (feature|change|pr|task)|not this feature|pre-?existing|out of scope|unrelated to this|left (it|them|that) alone"; "i")) as $dismiss
-  | [ (if $ask then "Before you stop, check each ask: does it say in plain words what the thing is (no bare name or earlier shorthand), why it matters, and your pick? If it came from notes, memory or another session, check it is still needed now. Read the rest of the message the same way. All pass: reply exactly \"Asks checked.\" Otherwise rewrite only what fails." else empty end),
-      (if $gap or $words > 250 then "Your message hands over an email draft for someone outside the team, and it " + ([(if $gap then "has [BRACKETED] placeholders" else empty end), (if $words > 250 then "runs \($words) words" else empty end)] | join(" and ")) + ". Fill each placeholder or say the draft is not ready and why. Answer only what the recipient asked, in their order, under 250 words, no internal names. Show the fixed draft once, or reply exactly \"Draft checked.\"" else empty end),
-      (if $uiApproval and ($options | not) then "You ask for approval of a screen or design but name no options. A new or redesigned surface goes up as two or three different directions with your pick: build them first. Small change or direction already chosen: reply exactly \"Options checked.\"" else empty end),
-      (if $dismiss then "You set a defect you found aside as outside this change. If it shows on a screen or flow this change adds or touches, fix it before you stop. Otherwise give it its own line: what is wrong, why it is outside this change, and whether you would fix it now. All pass: reply exactly \"Scope checked.\"" else empty end) ]
+  | [ (if $ask then "Before you stop, check each ask: does it say in plain words what the thing is (no bare name or earlier shorthand), why it matters, and your pick? If it came from notes, memory or another session, check it is still needed now. Read the rest of the message the same way. All pass: repeat the last line of your message (its status line, if it has one) word for word and nothing else. Otherwise rewrite only what fails." else empty end),
+      (if $gap or $words > 250 then "Your message hands over an email draft for someone outside the team, and it " + ([(if $gap then "has [BRACKETED] placeholders" else empty end), (if $words > 250 then "runs \($words) words" else empty end)] | join(" and ")) + ". Fill each placeholder or say the draft is not ready and why. Answer only what the recipient asked, in their order, under 250 words, no internal names. Show the fixed draft once, or if it is fine, repeat the last line of your message (its status line, if it has one) word for word and nothing else." else empty end),
+      (if $uiApproval and ($options | not) then "You ask for approval of a screen or design but name no options. A new or redesigned surface goes up as two or three different directions with your pick: build them first. Small change or direction already chosen: repeat the last line of your message (its status line, if it has one) word for word and nothing else." else empty end),
+      (if $dismiss then "You set a defect you found aside as outside this change. If it shows on a screen or flow this change adds or touches, fix it before you stop. Otherwise give it its own line: what is wrong, why it is outside this change, and whether you would fix it now. All pass: repeat the last line of your message (its status line, if it has one) word for word and nothing else." else empty end) ]
   | if length == 0 then empty else {hookSpecificOutput: {hookEventName: "Stop", additionalContext: join("\n\n")}} end
 end' 2>/dev/null
 exit 0
