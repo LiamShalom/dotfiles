@@ -34,7 +34,7 @@ caveats, not for "no page selected". Fix the state in the UI itself.
 - 10-05 "this huge yellow box is not helpful" · 10-16 "I dont like the yellow banner when no page selected"
 - 10-15 "remove this banner from appearing all the time" · 10-23 "I still dont like the yellow banner on ads hub"
 
-- 10-30 Build Ads picker, latest preference: put spend (purple) or Ready (green) on the left under the creator beside the video; keep the Launched badge on the right.
+- 11-04 Build Ads picker: "Lets put the ready button back to match the launched button". Ready is a green pill on the right, with the same size and responsive position as Launched; Ready uses a checkmark, Launched uses a rocket (11-04 follow-up). Spend stays below the creator. This replaces the 10-30 Ready placement preference.
 
 - 10-30 Build Ads Setup: hide the campaign budget summary for an existing campaign; show it only for a new campaign.
 
