@@ -49,7 +49,14 @@ you made — not a transcript of the code.
 - **Change as little as possible.** Write the smallest thing that solves the problem, touch only
   what the task requires, and match the style already in the file. Don't refactor or tidy
   neighbouring code I didn't ask about. Clean up orphans your own change created; if you spot
-  pre-existing dead code, mention it rather than deleting it.
+  pre-existing dead code, mention it rather than deleting it. For a bug, "smallest" means
+  the smallest change that stops the *class* of bug, not only the reported instance.
+- **Fix why the bug was possible, not only the bug.** After proving the mechanism, ask why
+  the system allowed it (two sources of truth, a misleading field, a swallowed error,
+  copied logic, a state that should be unrepresentable, no check at the boundary). Fix that
+  in the same change when it stays small; when it is large, ship the immediate fix and bring
+  me the structural fix with evidence and your pick. A one-off with no deeper cause is fine;
+  say so in one line.
 - **Ship features on, not flagged.** Don't wrap new work in `NEXT_PUBLIC_*` env flags, kill
   switches, or cohort gates by default — implemented means used. A flag that never gets flipped
   is a feature that never shipped; it doubles the verification surface (on *and* off both need

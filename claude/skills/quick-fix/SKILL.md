@@ -39,8 +39,8 @@ If unsure, treat it as large. A large change still gets built, tested and proven
 well without a spec, say so and suggest `brainstorm`.
 
 **A small change that is not a bug** (a tweak, copy change, small behaviour change): skip
-Phases 1 and 3, read the code path (Phase 2), then continue from Phase 5. Every gate still
-applies.
+Phases 1, 3 and 3b, read the code path (Phase 2), then continue from Phase 5. Every gate
+still applies.
 
 ## The one discipline that matters
 
@@ -172,6 +172,49 @@ calculation seems to have a filtering issue" is a theory.
 
 Exact commands for each technique: `references/evidence-recipes.md`.
 
+## Phase 3b — Find why the bug was possible
+
+Phase 3 tells you which line produced the wrong output. This phase asks why the system let
+that line exist and ship. A bug report is one sighting of a weakness. If you fix only the
+sighting, the weakness stays, and the next report comes from another screen or another
+account.
+
+Ask "why" until you reach something structural, usually two to four steps: why was the line
+wrong → why did nothing catch it → why would the next person make the same mistake? Stop at
+a cause you can show in the code or the data, not at a guess.
+
+Structural causes this codebase has had, and the long-term fix for each:
+
+- **Two sources of truth for one fact** (the roster against the contracts) → read from the
+  owner and derive or delete the copy.
+- **A name that lies about its meaning** (`restrictCompanySwitching` stamped on nearly every
+  profile) → gate on the field that means the thing, and rename or document the other.
+- **A swallowed error** (a contract cancel that failed silently) → let it fail loudly or make
+  the caller handle it.
+- **The same logic in several places** → one shared helper or constant (`copy-sweep` finds
+  the copies).
+- **A bad state that can be represented** (an optional field that every reader assumes is
+  set) → set it at write time, enforce it in the type, schema or constraint, and backfill.
+- **No check at the boundary** → add the test, lint rule, guard or assertion that fails when
+  this comes back.
+- **Bad data already written** → repair the affected rows, or say why not and how many.
+
+Then decide:
+
+- **Fix the structural cause in this PR when the size check still says small.** For a bug,
+  "the smallest change" means the smallest change that stops this class of bug, not only the
+  reported instance.
+- **When the structural fix is large** (a migration, many files, a product decision), ship
+  the immediate fix now and bring the structural fix to the operator: what it is, the
+  evidence (how many call sites, rows or accounts), and your pick. File it in Linear with a
+  `Why not now:` line. Do not drop it silently.
+- **Some bugs have no deeper cause** (a one-off typo that a new test now covers). Say so in
+  one line; do not invent a systemic story. The test for done: if this class of bug came
+  back, would something now fail before a user saw it?
+
+Write the chain in one or two sentences. It goes into the PR body under "Why it was
+possible" and into the report.
+
 ## Phase 4 — Ask, but only when it changes what you'd do
 
 Before recommending a workaround that changes the record type or flow, check the original
@@ -199,7 +242,8 @@ were hidden from members without Ads access; the operator wanted Posts access to
 ## Phase 5 — Fix
 
 Work in a new worktree off `origin/main`, branch `fix/<short-description>`, env files
-linked. Write the smallest change that removes the proven cause. Match the file's existing
+linked. Write the smallest change that removes the proven cause and, when the size check
+allows, the structural cause from Phase 3b. Match the file's existing
 style, comment density, and idioms. Reuse existing components and code. If the change
 touches what a user sees, read `~/dotfiles/claude/references/ui-taste.md` first, and add to
 it when the operator reacts to the result. New or changed UI must also pass the checklist in
@@ -267,6 +311,10 @@ Commit subject in the imperative, under 72 chars, no trailing period. Push, then
 ## Root cause
 <the proven mechanism, with the evidence — the query result, the log line, the number>
 
+## Why it was possible
+<the structural cause from Phase 3b, and what now stops this class of bug — or the follow-up
+ticket for it, or "one-off" with the reason>
+
 ## Fix
 <what changed and why this removes the cause>
 
@@ -309,8 +357,9 @@ If any condition fails, leave the PR open and go to Report.
 
 ## Report
 
-Plain sentences: what was broken, the cause in one line, what changed for users, and the
-evidence. If anything is unverified, lead with that.
+Plain sentences: what was broken, the cause in one line, why it was possible and what now
+stops it coming back (or the follow-up you filed and your pick), what changed for users, and
+the evidence. If anything is unverified, lead with that.
 
 - Merged: `**Status:** Done — verified · PR #123 <url> · merged: yes`.
 - Not merged: say which gate failed (large UI, large feature, CI, unverifiable step), give
