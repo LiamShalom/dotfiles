@@ -308,10 +308,13 @@ try {
     await call(id, clearAndFocus);
     typedSomething = true;
     await send("Input.insertText", { text: value }, sessionId);
-    if (await call(id, "function () { return this.value.length; }") === value.length) return true;
+    // Some code boxes display "123 456"; spaces the page adds do not make the fill fail.
+    const took = `function () { return this.value.replace(/\\s/g, "").length; }`;
+    const want = value.replace(/\s/g, "").length;
+    if (await call(id, took) === want) return true;
     // Some inputs drop typed text (masked or custom fields): set the value and announce the change.
     await call(id, setValue, value);
-    return await call(id, "function () { return this.value.length; }") === value.length;
+    return await call(id, took) === want;
   };
 
   const filled = [];
