@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# pip-iphone-sim — print the UDID of an iPhone simulator that supports Picture in Picture, making it if needed.
+#
+# Stock iPhone simulators report AVPictureInPictureController.isPictureInPictureSupported() == false, so the
+# SideShift floating guide card never floats there. This copies Xcode's iPhone 17 Pro device profile into
+# ~/Library/Developer/CoreSimulator/Profiles/DeviceTypes as "iPhone 17 Pro PiP" with the PiPOverlay and
+# PiPPinned capabilities on (the two flags the iPad profile has and the iPhone profile lacks), then creates
+# and boots "SideShift iPhone 17 Pro (PiP)" on the newest iOS runtime. Xcode itself is not changed.
+#
+# Why: 2026-11-04, the operator saw no floating card on the iPhone preview; the agent had moved PiP tests to an
+# iPad, which the app does not support. With this simulator all 13 FloatingGuideUITests pass on an iPhone.
+set -euo pipefail
+
+name="SideShift iPhone 17 Pro (PiP)"
+type_id="com.sideshift.SimDeviceType.iPhone-17-Pro-PiP"
+src="/Library/Developer/CoreSimulator/Profiles/DeviceTypes/iPhone 17 Pro.simdevicetype"
+dst="$HOME/Library/Developer/CoreSimulator/Profiles/DeviceTypes/iPhone 17 Pro PiP.simdevicetype"
+
+if [ ! -d "$dst" ]; then
+	[ -d "$src" ] || { echo "pip-iphone-sim: $src not found (Xcode changed its profiles?)" >&2; exit 1; }
+	mkdir -p "${dst%/*}"
+	cp -R "$src" "$dst"
+	plutil -replace CFBundleIdentifier -string "$type_id" "$dst/Contents/Info.plist"
+	plutil -replace CFBundleName -string "iPhone 17 Pro PiP" "$dst/Contents/Info.plist"
+	plutil -replace capabilities.PiPOverlay -bool true "$dst/Contents/Resources/capabilities.plist"
+	plutil -replace capabilities.PiPPinned -bool true "$dst/Contents/Resources/capabilities.plist"
+	plutil -remove createByDefaultForRuntimeVersions "$dst/Contents/Resources/profile.plist" 2>/dev/null || true
+	plutil -remove pairByDefaultForRuntimeVersions "$dst/Contents/Resources/profile.plist" 2>/dev/null || true
+fi
+
+udid=$(xcrun simctl list devices -j | jq -r --arg n "$name" '[.devices[][] | select(.name == $n and .isAvailable)][0].udid // empty')
+if [ -z "$udid" ]; then
+	runtime=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.platform == "iOS" and .isAvailable)] | last | .identifier')
+	udid=$(xcrun simctl create "$name" "$type_id" "$runtime")
+fi
+xcrun simctl boot "$udid" 2>/dev/null || true
+echo "$udid"

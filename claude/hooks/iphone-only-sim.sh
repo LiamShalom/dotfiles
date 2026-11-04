@@ -5,8 +5,10 @@
 # (2026-11-03/04: the operator said "so only test for iphone", and the agent kept testing the
 # floating guide on an iPad simulator because the iPhone simulator has no Picture in Picture.)
 #
-# A test that needs something the iPhone simulator cannot do runs on a real iPhone, or is reported
-# as not verified. It never moves to an iPad.
+# Picture in Picture runs on the "SideShift iPhone 17 Pro (PiP)" simulator: a user device type that copies
+# the iPhone 17 Pro profile with PiPOverlay and PiPPinned on (2026-11-04; the operator saw no floating card
+# on a stock iPhone simulator). Anything else the iPhone simulator cannot do runs on a real iPhone, or is
+# reported as not verified. It never moves to an iPad.
 #
 # Only the parts of a command that run simctl, xcodebuild or board-browser.mjs are checked, so text
 # that mentions them (a note, a commit message) passes. A part that runs a script (bash/zsh/sh FILE)
@@ -14,7 +16,7 @@
 cmd=$(jq -r '.tool_input.command // ""')
 printf '%s' "$cmd" | grep -Eq 'simctl|xcodebuild|board-browser|(^|[[:space:]])(ba|z)?sh[[:space:]]' || exit 0
 
-why='SideShift iOS is iPhone only: test, build for and show only iPhone simulators (or a real iPhone). This command targets an iPad simulator. If the iPhone simulator cannot do what the test needs (for example Picture in Picture), say it is not verified and what a real iPhone run needs; do not move to an iPad.'
+why='SideShift iOS is iPhone only: test, build for and show only iPhone simulators (or a real iPhone). This command targets an iPad simulator. For Picture in Picture (the floating guide card) use the iPhone simulator "SideShift iPhone 17 Pro (PiP)" (device type "iPhone 17 Pro PiP" in ~/Library/Developer/CoreSimulator/Profiles/DeviceTypes, a copy of the iPhone 17 Pro profile with PiPOverlay and PiPPinned on); stock iPhone simulators report it unsupported. Never move to an iPad.'
 deny() {
   jq -cn --arg why "$why" '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$why}}'
   exit 0
