@@ -30,4 +30,13 @@ if [[ $prompt =~ $port_from ]] && [[ $prompt =~ $port_to ]] && [[ $prompt =~ $po
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/platform-port-nudge.log"
   echo "If this asks to bring one platform's design to another (iOS app to web, or the reverse): carry over the design choices (structure, sections, content, behaviour) and build them from the target's own components, nav, type and colours. Do not rebuild the source platform's chrome (tab bars, glass, side menus, its font). Keep the nav to five groups or fewer, with tabs inside pages, so it never scrolls."
 fi
+
+# Judging which features or gaps are worth building: on 2026-11-04 an ads teardown review ranked
+# an Ads Overview checklist first from code reads alone; the live page already showed the prompt.
+value_ask='(^|[^a-z])(determine which|which of (them|these)|worth (building|it)|have value|prioriti[sz]e|teardown|feature (list|requests?))([^a-z]|$)'
+value_src='(^|[^a-z])(codebase|internal data|our data|the platform|the app|production)([^a-z]|$)'
+if [[ $prompt =~ $value_ask ]] && [[ $prompt =~ $value_src ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/value-review-nudge.log"
+  echo "If this asks you to judge which features or gaps are real or worth building: a code read (yours or a subagent's) is not proof that a screen lacks something. Before you report a UI gap, open the live app as a test brand in each state that matters (for example no account, connected but empty, active) and read what it shows. Mark every item as checked on screen, checked in code only, or not checked."
+fi
 exit 0
