@@ -172,6 +172,8 @@ and one primary action whose label follows the choice.
 
 ## What he approved
 
+- 11-05 Ads connect screen, "No ad account yet?" path for brands with no ad account: "A". Picked A, a quiet text link under the Connect button that opens a DsModal of Connected Sources rows (logo tile, name, what the platform needs, Create ↗ that turns into Connect) (my pick), over B (the link swaps the screen's copy and button for the rows in place) and C (the rows always visible under the button, no link). Fifth time the shipped pattern beside the entry point won; the hero screen stays unchanged for brands that already have an account.
+
 - 11-05 Ads plan on /pricing: "I like the band." Picked A, a dark band above the paid row (featured card's face; Ads + big $0 left,
   TikTok/Meta badges + one line middle, Start free right), over B (Ads as a fourth fanned card) and C (a two-path tab with a
   full Ads hero). The free offer on top as its own hero, paid plans untouched below.
