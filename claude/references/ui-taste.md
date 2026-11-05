@@ -95,6 +95,7 @@ secondary link over a second full button; a deep link over a "check" button.
 - 10-21 "I dont like the more actions it can just be contrcat and analytics buttons"
 - 09-27 "instead of toggles… can it just be a small x to remove a component"
 - 10-01 "I like how it was where skip for now was a secondary option, not a whole button"
+- 11-05 contract editor, one 72px row with Edit/Preview, 15 formatting controls, Insert, Sign, Templates, Upload, Save and ⋮ (formatting scrolled sideways at 1280px): "need to redesign the UI, maybe making the button options on the right or something. The top header bar is too full". Adding a button to a full toolbar row is the moment to re-split the row, not to shrink the button to an icon
 
 **9. Prompt or queue, don't error.** If the user can fix it, open the fix.
 - 09-30 "I wish it just opened a popup that prompted user to connect that specific account"
