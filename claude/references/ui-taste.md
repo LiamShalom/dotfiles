@@ -158,6 +158,8 @@ short line at that scale, never the page form's labelled 40px field.
 
 ## What he approved
 
+- 11-05 brand creator invite page (/creator-invite, "join our creators"): "go with B", one narrow centered card (brand logo, "Join <brand>'s creators", website/social links as icon-only buttons, one button + Log in) over A (the campaign invite link's two-column frame, my pick) and C (brand photos as a hero strip, about text, bottom action bar). The shipped-pattern rule lost this time: for a one-step action the fewest words won (principle 1), even over sibling-frame consistency.
+
 - 11-04 Import from Trybe (connect Trybe, pick a program, open the wizard on Review): picked A, a DsModal like the template picker beside the entry button (programs as DS radio rows: name, terms on one line, avatar stack + count), over B (own page with step rail and a live campaign preview card, principle 16) and C (program tiles with the creator count as the big number inside the wizard's first step). Fourth time the shipped pattern next to the entry point won.
 
 - 11-03 iOS floating connect guide: "lets go with A". Picked the short dark list (Wispr Flow's layout: every step on its own row with an icon, current row bold, done rows ticked, last row "← Back to SideShift") over a one-line pill and a square badge.
