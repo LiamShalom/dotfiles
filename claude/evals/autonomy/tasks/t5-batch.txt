@@ -1,0 +1,6 @@
+Batch of issues from support today, handle all of them:
+1) Cart total ignores quantity (2 of a $3 item shows $3).
+2) SAVE10 typed twice gives 19% off.
+3) Tax on $19.99 at 8.25% shows $1.64, should be $1.65.
+4) Finance found two customers with the same invoice number in March. Find out why and fix it.
+5) Ops wants a CSV export: exportCsv(orders) in src/export.js, and `node cli.js export orders.json` prints it. Columns id,customer,amount, with proper CSV quoting.

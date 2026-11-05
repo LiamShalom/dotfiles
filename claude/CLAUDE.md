@@ -7,6 +7,35 @@ just ran is evidence; "this should work now" is not. If you couldn't verify some
 plainly — an honest "I changed this but couldn't run it" is far more useful to me than false
 confidence, because I'll go check it myself.
 
+## #2 Rule: keep going until it's done
+
+Keep working until everything I asked for is done. Stop to ask only when you can't go on
+without me, or before a step this file reserves for me: real money, destructive or irreversible
+changes to real (non-test) data, messages to real people, merging a large PR. Settle everything
+else yourself. When a choice has a sensible default (a clearer name, where a file goes, a
+format), pick it, do it, and say what you picked. A question your own tools can answer is not
+a reason to stop, and neither is "should I test this?": testing never needs my permission.
+
+When you change code that can be run, built or type-checked, run a real check that exercises
+the change before you report it done: the tests, the type-checker, the build, or the changed
+command itself. A syntax-only check, or a check command that failed to start, does not count;
+if only the project's declared dependencies are missing, install them with its own package
+manager and lockfile. Only if no real check can run here, name the check you did not run and
+why, instead of reporting the change as done.
+
+A bug report or a "why does X happen?" ends with the cause reproduced and, when it is a bug,
+fixed and checked. Explaining the cause and offering to fix it is stopping halfway.
+
+Your context window is compacted automatically as it fills, so you can keep working
+indefinitely. Never stop or wrap up early because of context or token budget; on long work,
+save progress to a file before compaction instead.
+
+When the work is done and checked, stop and report. Don't add features, files or refactors I
+didn't ask for; if one would help, mention it at the end.
+
+A second model checks each turn end (`~/.claude/hooks/finish-judge.sh`). When it sends you
+back with "Finish check", do what it says; if it is wrong, say why in one line and continue.
+
 ## How to explain things to me
 
 I work across large codebases and I don't know every variable, field, or file in them. When
@@ -87,6 +116,20 @@ When I correct something you did, fix it, then run the `correct` skill's in-sess
 a rule for it already existed, that's a repeat: don't add another line or more emphasis. Move
 it up to something that fails (a script default, hook, lint, test, or a step in the skill
 where the decision is made), and log it in `~/dotfiles/claude/learning/ledger.md`.
+
+## Long runs and independent review
+
+- **Review, verification, diagnosis and judgment calls go to Opus.** Spawn them as the
+  `skeptical-verifier` agent or with `model: opus`. Haiku and Sonnet find and read code and run
+  well-specified steps. Give a reviewer the request and where the change lives, never your
+  conclusion: models grade their own work too kindly.
+- **Before you report a feature or fix as done, run `skeptical-verifier` on it** and fix every
+  FAIL it returns. Skip this only for copy, docs or one-line config changes.
+- **For work longer than one session, keep `acceptance.json`** in the work folder: one item
+  per requirement with the check that proves it and `"passes": false`, set to `true` only after
+  the check passed. For an unattended overnight run, use
+  `~/.claude/bin/run-until-done <dir>`: a fresh session per iteration until every check
+  passes.
 
 ## Managing your own context
 

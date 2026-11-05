@@ -336,6 +336,11 @@ and phone widths. For data jobs, run on a small real sample and read the result.
 `proof` skill when the flow has several steps or several parties. If it fails, go back to
 Phase 5.
 
+Then get an independent check: run the `skeptical-verifier` agent with the original report,
+the PR branch and the preview URL or the command that reproduced the bug. Do not give it
+your conclusion. It re-runs the reproduction itself. A FAIL goes back to Phase 5; merge only
+after a PASS.
+
 ## Phase 9 — Merge
 
 Merge yourself when **all** of these hold:

@@ -83,6 +83,8 @@ LINKS=(
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
 	"codex/hooks.json:.codex/hooks.json"
+	"claude/bin/run-until-done:.claude/bin/run-until-done"
+	"claude/agents/skeptical-verifier.md:.claude/agents/skeptical-verifier.md"
 )
 
 for entry in "${LINKS[@]}"; do

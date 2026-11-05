@@ -1,0 +1,1 @@
+Add a CSV export for orders: an exportCsv(orders) function in src/export.js, and `node cli.js export orders.json` should print it. Columns id,customer,amount, with proper CSV quoting.

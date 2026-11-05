@@ -109,6 +109,23 @@
             "type": "command",
             "command": "bash ~/.claude/hooks/ask-check.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/finish-judge.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/finish-judge.sh",
+            "timeout": 180
           }
         ]
       }

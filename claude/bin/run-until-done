@@ -1,0 +1,77 @@
+#!/bin/bash
+# Run a long task to completion in fresh sessions, one acceptance item at a time.
+# Anthropic's long-running-agent harness: a JSON list of acceptance items that start as passes=false, a progress
+# file and git as memory, one item per session, a fresh context each time. The loop, not the agent, runs each item's
+# `check` command after every iteration and writes the real result into `passes`, so an item is never marked done
+# without proof.
+#
+# usage: run-until-done [--model sonnet] [--effort medium] [--max-iterations 8] [--budget-usd 5] <dir> [extra prompt]
+#   <dir>/acceptance.json: {"goal": "...", "items": [{"id": "a", "description": "...", "check": "npm test -- a", "passes": false}]}
+#   Items without "check" keep whatever the agent wrote. <dir>/progress.md is created if missing.
+# Exit 0 when every item passes, 1 when iterations ran out, 2 when two iterations in a row made no progress.
+set -uo pipefail
+model=sonnet effort=medium max=8 budget=5
+while [ $# -gt 0 ]; do
+  case $1 in
+    --model) model=$2; shift 2 ;;
+    --effort) effort=$2; shift 2 ;;
+    --max-iterations) max=$2; shift 2 ;;
+    --budget-usd) budget=$2; shift 2 ;;
+    *) break ;;
+  esac
+done
+dir=${1:?usage: run-until-done [options] <dir> [extra prompt]}
+extra=${2:-}
+spec="$dir/acceptance.json"
+[ -f "$spec" ] || { echo "run-until-done: $spec not found" >&2; exit 64; }
+[ -f "$dir/progress.md" ] || printf '# Progress\n' > "$dir/progress.md"
+logdir="$dir/.run-until-done"
+mkdir -p "$logdir"
+
+run_checks() {
+  local n i id check
+  n=$(jq '.items | length' "$spec")
+  for ((i = 0; i < n; i++)); do
+    check=$(jq -r ".items[$i].check // empty" "$spec")
+    [ -z "$check" ] && continue
+    id=$(jq -r ".items[$i].id" "$spec")
+    if (cd "$dir" && bash -c "$check") > "$logdir/check-$id.log" 2>&1; then
+      jq ".items[$i].passes = true" "$spec" > "$spec.tmp" && mv "$spec.tmp" "$spec"
+    else
+      jq ".items[$i].passes = false" "$spec" > "$spec.tmp" && mv "$spec.tmp" "$spec"
+    fi
+  done
+}
+passing() { jq '[.items[] | select(.passes == true)] | length' "$spec"; }
+total() { jq '.items | length' "$spec"; }
+
+run_checks
+last=$(passing)
+stalls=0
+for ((iter = 1; iter <= max; iter++)); do
+  if [ "$(passing)" -eq "$(total)" ]; then
+    echo "run-until-done: all $(total) items pass after $((iter - 1)) iterations"
+    exit 0
+  fi
+  echo "run-until-done: iteration $iter: $(passing)/$(total) passing"
+  prompt="You are one session in a series working on a long task in this directory. Earlier sessions may have done part of it; later sessions will continue after you.
+Goal: $(jq -r '.goal' "$spec")
+
+Work directly in this directory on the branch that is checked out: do not create worktrees or branches, because the checks run here. The person who started this loop already chose this branch, and this instruction overrides any rule about branching off main.
+
+Start by reading progress.md, acceptance.json and \`git log --oneline -20\`, and run the checks of the items marked passing to confirm nothing is broken. Then take the first item in acceptance.json whose passes is false, finish it completely, and run its check (or, without one, a real test of it). Set its passes to true only when that check passes. Never edit or remove an item's description or check. Append two or three lines to progress.md on what you did and what is next, and commit your work with git. Then continue with the next failing item until all pass or you run low on context. Do not ask questions: nobody is there to answer. Make sensible choices and note them in progress.md.
+$extra"
+  (cd "$dir" && claude -p "$prompt" --model "$model" --effort "$effort" --dangerously-skip-permissions \
+    --max-budget-usd "$budget" --output-format json > "$logdir/iter-$iter.json" 2> "$logdir/iter-$iter.err")
+  run_checks
+  now=$(passing)
+  if [ "$now" -le "$last" ]; then stalls=$((stalls + 1)); else stalls=0; fi
+  last=$now
+  if [ "$stalls" -ge 2 ]; then
+    echo "run-until-done: no progress in 2 iterations, stopping at $now/$(total). See $logdir and progress.md." >&2
+    exit 2
+  fi
+done
+if [ "$(passing)" -eq "$(total)" ]; then echo "run-until-done: all $(total) items pass"; exit 0; fi
+echo "run-until-done: stopped after $max iterations at $(passing)/$(total)" >&2
+exit 1

@@ -1,0 +1,5 @@
+Three customer reports from today:
+1) The cart total ignores quantity: 2 of a $3 item shows $3.
+2) Someone typed SAVE10 twice and got 19% off.
+3) Tax on a $19.99 item at 8.25% shows $1.64. It should be $1.65.
+Fix these.

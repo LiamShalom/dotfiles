@@ -39,6 +39,12 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
    Start `HANDOFF.md` (not committed) with the plan summary and a progress log. Update it
    after every task. Commit `plan.md`.
 
+   Also write `acceptance.json` (not committed) from the spec coverage: one item per
+   requirement and party-matrix row, `{"id", "description", "check", "passes": false}`, where
+   `check` is the command or proof step that shows it works. Set an item to `true` only after
+   its check passed in this session. Never reword or delete an item. It is the list you work
+   from after a compaction, and the list the verifier checks in step 9.
+
 2. **Ship the migration first** if there is one: its own PR off `main`, then wait for the
    apply before the feature code depends on it.
 
@@ -106,9 +112,11 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
      the user a clear state, not a hang or a blank page.
    - No dev preview routes, fixtures, TODOs, flags, debug logs or placeholder copy left.
 
-   Then get a second read: give a fresh `opus` subagent the spec, the diff and the proof
-   report (not your ledger) and ask it what a real user or the production setup would hit
-   that is not proven. Add each real finding as a row.
+   Then get a second read: give the `skeptical-verifier` agent (Opus, fresh context) the
+   spec, `acceptance.json`, the branch and the proof report (not your ledger or your
+   conclusions). It re-runs the checks itself and returns PASS or FAIL per item. Also ask it
+   what a real user or the production setup would hit that is not proven. Add each FAIL and
+   each real finding as a row.
 
    Close every open row: fix it, prove it, and update its evidence. Go back to step 3 as
    often as needed. A row can stay open only when the operator alone can close it (a product
