@@ -170,6 +170,11 @@ and one primary action whose label follows the choice.
   many similar buttons". Picked A: five report radio rows plus one "Download CSV/PDF" button, over B (a select)
   and C (menu rows that download on click)
 
+**20. No metrics UI before there is anything to measure.** A page whose data needs a connection
+shows only the connect step until it is connected: no zero charts, date ranges, filters or Build
+buttons around it.
+- 11-05 Ads page with no ad account (Performance chart, date range and Build Ads above the connect card): "why does the chart show if they havent connected an ad account yet? I thosuld only show once connected"
+
 ## What he approved
 
 - 11-05 Ads connect screen, "No ad account yet?" path for brands with no ad account: "A". Picked A, a quiet text link under the Connect button that opens a DsModal of Connected Sources rows (logo tile, name, what the platform needs, Create ↗ that turns into Connect) (my pick), over B (the link swaps the screen's copy and button for the rows in place) and C (the rows always visible under the button, no link). Fifth time the shipped pattern beside the entry point won; the hero screen stays unchanged for brands that already have an account.
