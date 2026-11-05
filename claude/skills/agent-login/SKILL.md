@@ -60,6 +60,13 @@ adapter for your browser. Ask for an item name only after this lookup is empty o
 an actual vault-access error separately. Never choose a personal login for a test.
 Classify a handle from the saved QA item and a verified test profile or internal test-account record; do not infer personal ownership from its name.
 
+Before the first QA sign-in, match the saved item to its account-creation reference.
+Search project memory or references for the item title and public handle. A grant on
+the SideShift test user may belong to a different QA account; do not combine that
+account's username with this item's password. If the adapter reports a filled
+password, it is available: report the observed sign-in failure, not a missing-password
+blocker. Keep the one-failed-sign-in handoff rule below.
+
 ## Run it
 
 1. Open the sign-in page in your own tab (your chat's window in the agent Chrome).
