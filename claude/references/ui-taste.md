@@ -42,6 +42,7 @@ caveats, not for "no page selected". Fix the state in the UI itself.
 reference for metrics, charts, stat icons (liquid-metal grey) and platform pills. A Figma, or
 the other platform's app (iOS to web), is for content and structure, not a new visual language.
 - 11-03 returning terminated applicants: "Use the same UI as the private/incorrect handle but it be ytellow". Use the existing handle-warning chip, tooltip and decision-card treatment in yellow, rather than a generic badge or an extra table row. For this warning, use "Removed before" and "Previously removed from this campaign"; the operator rejected "Terminated".
+- 11-05 ad copy Suggest (#8776): "one button for all the fields ... the standard across all platforms", then "the suggest button applies to all, but the options and the refresh are per copy section". One Suggest pill in the Copy header fills every field; each field keeps its own in-field ‹ 1 of 2 › and refresh. A shared trigger does not mean shared flip controls.
 - 10-30 Meta copy actions: "make the suggest buttons pop" and mimic Pull earlier in the flow. Share the Pull control's compact pill and trailing provider mark; give Suggest blue emphasis.
 - 10-30 Meta copy suggestions: "Make it feel like sidekick inspired. Use the existing compolnents for the bhutton etc". Use Sidekick's shared artifact surface and existing DS buttons for inline copy suggestions, with divider rows instead of nested cards.
 - 09-27 "match the elegance as the rest of the dashboard" · 10-14 "It doesnt fit with the design system for this page"
