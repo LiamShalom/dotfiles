@@ -58,6 +58,7 @@ You MUST complete each phase before proceeding to the next.
    - Note line numbers, file paths, error codes
 
 2. **Reproduce Consistently**
+   - Preserve the reported scope. If many accounts are affected, build a cohort from reachable records and compare current holds, successful cases, and dated failures before closing with an individual escalation. Keep the trigger, the reason a hold remains open, and any UI defect separate. A single account cannot establish a common cause.
    - Can you trigger it reliably?
    - What are the exact steps?
    - Does it happen every time?
