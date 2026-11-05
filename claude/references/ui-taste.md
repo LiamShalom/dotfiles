@@ -156,6 +156,15 @@ short line at that scale, never the page form's labelled 40px field.
   same line as the thing's input, set at add time, not in an editor opened afterwards. Built as a
   "Max #" box inside the hashtag input; the per month / per platform choices left the UI
 
+**19. Before adding another action next to look-alike actions, merge them into one picker and one button.**
+When a surface already has two or more buttons that do the same kind of thing (download, export, create),
+do not add another one. Turn them into a list of choices (DS `ChoiceRow` radio rows, one short line each)
+and one primary action whose label follows the choice.
+- 11-05 Payouts → Generate Report: a scope toggle plus four outline download buttons, each with a hint line,
+  after "Download daily cost by video" was added: "this UI is at the point where it needs to be reworked, too
+  many similar buttons". Picked A: five report radio rows plus one "Download CSV/PDF" button, over B (a select)
+  and C (menu rows that download on click)
+
 ## What he approved
 
 - 11-05 agency and upgrade app welcomes: agency must center on managing client workspaces and agency work, not a brand, brief or single-client campaign. “Starter shouldnt be the big, it should be Agency”: Agency is the large plan identity; Starter/Growth/Scale stays a secondary included-client detail. Upgrade keeps the old compact receipt, using Nikolai’s header and content formatting; no two-sided plan sidebar. This replaces the earlier split-layout choice for upgrade. Agency welcome needs a useful set of next steps beyond adding/switching clients: team access and client results belong here too. Revised screens still need visual review.
