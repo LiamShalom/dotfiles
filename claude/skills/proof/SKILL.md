@@ -32,6 +32,8 @@ Do NOT skip a journey because an integration test covers the same endpoint. The 
 
 ### 2. Stand up the REAL app — and verify it's YOUR code
 
+If the operator confirms browser access is enabled but this chat still reports disabled access, refresh the connection once and try the documented native entry point. If it still fails, report the conflicting tool result as a chat connection blocker; do not repeat the settings request, claim the setting is off, or switch browsers. Continue independent API and build checks.
+
 Run the real dev server against a real database. No mocks, no fixtures-only mode, no storybook.
 
 **Trust nothing about an already-running server.** Before driving it, verify the process on the port is serving the code under review:
