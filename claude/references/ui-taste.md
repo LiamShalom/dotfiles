@@ -158,6 +158,8 @@ short line at that scale, never the page form's labelled 40px field.
 
 ## What he approved
 
+- 11-05 agency and upgrade app welcomes: chose "Extend the approved split layout" over a compact receipt. Reuse the dark plan sidebar and action panel from the first-plan welcome, with the actual client or plan changes and one main next action. This approves the direction; the revised screens still need visual review.
+
 - 11-05 brand creator invite page (/creator-invite, "join our creators"): "go with B", one narrow centered card (brand logo, "Join <brand>'s creators", website/social links as icon-only buttons, one button + Log in) over A (the campaign invite link's two-column frame, my pick) and C (brand photos as a hero strip, about text, bottom action bar). The shipped-pattern rule lost this time: for a one-step action the fewest words won (principle 1), even over sibling-frame consistency.
 
 - 11-04 Import from Trybe (connect Trybe, pick a program, open the wizard on Review): picked A, a DsModal like the template picker beside the entry button (programs as DS radio rows: name, terms on one line, avatar stack + count), over B (own page with step rail and a live campaign preview card, principle 16) and C (program tiles with the creator count as the big number inside the wizard's first step). Fourth time the shipped pattern next to the entry point won.
