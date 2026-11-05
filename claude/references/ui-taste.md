@@ -158,7 +158,7 @@ short line at that scale, never the page form's labelled 40px field.
 
 ## What he approved
 
-- 11-05 agency and upgrade app welcomes: agency must center on managing client workspaces and agency work, not a brand, brief or single-client campaign. Upgrade keeps the old compact receipt, using Nikolai’s header and content formatting; no two-sided plan sidebar. This replaces the earlier split-layout choice for upgrade. Revised screens still need visual review.
+- 11-05 agency and upgrade app welcomes: agency must center on managing client workspaces and agency work, not a brand, brief or single-client campaign. “Starter shouldnt be the big, it should be Agency”: Agency is the large plan identity; Starter/Growth/Scale stays a secondary included-client detail. Upgrade keeps the old compact receipt, using Nikolai’s header and content formatting; no two-sided plan sidebar. This replaces the earlier split-layout choice for upgrade. Revised screens still need visual review.
 
 - 11-05 brand creator invite page (/creator-invite, "join our creators"): "go with B", one narrow centered card (brand logo, "Join <brand>'s creators", website/social links as icon-only buttons, one button + Log in) over A (the campaign invite link's two-column frame, my pick) and C (brand photos as a hero strip, about text, bottom action bar). The shipped-pattern rule lost this time: for a one-step action the fewest words won (principle 1), even over sibling-frame consistency.
 
