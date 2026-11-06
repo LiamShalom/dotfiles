@@ -5,6 +5,30 @@ description: "Show the operator mockups, wireframes, diagrams, flowcharts and si
 
 # Visual Companion
 
+## Artifacts first
+
+Publish each screen as a claude.ai Artifact (the `Artifact` tool) by default, and use the
+local server below only as the fallback. An artifact keeps one URL across iterations, works
+on the operator's phone, can be shared with the team, and returns comments to this session.
+
+1. Load the `artifact-design` skill (and `artifact-diagramming` for a diagram) before you
+   write the page. Write a full page to `$CLAUDE_JOB_DIR/tmp/<topic>.html` (or the session
+   scratchpad), not a fragment: the frame template and `toggleSelect` do not exist there.
+2. Give each option a letter and a heading, and put your pick and its reason at the top.
+   Put real screenshots (the preview route, the reference screen) in with `files`, not
+   hand-drawn lookalikes of product UI.
+3. Publish, then open the URL in the pane in the same turn:
+   `node ~/session-board/scripts/board-browser.mjs <artifact-url> "<what to look at and decide>"`.
+4. Ask for the answer in the terminal ("A, B or C?"). Read comments on the page with
+   `ArtifactComments`. For the next round, republish the same file path, so the URL in the
+   pane stays the same. Never open a new artifact for each iteration.
+
+Use the local server instead when the `Artifact` tool is missing or refuses (for example
+"Artifacts need a claude.ai login"), or when the operator must click options and you must
+read the clicks back from `state_dir/events`. Say in one line why you used the fallback.
+
+## Local server (fallback)
+
 Browser-based companion for showing mockups, diagrams, and options. It works in any session.
 **Do not ask permission to open it.** When a question is visual, start the server (or reuse a
 running one) and show the screen in the same turn. Scripts live in

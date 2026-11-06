@@ -82,7 +82,13 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
-   Show the directions from step 4 side by side and say which you would pick and why. Once
+   Show the directions from step 4 side by side and say which you would pick and why.
+   **Put that comparison on an Artifact** (see `visual-companion`, "Artifacts first"): one
+   page with a screenshot of each direction from the preview route at 1280 and 390 wide, the
+   reference screen beside them, your pick at the top, and the preview link for each. Open it in
+   the Session Board pane with `board-browser.mjs`. Republish the same file each round, so the
+   operator keeps one URL. The screenshots come from the real components; never redraw product
+   UI in the artifact's HTML. The preview route stays where the operator clicks through it. Once
    one is chosen, delete the others and iterate on feedback until they approve. **Build the
    chosen option exactly as it was mocked, plus only the changes the operator named.** Never
    carry a treatment over from an option they did not pick, even your own pick. Before showing
