@@ -89,7 +89,13 @@ the last 10 minutes, from the same site as the page, that Gmail marked as really
 sender. `node ~/.claude/bin/agent-mail.mjs status` shows which inboxes are connected. When it
 says no inbox is connected or a grant is broken, ask Liam to run
 `node ~/.claude/bin/agent-mail.mjs connect` (it opens Google's consent page in his own browser).
-Never read the inbox any other way, and never print a code or an email.
+Never retrieve sign-in codes another way, and never print a code or an email.
+
+When Liam authorizes using his email for account recovery, check the connected Gmail
+tools or `agent-mail.mjs list/show` before handing recovery back to him. Match the
+recipient to the intended test account; a saved item's title alone does not prove that
+pairing. Do not print recovery URLs or tokens. Open the verified recovery link in the
+task's browser. A new password still requires Liam to enter, confirm and submit it.
 
 | Exit | Meaning | What to do |
 |---|---|---|
@@ -125,7 +131,7 @@ Never read the inbox any other way, and never print a code or an email.
   always asks for a passkey (proven 10-28).
 - Hand the step to Liam in Session Board's pane when the tool cannot do it: a passkey with no
   other way, a Google sign-in that Google refuses in this browser, picture puzzles (TikTok), codes
-  sent by text message, sign-in links sent by email (only codes are read), and OAuth consent.
+  sent by text message, sign-in links without authorized inbox access, and OAuth consent.
 - An OAuth connect as an account Liam is already signed in to in his own browser (Arc), such as
   another person's Facebook: do not sign that account in here (it sends him a device approval).
   Give him the click-by-click steps for Arc instead, with what to pick on each screen (10-28).
