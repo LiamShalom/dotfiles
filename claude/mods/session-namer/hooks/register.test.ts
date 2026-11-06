@@ -1,8 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
-import { cleanName, parseSlackLink, pickColor, senderOf } from './register'
+import { cleanName, parseSlackLink, senderOf } from './register'
 
-const pane = (name: string | null, color: string | null) => ({ title: name ?? 'zsh', sessionId: name, name, color })
+const pane = (name: string | null) => ({ title: name ?? 'zsh', sessionId: name, name })
 
 const CLEAR = { role: 'user', text: '<command-name>/clear</command-name>', toolUses: [] }
 const REPLY = { role: 'assistant', text: 'done', toolUses: [] }
@@ -32,39 +32,18 @@ test('cleanName keeps at most two lowercase words', () => {
   expect(cleanName('  ')).toBe('')
 })
 
-test('pickColor reuses a related session color, else the first free one', () => {
-  const tab = [pane('payouts', 'red'), pane('ads', 'blue'), pane(null, null)]
-  expect(pickColor(tab, 'Payouts')).toBe('red')
-  expect(pickColor(tab, null)).toBe('green')
-  expect(pickColor(tab, 'unknown')).toBe('green')
-})
-
-test('pickColor falls back to the least used color when all are taken', () => {
-  const all = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan', 'red'].map((c, i) => pane(`s${i}`, c))
-  expect(pickColor(all, null)).toBe('blue')
-})
-
-test('first prompt renames and colors the session', async ($, on) => {
+test('first prompt renames the session and does not color it', async ($, on) => {
   const clock = mock.clock(on)
-  const tab = { tab: [pane('payouts', 'red'), pane('ads', 'blue')] }
-  const commands = engine(on, [], tab, '{"name": "Wallet Gate", "related": null}')
+  const tab = { tab: [pane('payouts'), pane('ads')] }
+  const commands = engine(on, [], tab, '{"name": "Wallet Gate"}')
   await $.prompt.submit({ text: 'fix the wallet funding gate' })
   await clock.advance(0)
-  expect(commands).toEqual(['/rename wallet gate', '/color green'])
-})
-
-test('a related session shares its color', async ($, on) => {
-  const clock = mock.clock(on)
-  const tab = { tab: [pane('payouts', 'red'), pane('ads', 'blue')] }
-  const commands = engine(on, [], tab, '{"name": "payout copy", "related": "payouts"}')
-  await $.prompt.submit({ text: 'change the payouts page copy' })
-  await clock.advance(0)
-  expect(commands).toEqual(['/rename payout copy', '/color red'])
+  expect(commands).toEqual(['/rename wallet gate'])
 })
 
 test('later prompts and slash commands are left alone', async ($, on) => {
   const clock = mock.clock(on)
-  const commands = engine(on, [CLEAR, REPLY], { tab: [] }, '{"name": "x", "related": null}')
+  const commands = engine(on, [CLEAR, REPLY], { tab: [] }, '{"name": "x"}')
   await $.prompt.submit({ text: 'keep going' })
   await clock.advance(0)
   expect(commands).toEqual([])
@@ -72,15 +51,15 @@ test('later prompts and slash commands are left alone', async ($, on) => {
 
 test('the first prompt after /clear still renames the session', async ($, on) => {
   const clock = mock.clock(on)
-  const commands = engine(on, [CLEAR], { tab: [] }, '{"name": "announcements", "related": null}')
+  const commands = engine(on, [CLEAR], { tab: [] }, '{"name": "announcements"}')
   await $.prompt.submit({ text: 'send the creator announcement' })
   await clock.advance(0)
-  expect(commands).toEqual(['/rename announcements', '/color red'])
+  expect(commands).toEqual(['/rename announcements'])
 })
 
-test('a session the person already named keeps its name and color', async ($, on) => {
+test('a session the person already named keeps its name', async ($, on) => {
   const clock = mock.clock(on)
-  const commands = engine(on, [], { tab: [], ownNamed: true }, '{"name": "x", "related": null}')
+  const commands = engine(on, [], { tab: [], ownNamed: true }, '{"name": "x"}')
   await $.prompt.submit({ text: 'fix the livfresh payouts page' })
   await clock.advance(0)
   expect(commands).toEqual([])
@@ -122,7 +101,7 @@ test('senderOf finds the author of the linked message, not the thread parent', (
 
 test('a Slack link names the session after its channel and sender', async ($, on) => {
   const clock = mock.clock(on)
-  const commands = engine(on, [], { tab: [] }, '{"name": "creator questions", "related": null}')
+  const commands = engine(on, [], { tab: [] }, '{"name": "creator questions"}')
   on('mcp.call', (_$, e) => ({
     value: {
       isError: false,
@@ -138,14 +117,14 @@ test('a Slack link names the session after its channel and sender', async ($, on
     text: 'look into https://sideshift.slack.com/archives/C0CCDCTLEHJ/p1793043383656429?thread_ts=1793042520.539289',
   })
   await clock.advance(0)
-  expect(commands).toEqual(['/rename #sideshift-infinite gul · creator questions', '/color red'])
+  expect(commands).toEqual(['/rename #sideshift-infinite gul · creator questions'])
 })
 
 test('a failed Slack lookup falls back to the topic name', async ($, on) => {
   const clock = mock.clock(on)
-  const commands = engine(on, [], { tab: [] }, '{"name": "creator questions", "related": null}')
+  const commands = engine(on, [], { tab: [] }, '{"name": "creator questions"}')
   on('mcp.call', () => ({ value: { isError: true, content: [] } }))
   await $.prompt.submit({ text: 'https://sideshift.slack.com/archives/C0CCDCTLEHJ/p1793043383656429' })
   await clock.advance(0)
-  expect(commands).toEqual(['/rename creator questions', '/color red'])
+  expect(commands).toEqual(['/rename creator questions'])
 })

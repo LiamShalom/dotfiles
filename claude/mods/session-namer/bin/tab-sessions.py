@@ -2,8 +2,8 @@
 """Print the Claude sessions in the focused Ghostty tab as JSON.
 
 Usage: tab-sessions.py <own-session-id>
-Output: {"tab": [{"title", "sessionId", "name", "color"}], "ownNamed": bool}, own pane
-unmatched. A pane that is not a live Claude session has sessionId/name/color null.
+Output: {"tab": [{"title", "sessionId", "name"}], "ownNamed": bool}, own pane
+unmatched. A pane that is not a live Claude session has sessionId/name null.
 """
 import glob
 import json
@@ -96,7 +96,7 @@ def last_values(session_id, types):
 
 
 def describe(s):
-    meta = last_values(s["sessionId"], ["agent-color", "custom-title", "ai-title"])
+    meta = last_values(s["sessionId"], ["custom-title", "ai-title"])
     labels = []
     if s.get("nameSource") == "user" and s.get("name"):
         labels.append(s["name"])
@@ -104,12 +104,10 @@ def describe(s):
         labels.append(meta["custom-title"].get("customTitle", ""))
     if "ai-title" in meta:
         labels.append(meta["ai-title"].get("aiTitle", ""))
-    color = meta.get("agent-color", {}).get("agentColor")
     return {
         "sessionId": s["sessionId"],
         "name": labels[0] if labels else None,
         "labels": [l.lower() for l in labels if l],
-        "color": None if color in (None, "default") else color,
     }
 
 
@@ -143,7 +141,6 @@ def main():
             "title": title,
             "sessionId": hit and hit["sessionId"],
             "name": hit and hit["name"],
-            "color": hit and hit["color"],
         })
     json.dump({"tab": tab, "ownNamed": own_named(mine)}, sys.stdout)
 

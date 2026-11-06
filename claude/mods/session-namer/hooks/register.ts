@@ -1,8 +1,6 @@
 import type { Engine, Register } from 'claude-code'
 
-export const COLORS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan'] as const
-
-type Pane = { title: string; sessionId: string | null; name: string | null; color: string | null }
+type Pane = { title: string; sessionId: string | null; name: string | null }
 type Tab = { tab: Pane[]; ownNamed?: boolean }
 
 export function cleanName(raw: string): string {
@@ -13,15 +11,6 @@ export function cleanName(raw: string): string {
     .filter(Boolean)
     .slice(0, 2)
     .join(' ')
-}
-
-export function pickColor(panes: Pane[], related: string | null): string {
-  const relatedColor = panes.find(p => related && p.name?.toLowerCase() === related.toLowerCase())?.color
-  if (relatedColor) return relatedColor
-  const used = panes.map(p => p.color).filter((c): c is string => !!c)
-  const free = COLORS.find(c => !used.includes(c))
-  if (free) return free
-  return [...COLORS].sort((a, b) => used.filter(c => c === a).length - used.filter(c => c === b).length)[0]
 }
 
 async function readTab($: Engine, sessionId: string): Promise<Tab> {
@@ -84,16 +73,13 @@ async function chooseName($: Engine, prompt: string, panes: Pane[]) {
       'If the message is about one specific brand, company or customer account, the name starts with ' +
       'that brand written as one word, then the topic (for example "livfresh payouts"). ' +
       'Otherwise the name is the topic. ' +
-      'Reply with JSON only: {"name": "<one or two lowercase words>", ' +
-      '"related": "<the exact name of another session above that works on the same feature, or null>"}. ' +
-      'Mark a session related only when it is clearly the same feature or project.',
+      'Reply with JSON only: {"name": "<one or two lowercase words>"}.',
   })
   if (!reply.isAnswered) return null
   const json = reply.text.match(/\{[\s\S]*\}/)?.[0]
   if (!json) return null
-  const parsed = JSON.parse(json) as { name?: string; related?: string | null }
-  const name = cleanName(parsed.name ?? '')
-  return name ? { name, related: parsed.related ?? null } : null
+  const parsed = JSON.parse(json) as { name?: string }
+  return cleanName(parsed.name ?? '') || null
 }
 
 export const register: Register = on => {
@@ -108,13 +94,12 @@ export const register: Register = on => {
           const sessionId = await $.session.id()
           const { tab, ownNamed } = await readTab($, sessionId)
           if (ownNamed) return
-          const [chosen, origin] = await Promise.all([
+          const [name, origin] = await Promise.all([
             chooseName($, text, tab),
             slackOrigin($, text).catch(() => null),
           ])
-          if (!chosen) return
-          await $.command.run({ command: 'rename', args: origin ? `${origin} · ${chosen.name}` : chosen.name })
-          await $.command.run({ command: 'color', args: pickColor(tab, chosen.related) })
+          if (!name) return
+          await $.command.run({ command: 'rename', args: origin ? `${origin} · ${name}` : name })
         } catch (err) {
           $.ui.log(`session-namer: ${err instanceof Error ? err.message : String(err)}`)
         }

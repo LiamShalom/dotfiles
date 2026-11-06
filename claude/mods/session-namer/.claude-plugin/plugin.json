@@ -1,5 +1,5 @@
 {
   "name": "session-namer",
   "version": "0.1.0",
-  "description": "Names and colors a session on its first prompt, using a color unused in its Ghostty tab or a related session's color"
+  "description": "Names a session on its first prompt"
 }
