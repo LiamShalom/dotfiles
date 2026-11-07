@@ -180,11 +180,40 @@ async function load(u) {
       return { bytes, mime: hit.mimeType || guessMime(u) }
     } catch {}
   }
+  // Fallback outside the browser: a page can name any URL (a creator's avatar link), so only fetch
+  // the page's own origin or public hosts, never this Mac or a private network, and only keep assets.
   try {
-    const res = await fetch(u, { signal: AbortSignal.timeout(15000) })
-    if (res.ok) return { bytes: Buffer.from(await res.arrayBuffer()), mime: res.headers.get('content-type')?.split(';')[0] || guessMime(u) }
+    // Follow redirects by hand so every hop passes the same check.
+    let next = u
+    let res
+    for (let hop = 0; hop < 5; hop++) {
+      if (!(await fetchable(next))) return null
+      res = await fetch(next, { signal: AbortSignal.timeout(15000), redirect: 'manual' })
+      const to = res.status >= 300 && res.status < 400 && res.headers.get('location')
+      if (!to) break
+      next = new URL(to, next).href
+    }
+    const mime = res.headers.get('content-type')?.split(';')[0].trim().toLowerCase() ?? ''
+    if (res.ok && ASSET_MIME.test(mime)) return { bytes: Buffer.from(await res.arrayBuffer()), mime }
   } catch {}
   return null
+}
+
+const ASSET_MIME = /^(image\/|font\/|text\/css$|application\/(font-woff2?|x-font-[\w.-]+|vnd\.ms-fontobject)$)/
+const PRIVATE_V4 = [/^0\./, /^10\./, /^127\./, /^169\.254\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, /^22[4-9]\.|^2[3-5]\d\./]
+const isPrivate = ({ address, family }) => {
+  const a = address.toLowerCase()
+  if (family === 4) return PRIVATE_V4.some((r) => r.test(a))
+  const mapped = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
+  if (mapped) return PRIVATE_V4.some((r) => r.test(mapped[1]))
+  return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a) || /^ff/.test(a)
+}
+async function fetchable(u) {
+  const parsed = new URL(u)
+  if (parsed.origin === new URL(page.href).origin) return true
+  const { lookup } = await import('node:dns/promises')
+  const addresses = await lookup(parsed.hostname, { all: true })
+  return addresses.length > 0 && !addresses.some(isPrivate)
 }
 
 let css = page.sheets.join('\n')
