@@ -30,6 +30,7 @@ const opt = (name, fallback) => {
   return value
 }
 let tab = opt('--tab')
+const openedHere = !tab
 const out = opt('--out')
 const who = opt('--as', 'brand')
 const title = opt('--title')
@@ -264,6 +265,8 @@ for (const u of [...new Set(page.urls)].sort((a, b) => b.length - a.length)) {
   html = html.replaceAll(u, () => data)
   if (u.includes('&')) html = html.replaceAll(escapeAttr(u), () => data)
 }
+// A tab this run opened is closed; a tab passed with --tab stays for the caller.
+if (openedHere) await call('Page.close').catch(() => {})
 ws.close()
 
 writeFileSync(resolve(out), html)
