@@ -177,6 +177,8 @@ buttons around it.
 
 ## What he approved
 
+- 11-07 campaign briefs: "A, B". Brand wizard: picked A, one 48px line per brief (name, posting-days chip, # and link icons, inline Max #, archive), added like a hashtag (name + Max # + Enter), over B (hashtag-style chips with settings in a popover) and C (read-only table, every edit in a DsModal). Creator videos found by hashtag: picked B, one strip above the Posts grid (thumbnail fan, "3 videos need a brief", Pick) that steps through a popup "1 of 3", over A ("Pick brief" pill on each faded tile) and C (filter pills led by "Needs brief · 3"). Both my picks: settings set inline at add time (principle 18), and a queue over hunting tile by tile (principle 9).
+
 - 11-05 Ads connect screen, "No ad account yet?" path for brands with no ad account: "A". Picked A, a quiet text link under the Connect button that opens a DsModal of Connected Sources rows (logo tile, name, what the platform needs, Create ↗ that turns into Connect) (my pick), over B (the link swaps the screen's copy and button for the rows in place) and C (the rows always visible under the button, no link). Fifth time the shipped pattern beside the entry point won; the hero screen stays unchanged for brands that already have an account.
 
 - 11-05 Ads plan on /pricing: "I like the band." Picked A, a dark band above the paid row (featured card's face; Ads + big $0 left,
