@@ -18,6 +18,10 @@
 // The output is in Artifact form (no <html>/<head>/<body> of its own; the publish step adds them),
 // so publish it as is with the Artifact tool. Opened directly as a file it renders in quirks mode.
 import { execFileSync } from 'node:child_process'
+import dns from 'node:dns'
+import http from 'node:http'
+import https from 'node:https'
+import net from 'node:net'
 import { writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -178,7 +182,7 @@ async function load(u) {
     try {
       const { content, base64Encoded } = await call('Page.getResourceContent', { frameId: hit.frameId, url: u })
       const bytes = base64Encoded ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf8')
-      return { bytes, mime: hit.mimeType || guessMime(u) }
+      return { bytes, mime: safeMime((hit.mimeType || '').toLowerCase(), u) }
     } catch {}
   }
   // Fallback outside the browser: a page can name any URL (a creator's avatar link), so only fetch
@@ -188,19 +192,20 @@ async function load(u) {
     let next = u
     let res
     for (let hop = 0; hop < 5; hop++) {
-      if (!(await fetchable(next))) return null
-      res = await fetch(next, { signal: AbortSignal.timeout(15000), redirect: 'manual' })
-      const to = res.status >= 300 && res.status < 400 && res.headers.get('location')
+      res = await guardedGet(next)
+      const to = res.status >= 300 && res.status < 400 && res.headers.location
       if (!to) break
       next = new URL(to, next).href
     }
-    const mime = res.headers.get('content-type')?.split(';')[0].trim().toLowerCase() ?? ''
-    if (res.ok && ASSET_MIME.test(mime)) return { bytes: Buffer.from(await res.arrayBuffer()), mime }
+    const mime = String(res.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase()
+    if (res.status >= 200 && res.status < 300 && ASSET_MIME.test(mime)) return { bytes: res.body, mime }
   } catch {}
   return null
 }
 
-const ASSET_MIME = /^(image\/|font\/|text\/css$|application\/(font-woff2?|x-font-[\w.-]+|vnd\.ms-fontobject)$)/
+// The MIME type goes into a data: URI inside an HTML attribute, so it must match this exactly.
+const ASSET_MIME = /^(image\/[a-z0-9.+-]+|font\/[a-z0-9.+-]+|text\/css|application\/(font-woff2?|x-font-[a-z0-9.-]+|vnd\.ms-fontobject))$/
+const safeMime = (mime, u) => (ASSET_MIME.test(mime) ? mime : guessMime(u) ?? 'application/octet-stream')
 const PRIVATE_V4 = [/^0\./, /^10\./, /^127\./, /^169\.254\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, /^22[4-9]\.|^2[3-5]\d\./]
 const isPrivate = ({ address, family }) => {
   const a = address.toLowerCase()
@@ -209,12 +214,38 @@ const isPrivate = ({ address, family }) => {
   if (mapped) return PRIVATE_V4.some((r) => r.test(mapped[1]))
   return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a) || /^ff/.test(a)
 }
-async function fetchable(u) {
+// The address check runs inside the connection's own DNS lookup, so the address checked is the
+// address connected to (no rebinding between a check and the fetch).
+function guardedLookup(hostname, options, callback) {
+  dns.lookup(hostname, { ...options, all: true }, (error, addresses) => {
+    if (error) return callback(error)
+    if (!addresses.length || addresses.some(isPrivate)) return callback(new Error(`${hostname} resolves to a private address`))
+    options.all ? callback(null, addresses) : callback(null, addresses[0].address, addresses[0].family)
+  })
+}
+function guardedGet(u) {
   const parsed = new URL(u)
-  if (parsed.origin === new URL(page.href).origin) return true
-  const { lookup } = await import('node:dns/promises')
-  const addresses = await lookup(parsed.hostname, { all: true })
-  return addresses.length > 0 && !addresses.some(isPrivate)
+  if (!/^https?:$/.test(parsed.protocol)) return Promise.reject(new Error('not http(s)'))
+  const ownOrigin = parsed.origin === new URL(page.href).origin
+  const host = parsed.hostname.replace(/^\[|\]$/g, '')
+  // An IP literal skips DNS lookup, so check it directly.
+  if (!ownOrigin && net.isIP(host) && isPrivate({ address: host, family: net.isIP(host) })) return Promise.reject(new Error('private address'))
+  const client = parsed.protocol === 'https:' ? https : http
+  return new Promise((resolve, reject) => {
+    const req = client.get(u, { lookup: ownOrigin ? undefined : guardedLookup, timeout: 15000 }, (res) => {
+      const chunks = []
+      let size = 0
+      res.on('data', (chunk) => {
+        chunks.push(chunk)
+        size += chunk.length
+        if (size > maxAssetBytes) res.destroy()
+      })
+      res.on('close', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }))
+      res.on('error', reject)
+    })
+    req.on('timeout', () => req.destroy(new Error('timeout')))
+    req.on('error', reject)
+  })
 }
 
 let css = page.sheets.join('\n')
