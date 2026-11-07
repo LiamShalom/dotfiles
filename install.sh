@@ -84,6 +84,7 @@ LINKS=(
 	"codex/rules/default.rules:.codex/rules/default.rules"
 	"codex/hooks.json:.codex/hooks.json"
 	"claude/bin/run-until-done:.claude/bin/run-until-done"
+	"claude/bin/android-port-nightly.sh:.claude/bin/android-port-nightly.sh"
 	"claude/agents/skeptical-verifier.md:.claude/agents/skeptical-verifier.md"
 )
 

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: install.sh replaces __HOME__ and loads it. See claude/bin/android-port-nightly.sh.
+     02:00 nightly, after the day's iOS merges; if the Mac is asleep then, launchd runs it on wake.
+     With no open "Port to Android" issue it exits in seconds and starts no agent. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.sideshift.android-port.nightly</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>__HOME__/.claude/bin/android-port-nightly.sh</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>2</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>StandardOutPath</key>
+	<string>__HOME__/.claude/logs/android-port/launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>__HOME__/.claude/logs/android-port/launchd.log</string>
+</dict>
+</plist>
