@@ -206,13 +206,20 @@ async function load(u) {
 // The MIME type goes into a data: URI inside an HTML attribute, so it must match this exactly.
 const ASSET_MIME = /^(image\/[a-z0-9.+-]+|font\/[a-z0-9.+-]+|text\/css|application\/(font-woff2?|x-font-[a-z0-9.-]+|vnd\.ms-fontobject))$/
 const safeMime = (mime, u) => (ASSET_MIME.test(mime) ? mime : guessMime(u) ?? 'application/octet-stream')
-const PRIVATE_V4 = [/^0\./, /^10\./, /^127\./, /^169\.254\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, /^22[4-9]\.|^2[3-5]\d\./]
+// Every non-public range. IPv6 ranges that embed an IPv4 address (mapped, compatible, NAT64) are
+// blocked whole, so no spelling of a private IPv4 address gets through.
+// Two lists: Node's BlockList treats an IPv4 address as IPv4-mapped IPv6, so one shared list with
+// ::ffff:0:0/96 would match every IPv4 address.
+const PRIVATE_V4 = new net.BlockList()
+const PRIVATE_V6 = new net.BlockList()
+for (const [net4, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3]]) PRIVATE_V4.addSubnet(net4, bits, 'ipv4')
+for (const [net6, bits] of [['::', 96], ['::ffff:0:0', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['2002::', 16], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) PRIVATE_V6.addSubnet(net6, bits, 'ipv6')
 const isPrivate = ({ address, family }) => {
-  const a = address.toLowerCase()
-  if (family === 4) return PRIVATE_V4.some((r) => r.test(a))
-  const mapped = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-  if (mapped) return PRIVATE_V4.some((r) => r.test(mapped[1]))
-  return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a) || /^ff/.test(a)
+  try {
+    return family === 6 || family === 'IPv6' ? PRIVATE_V6.check(address, 'ipv6') : PRIVATE_V4.check(address, 'ipv4')
+  } catch {
+    return true
+  }
 }
 // The address check runs inside the connection's own DNS lookup, so the address checked is the
 // address connected to (no rebinding between a check and the fetch).
@@ -227,12 +234,12 @@ function guardedGet(u) {
   const parsed = new URL(u)
   if (!/^https?:$/.test(parsed.protocol)) return Promise.reject(new Error('not http(s)'))
   const ownOrigin = parsed.origin === new URL(page.href).origin
-  const host = parsed.hostname.replace(/^\[|\]$/g, '')
-  // An IP literal skips DNS lookup, so check it directly.
-  if (!ownOrigin && net.isIP(host) && isPrivate({ address: host, family: net.isIP(host) })) return Promise.reject(new Error('private address'))
+  // An IP-literal host skips the DNS lookup (and its check), and real asset links use host names.
+  if (!ownOrigin && net.isIP(parsed.hostname.replace(/^\[|\]$/g, ''))) return Promise.reject(new Error('IP-literal host'))
   const client = parsed.protocol === 'https:' ? https : http
   return new Promise((resolve, reject) => {
-    const req = client.get(u, { lookup: ownOrigin ? undefined : guardedLookup, timeout: 15000 }, (res) => {
+    // A hard deadline for the whole request, not only for idle gaps.
+    const req = client.get(u, { lookup: ownOrigin ? undefined : guardedLookup, timeout: 15000, signal: AbortSignal.timeout(15000) }, (res) => {
       const chunks = []
       let size = 0
       res.on('data', (chunk) => {
@@ -240,7 +247,11 @@ function guardedGet(u) {
         size += chunk.length
         if (size > maxAssetBytes) res.destroy()
       })
-      res.on('close', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }))
+      res.on('close', () => {
+        // Cut off by the deadline or the server: not an asset. Cut off by the size cap: too big.
+        if (!res.complete && size <= maxAssetBytes) return reject(new Error('incomplete response'))
+        resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) })
+      })
       res.on('error', reject)
     })
     req.on('timeout', () => req.destroy(new Error('timeout')))
@@ -305,5 +316,5 @@ const mb = (Buffer.byteLength(html) / 1048576).toFixed(2)
 console.log(`Saved ${page.href} ("${page.title}") to ${resolve(out)}: ${mb} MB, ${inlined} assets inlined.`)
 if (Number(mb) > 16) console.log('WARNING: over the 16 MB Artifact limit. Lower --max-asset-kb or remove large images.')
 if (tooBig.length) console.log(`Replaced with a blank pixel (over --max-asset-kb):\n  ${tooBig.join('\n  ')}`)
-if (missed.length) console.log(`Could not load, replaced with a blank pixel (the live page may not have loaded them yet; scroll them into view and capture again):\n  ${[...new Set(missed)].join('\n  ')}`)
+if (missed.length) console.log(`Could not load, replaced with a blank pixel (the live page may not have loaded them yet; raise --wait or scroll them into view and capture again):\n  ${[...new Set(missed)].join('\n  ')}`)
 console.log('Scripts were removed. Add the interactions with inline JS and fixture state before you publish.')
