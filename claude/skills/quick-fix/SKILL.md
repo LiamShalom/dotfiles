@@ -369,10 +369,11 @@ the evidence. If anything is unverified, lead with that.
 - Merged: `**Status:** Done — verified · PR #123 <url> · merged: yes`.
 - Not merged: say which gate failed (large UI, large feature, CI, unverifiable step), give
   the preview URL and what to click to review, and end with the status line below. When
-  large UI is the only gate, first open the preview on the changed page (or the
-  before/after screenshots) in Session Board's pane with
-  `node ~/session-board/scripts/board-browser.mjs <url | file> "<what to approve>"`, so the
-  operator can approve it at a glance. **iOS change: the live simulator, not screenshots.**
+  large UI is the only gate, first publish a clickable Artifact copy of the changed page
+  (built from the real page's rendered HTML and CSS, working buttons and states, preview
+  link inside; see the global CLAUDE.md UI-approval rule) and open it in Session Board's pane
+  with `node ~/session-board/scripts/board-browser.mjs <artifact-url> "<what to approve>"`,
+  so the operator can approve it at a glance. **iOS change: the live simulator, not screenshots.**
   Leave the simulator, its build and any proxy running on the changed screen, and open it
   with `board-browser.mjs --simulator <udid> "<what to tap>"`. Do not clean up until the
   operator says they are done. Clean up after the approval, not before. End with

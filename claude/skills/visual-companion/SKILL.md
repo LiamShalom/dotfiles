@@ -15,8 +15,9 @@ on the operator's phone, can be shared with the team, and returns comments to th
    write the page. Write a full page to `$CLAUDE_JOB_DIR/tmp/<topic>.html` (or the session
    scratchpad), not a fragment: the frame template and `toggleSelect` do not exist there.
 2. Give each option a letter and a heading, and put your pick and its reason at the top.
-   Put real screenshots (the preview route, the reference screen) in with `files`, not
-   hand-drawn lookalikes of product UI.
+   For product UI, publish a clickable copy captured from the real page's rendered HTML and
+   CSS (the preview route, the reference screen), with working buttons and states in JS, not
+   a hand-drawn lookalike. Screenshots in `files` are fine for static comparisons.
 3. Publish, then open the URL in the pane in the same turn:
    `node ~/session-board/scripts/board-browser.mjs <artifact-url> "<what to look at and decide>"`.
 4. Ask for the answer in the terminal ("A, B or C?"). Read comments on the page with

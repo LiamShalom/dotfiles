@@ -87,8 +87,9 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    page with a screenshot of each direction from the preview route at 1280 and 390 wide, the
    reference screen beside them, your pick at the top, and the preview link for each. Open it in
    the Session Board pane with `board-browser.mjs`. Republish the same file each round, so the
-   operator keeps one URL. The screenshots come from the real components; never redraw product
-   UI in the artifact's HTML. The preview route stays where the operator clicks through it. Once
+   operator keeps one URL. Make each direction clickable in the artifact: capture the preview
+   route's rendered HTML and CSS and wire its buttons and states with fixture data in JS. Do
+   not redraw product UI by hand. Keep the preview link beside each direction. Once
    one is chosen, delete the others and iterate on feedback until they approve. **Build the
    chosen option exactly as it was mocked, plus only the changes the operator named.** Never
    carry a treatment over from an option they did not pick, even your own pick. Before showing
