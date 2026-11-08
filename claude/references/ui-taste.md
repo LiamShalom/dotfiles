@@ -66,6 +66,7 @@ numbers sit inside the squares; platform colours match the platform.
 
 **5. Big number first, short cards, secondary data hidden.** He prefers one large number to a
 pill, a short card to a tall one, and "show more" to everything at once.
+- 11-07 campaign Overview built as the full Analytics dashboard (Top Creators + Active Creators + recommendations + an applicants queue): "no need to have 3 creator sections in the overview. I'd rather the overview be simple and readable. Take inspo from Trybe". An overview shows each kind of thing once: one chart, one ranked list of creators, one of videos. Embedding a whole shipped page is not reuse when it carries that page's density; compose the overview from Home's cards instead.
 - 10-30 Meta copy suggestions: "only needs to generate a couple", clarified as "actually generate new copy based on their existing ads". Generate exactly two primary texts and two headlines; retain both options after selection, with no Load more.
 - 10-15 "I dontl ike the pill, I like the big number the A had"
 - 10-21 "the profile card is a little bit too long… highlighted more of the neccessary content"
