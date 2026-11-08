@@ -34,6 +34,12 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    use. A new component composes those primitives and tokens. Creator surfaces (`CREATOR_SURFACES` in
    `eslint.config.mjs`) stay off the design system.
 
+   **Before you pick where a surface lives, check who else is redesigning that page.** Run `ListAgents` and
+   `git branch -r --sort=-committerdate | head -30`, and read the `design.md` of any open session or branch that
+   touches the same page or flow. Write in `design.md` the host you chose and why. Any peer message about that page
+   counts too. (11-07 brief pages: three directions built in the create wizard while the campaign-page redesign
+   session had already offered a Brief tab → "it doesnt need to be in the campaign creation, check the other chat".)
+
 3. **Define the data contract first.** Write the props type each component takes: the shape
    the backend must deliver. Put it next to the component, or in the existing domain types
    if the concept is already modelled. This is the handover to `execute`.
