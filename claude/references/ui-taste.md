@@ -61,7 +61,7 @@ numbers sit inside the squares; platform colours match the platform.
 - 10-20 "This youtube analytics is awful: It should be visual like meta and tiktok"
 - 10-01 "The chart looks comletely awful… ensure it uses the same colors as the platforms are."
 - 10-02 "the bars should be as wide as the timeline allows… with only small gaps inbetween"
-- 11-07 smart CPM pay chart drawn on log-log axes (the taper became two straight lines): "Im so confueds, I thought smart should be a line thats surved like log is?". Draw a curve the way he pictures it: plain linear axes, so a taper reads as a line bending over. A log axis is an analyst's trick; don't use one in product UI to make a shape "clearer"
+- 11-07 smart CPM pay chart drawn on log-log axes (the taper became two straight lines): "Im so confueds, I thought smart should be a line thats surved like log is?". Draw a curve the way he pictures it: plain linear axes, so a taper reads as a line bending over. A log axis is an analyst's trick; don't use one in product UI to make a shape "clearer". Same day, after the full-rate default moved to 500K on a 2M axis (a kink, not a curve): "but I thought the point fo smart was for it to be almost logarithmic". Size the axis so the feature's shape fills it (here 0–10M), and re-check the picture after every default change
 - 11-07 smart CPM pay chart, approved: "A" = the fields, then one card with the chart and three priced readouts under it (pay at 100K / 1M / 10M, the flat cost muted below each), over a drag-the-curve chart-first layout and a big-single-number layout. Chart plus exact numbers beats direct manipulation or one hero figure for money terms
 
 **5. Big number first, short cards, secondary data hidden.** He prefers one large number to a
