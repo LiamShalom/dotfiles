@@ -114,6 +114,7 @@ platforms inline, not wrapped to two rows; on mobile the action stays in view.
 
 **11. Setup lives in settings, not in the main flow.**
 - 10-26 "I dont like having Business name and Logo in the build ad flow… in ad settings -> accounts"
+- 11-07 campaign brief pages, three editor directions built for the create wizard's Brief step: "it doesnt need to be in the campaign creation, check the other chat thats redesinginng the campaigns tab". Rich content a brand keeps working on (a brief with videos, named briefs) belongs on the object's own page (the campaign page's Brief tab), not in the create flow. Before placing a new surface, check what sibling sessions are building for that page; the redesign session had already offered a Brief tab.
 
 **12. Speed is design.** Slow loads and multi-step reveals get rejected even when the UI is right.
 - 10-26 "looks good, just takes too long to load" · "comes back in 3 steps. I dont like that UX"
