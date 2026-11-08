@@ -164,10 +164,11 @@ To merge, use `/pr-approve` in the monorepo (`.claude/skills/pr-approve/scripts/
 <pr> --merge`). It approves as the shared reviewer account, which branch protection needs,
 then waits for checks and squash-merges. Never use `gh pr merge --admin`.
 
-**Before merging a monorepo PR, run the browser QA suite on its final commit:** `node
-qa-agents/qa-pr.mjs <pr>`. Agents test what the PR changes on its preview against production,
-as the test brand and test creator, and post the result on the PR. gh-approve refuses the merge
-until it passes; fix the findings, or accept one that is intended with `--accept "<why>"`.
+**Before merging a monorepo PR, review it for bugs and gaps and fix them:** run `/code-review high
+<pr> --fix`, fix every real bug it finds, and check the diff against what was asked (a promised
+behaviour that is missing, or a state it does not handle: empty, error, loading, a role without
+access). Push the fixes and let CI finish, then merge. A hook refuses `gh-approve --merge` until the
+session has run `/code-review`.
 
 **Schema migration PRs:** merge them without asking once CI is green, then approve the
 `db-migrate-prod` apply without asking. This is my standing approval for every migration
