@@ -92,6 +92,13 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    label, number, icon or the layout already says. No screen should carry more words than
    its reference. (10-26: "very text heavy components which often arent neccessray".)
 
+   Then list every kind of content on the screen in each state (videos, creators, the brief
+   text, a metric, a listing, an action) and where each one appears. Any kind that appears in
+   two places, such as a hero above a card or a rail repeating the main column, keeps the
+   bigger one and loses the other before you show anything. (11-07 Overview: "no need to have
+   3 creator sections"; 11-08 Brief tab: "theres no need to have brief and examples when we
+   have the large UI above".)
+
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
    Show the directions from step 4 side by side and say which you would pick and why.
