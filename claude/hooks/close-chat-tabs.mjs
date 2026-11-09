@@ -1,7 +1,17 @@
 // UserPromptSubmit: close this chat's agent-Chrome tabs, which by the next prompt are stale previews.
 // One tab stays, blanked, because closing a window's last tab ends the chat's browser context.
+// Pages handed to Session Board's pane open in the chat's window too; they stay, as Liam is looking at them.
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+
+let paneTabs = new Set();
+try {
+  const pane = JSON.parse(readFileSync(`${homedir()}/Library/Application Support/Session Board/pane.json`, 'utf8'));
+  paneTabs = new Set((pane.tabs ?? []).map((t) => t.id));
+} catch {
+  // Without the pane's list a hand-off cannot be told apart, so touch nothing.
+  process.exit(0);
+}
 
 let input = {};
 try { input = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch {}
@@ -24,7 +34,7 @@ setTimeout(done, 4000);
 ws.onerror = done;
 ws.onopen = async () => {
   const { result } = await send('Target.getTargets');
-  const pages = (result?.targetInfos ?? []).filter((t) => t.type === 'page' && t.browserContextId === ctx);
+  const pages = (result?.targetInfos ?? []).filter((t) => t.type === 'page' && t.browserContextId === ctx && !paneTabs.has(t.targetId));
   if (pages.length === 0) return done();
   const [keep, ...rest] = pages;
   for (const t of rest) await send('Target.closeTarget', { targetId: t.targetId });
