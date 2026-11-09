@@ -54,7 +54,9 @@ function hide(electron) {
   // A window made with the default show: true activates the app in its constructor, before any
   // event fires, so every window is made hidden and then shown without activating. The module's
   // own BrowserWindow can't be redefined, so callers get a view of the module that swaps it.
-  class HiddenWindow extends BrowserWindow {
+  // Named BrowserWindow: Electron's getAllWindows() and fromId() only count windows whose
+  // constructor has that exact name.
+  const HiddenWindow = class BrowserWindow extends electron.BrowserWindow {
     constructor(options = {}) {
       super({ ...options, show: false, opacity: 0 })
       if (options.show !== false) this.showInactive()
