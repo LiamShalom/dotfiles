@@ -34,6 +34,12 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    use. A new component composes those primitives and tokens. Creator surfaces (`CREATOR_SURFACES` in
    `eslint.config.mjs`) stay off the design system.
 
+   **Name the shipped surface the ask means before you build.** "Redesign the screens for X" can mean a
+   one-time popup about X, the flow X itself, or a page. Write the exact component and where users meet it
+   as the first line of `design.md`; if the words fit two surfaces, ask which one with both named. (11-08:
+   "redesign the screens for the new sign + oauth flow" meant the creator release popup; I rebuilt the
+   in-flow Sign and You're in screens → "Im saying the UI for the informational popup".)
+
    **Before you pick where a surface lives, check who else is redesigning that page.** Run `ListAgents` and
    `git branch -r --sort=-committerdate | head -30`, and read the `design.md` of any open session or branch that
    touches the same page or flow. Write in `design.md` the host you chose and why. Any peer message about that page
