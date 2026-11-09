@@ -30,11 +30,20 @@ if (typeof cmd !== 'string' || !/^\s*open\s/.test(cmd)) process.exit(0)
 // A board-browser.mjs hand-off. On 10-21 and 10-22 Liam could not see a page the agent said was in the pane: the
 // agent closed the tab the board opened, or overrode CLAUDE_CODE_SESSION_ID so the tab went outside his pane, and
 // said "it's there" without a screenshot. The override is refused; every other hand-off gets the check to run first.
+// A /dev-*-preview route is a fixture page, not the product. On 11-08 Liam asked twice to see "the actual
+// platform" and was shown the dev route again ("stop opening the brief pages preview, open the actual vercedl
+// preview"). It opens only when the operator asked for that route or to compare directions: DEV_PREVIEW_OK=1.
 function boardBrowserCheck(command) {
+  const devRoute = /\/dev-[a-z0-9-]+-preview\b/i.test(command) && !/\bDEV_PREVIEW_OK=1\b/.test(command)
   const out = /\bCLAUDE_CODE_SESSION_ID=/.test(command)
     ? {
         permissionDecision: 'deny',
         permissionDecisionReason: 'Do not override CLAUDE_CODE_SESSION_ID for board-browser.mjs: the board then opens the tab outside the pane the operator is looking at. Run it as it is; the tab it opens is the pane\'s tab.',
+      }
+    : devRoute
+    ? {
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'That is a /dev-*-preview fixture route. The operator reviews the real page on the Vercel preview (the real campaign, profile or settings page, signed in), not the fixture route. Open the real page instead; if what he asked for is not on the real page yet, say so. Only when he asked for the dev route itself or to compare directions, prefix the command with DEV_PREVIEW_OK=1.',
       }
     : {
         additionalContext: 'Before you tell the operator the page is in the pane: (0) say only what board-browser.mjs printed about where it is. "in front of the chat the operator is looking at" means in front of them; a named other chat means they must click that chat in the sidebar; an error means it is not shown. A screenshot of the tab does not prove the pane shows it. (1) the tab board-browser.mjs just opened IS the pane\'s tab, even when chrome-devtools list_pages does not show it (find it in http://127.0.0.1:9222/json/list). Never close it as a stray tab; if the page needs a login, sign in that tab where it is (brand-tab.mjs adopt). (2) Screenshot that exact tab (CDP Page.captureScreenshot on its target id) and look at the image. If you cannot, tell the operator you could not confirm it.',
