@@ -53,10 +53,15 @@ esac
 # Electron apps launched by an e2e run (Session Board's suite on any branch) stay invisible and
 # never take focus. e2e-electron-hidden.cjs only touches the spawn of an Electron binary and that
 # Electron's windows; any other command runs as before.
+# Codex applies a rewrite only with an "allow", so there it rewrites only a plain e2e command
+# (an optional `cd <dir> &&`, then the e2e command, with no other shell operators).
+plain_e2e='^(cd [^;&|`$()<>]+ && )?(npx playwright test|npm run e2e|npm run test:e2e)([^;&|`$()]*)$'
 case "$cmd" in
 	*playwright\ test* | *run\ e2e* | *run\ test:e2e*)
-		hidden="$HOME/.claude/hooks/e2e-electron-hidden.cjs"
-		new="export NODE_OPTIONS=\"--require=$hidden\${NODE_OPTIONS:+ \$NODE_OPTIONS}\"; ${new:-$cmd}"
+		if [ "${1:-}" != "--codex" ] || [[ "$cmd" =~ $plain_e2e ]]; then
+			hidden="$HOME/.claude/hooks/e2e-electron-hidden.cjs"
+			new="export NODE_OPTIONS=\"--require=$hidden\${NODE_OPTIONS:+ \$NODE_OPTIONS}\"; ${new:-$cmd}"
+		fi
 		;;
 esac
 [ -n "$new" ] || exit 0
