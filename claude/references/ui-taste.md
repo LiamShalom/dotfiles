@@ -97,6 +97,8 @@ no emoji, sparkle/AI icons, "run by" pills or invented stats.
 - 10-20 "the run by sideshift pill looks AI generated" · "remove the stupid AI icons then use an actual case study"
 - 10-20 "I dont like the arbitraty numbers though" · 09-29 "make it more flashy including the ads icon"
 
+- 11-08 comment-to-DM brand card, a stack of labelled full-width fields: "The UI takes up so much space. Is there a way to compress it?", then on the compressed version (pairs side by side, replies as chips): "this UI is a little broing and also the tab sawicther is fucked". A shipped control (SegmentedControl) squeezed below its built height breaks; never resize a DS control to fit a label row. The DM-thread rebuild (editable chat bubbles, button text inline): "I dont like this either, design a couple of options and present them to me". Show directions before rebuilding a rejected settings card.
+
 **8. Fewer controls.** Two direct buttons over a "more actions" menu; an x over a toggle list; a
 secondary link over a second full button; a deep link over a "check" button.
 - 10-21 "I dont like the more actions it can just be contrcat and analytics buttons"
