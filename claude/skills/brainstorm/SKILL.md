@@ -41,7 +41,13 @@ docs/features/YYYY-MM-DD-<slug>/
 2. **Check the scope.** If the idea is several independent systems, say so first and propose
    how to split it. Brainstorm the first part; list the others as follow-ups.
 
-3. **Ask questions, one per message.** Only about what research cannot answer: intent,
+3. **Ask questions, one per message.** Before the first one, write two lines at the top of
+   the spec: the party whose pain the ask names (the primary party), and the ask's
+   distinctive part (step 4). Frame every question from the primary party's screen and
+   workflow; other parties come after, as consequences. (11-09 messaging spaces: the ask said
+   "for brands the view makes it almost impossible to handle mass creators", and the space
+   question was framed around the creator's rail → "this is more focused towards the brand
+   side".) Only about what research cannot answer: intent,
    priority, who it is for, what "done" looks like, trade-offs that are product calls. Put
    what you found and your recommended answer in each question so the operator can say
    "yes". Use `AskUserQuestion` when the answer is a choice. Stop when another question would
