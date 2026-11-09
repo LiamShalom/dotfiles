@@ -98,6 +98,7 @@ no emoji, sparkle/AI icons, "run by" pills or invented stats.
 - 10-20 "I dont like the arbitraty numbers though" · 09-29 "make it more flashy including the ads icon"
 
 - 11-08 comment-to-DM brand card, a stack of labelled full-width fields: "The UI takes up so much space. Is there a way to compress it?", then on the compressed version (pairs side by side, replies as chips): "this UI is a little broing and also the tab sawicther is fucked". A shipped control (SegmentedControl) squeezed below its built height breaks; never resize a DS control to fit a label row. The DM-thread rebuild (editable chat bubbles, button text inline): "I dont like this either, design a couple of options and present them to me". Show directions before rebuilding a rejected settings card.
+- 11-09 same card, three directions (A workflow-builder steps on a timeline, B collapsed summary rows (my pick, most compact), C fields beside a live DM preview): "I like A", with "reply under the comment would be the second step". An automation setting reads best as the workflow builder's steps (ToneGlyph + DsTimeline), not as the most compact list; list steps in the order he thinks of them (the public reply straight after the comment).
 
 **8. Fewer controls.** Two direct buttons over a "more actions" menu; an x over a toggle list; a
 secondary link over a second full button; a deep link over a "check" button.
