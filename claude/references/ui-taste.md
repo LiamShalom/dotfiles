@@ -18,6 +18,7 @@ principle it supports, or a new principle. Approvals count too.
 
 **1. Cut text. Show it with a visual, icon or logo.** He reads text-heavy UI as unfinished.
 Long values get a copy button, not the value. An action that fits as an icon is an icon.
+- 11-08 open joining brand email: after "It feels very wordy still" I cut it to a quarter; he replied "No I think all the informatino was good and usefull it just needs different size text etc to look more organized". "Wordy" on content he already approved means a flat wall of same-size paragraphs, not too much information: keep the content and add hierarchy (tiles with a bold title and smaller muted body, a two-row before/now table, one big number, compact rows). Cut content only when he says something is unnecessary. Ask "cut or restructure?" only if neither reading fits.
 - 10-26 "very text hgeavy components which often arent neccessray"
 - 10-06 "I dont like this wordy UI" · 10-07 "this modal is wayy too wordy"
 - 10-08 "Theyre wait too wordy and hard to follow for creators" (Google Ads creator screens)
