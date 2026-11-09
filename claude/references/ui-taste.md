@@ -88,7 +88,7 @@ pill, a short card to a tall one, and "show more" to everything at once.
 
 **7. Premium, never generic or AI-looking.** Liquid metal and the blue gradient for hero moments;
 no emoji, sparkle/AI icons, "run by" pills or invented stats.
-- 11-09 campaign Overview, the Marketplace Listing rail card (blue gradient sheen, metal buttons): "I'm not a fasn of the lqiuid metal for thew marketplac elisting". Liquid metal is for hero moments, not a working card that sits beside plain data cards on a dashboard; offered flat blue, white card, and a white card with the creator's card on the creator feed surface.
+- 11-09 campaign Overview, the Marketplace Listing rail card (blue gradient sheen, metal buttons): "I'm not a fasn of the lqiuid metal for thew marketplac elisting". Liquid metal is for hero moments, not a working card that sits beside plain data cards on a dashboard; offered flat blue, white card, and a white card with the creator's card on the creator feed surface. Picked the white card with the creator feed stage ("lets go with C, I do think the applicants and messaged, can be redesgined though": the stat tiles were too heavy). For the counts he picked A, a quiet grey line under the title ("221 applicants · 0 messaged"), over pills on the stage and over the count on the Applicants button (my pick). Secondary numbers on a card are a meta line, not tiles or chips.
 - 11-05 Ads plan /pricing (built as a bare "Ads / $0 a month" title over a two-row fee table): "/pricing needs a huge UI
   redesign. It should look exciting not be some shityty texzt on the screen". A plan or offer page is a hero moment: big price,
   the platform logos, the featured card's dark face. Never ship a pricing surface as a heading and a table, and show directions first.
