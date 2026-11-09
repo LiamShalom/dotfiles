@@ -83,7 +83,10 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    "this isnt the entire profile".)
 
 6. **Check it yourself first.** Open the route in the shared agent Chrome
-   (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. Put
+   (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. A page
+   that shows real records (a campaign, a creator, a brand) is checked and shown on an empty one
+   and a full one, never only one. (11-09: "we need to be testing and viewing on both an empty
+   campaign and a full campaign".) Put
    it beside the reference screen. Go through the "Signs of slop" table in `unslop.md` and
    list every sign you see, then run its nine passes in order (spacing, colour, icons, copy,
    type, layout, details, visuals, motion) across the whole screen until the list is empty
