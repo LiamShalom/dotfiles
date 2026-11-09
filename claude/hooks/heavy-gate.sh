@@ -42,13 +42,23 @@ case "$cmd" in
 		;;
 esac
 
+new=""
 case "$cmd" in
-	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint* | *xcodebuild* | *agent-preflight*) ;;
-	*) exit 0 ;;
+	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint* | *xcodebuild* | *agent-preflight*)
+		cwd=$(jq -r '.cwd // empty' <<<"$input")
+		new=$(node "$HOME/.claude/hooks/heavy-classify.mjs" "$cmd" "${cwd:-$PWD}" 2>/dev/null) || new=""
+		;;
 esac
 
-cwd=$(jq -r '.cwd // empty' <<<"$input")
-new=$(node "$HOME/.claude/hooks/heavy-classify.mjs" "$cmd" "${cwd:-$PWD}" 2>/dev/null) || exit 0
+# Electron apps launched by an e2e run (Session Board's suite on any branch) stay invisible and
+# never take focus. e2e-electron-hidden.cjs only touches the spawn of an Electron binary and that
+# Electron's windows; any other command runs as before.
+case "$cmd" in
+	*playwright\ test* | *run\ e2e* | *run\ test:e2e*)
+		hidden="$HOME/.claude/hooks/e2e-electron-hidden.cjs"
+		new="export NODE_OPTIONS=\"--require=$hidden\${NODE_OPTIONS:+ \$NODE_OPTIONS}\"; ${new:-$cmd}"
+		;;
+esac
 [ -n "$new" ] || exit 0
 
 mkdir -p "$(dirname "$log")"
