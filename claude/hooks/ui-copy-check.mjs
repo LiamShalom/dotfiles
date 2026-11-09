@@ -19,6 +19,21 @@ try {
 }
 const ti = input.tool_input ?? {};
 const file = ti.file_path ?? '';
+
+// A new standalone visual (a diagram, a mock, an email image) drawn as SVG outside the product's
+// icon and asset folders. 11-08: one boxes-and-arrows diagram for the open joining emails,
+// rejected as "generated poorly... present a couple of options".
+if (input.tool_name === 'Write' && /<svg[\s>]/.test(ti.content ?? '') && !/\/(components\/ui\/icons|public|Assets\.xcassets|res\/drawable)\//.test(file) && !/\.(test|spec)\./.test(file)) {
+  try {
+    appendFileSync(`${homedir()}/.claude/logs/ui-copy-check.log`, `${new Date().toISOString()} new-visual ${file}\n`);
+  } catch {}
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext:
+    'New visual drawn by hand. Before showing it: read ~/dotfiles/claude/references/ui-taste.md, build 2-3 different directions ' +
+    '(not variants of one layout), render each to an image and look at it, use real product assets (platform logos from ' +
+    'public/, DS colours, the creator kit blue for creator controls), and show them side by side with your pick.' } }));
+  process.exit(0);
+}
+
 const kind = /\.tsx$/.test(file) && /\/(app|components)\//.test(file)
   ? 'tsx'
   : (/\.swift$/.test(file) && /\/(UI|Views?|Components?|Screens?|Widget)\//.test(file)) || (/\.kt$/.test(file) && /\/android\//.test(file))
