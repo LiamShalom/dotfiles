@@ -125,6 +125,8 @@ not a hype promise or a state the user is not in. A spec's sales copy is not a f
 - 10-26 "the youre in isnt true though, its just an onboarding to get them setup and answer questions"
 - 10-27 open-joining brand popup ("Creators now join when you accept them", shown as a flow diagram, a before/after or a corner card): "It needs to communicate the fact that they can still keep their old flow but now they dont need to resend the campaign invite. Also ther UI needs to be improved". A change announcement names the one step the user stops doing, in their words (the campaign invite), and says the rest stays the same
 
+- 11-08 creator release popup + first-application popup, built around a warning ("Signing doesn't mean you're in", locked New account / Warm-up tiles, "You're not in yet"): "I dont like the negative direction you took in this approach. It should explain the new flow but put it in a positive light and explain what makes it better". A change announcement sells the change: name what got better (no invite to wait for, account approved instantly), and put the rule creators keep breaking as the next step ("Start when you're in"), never as a lock or a "not yet" headline. Even when the ask came from a complaint about misuse, the user-facing copy stays positive.
+
 **14. Give real options when it is new.** For a new screen, two or three different directions,
 not a variant of the closest weak pattern.
 - 10-23 "This is awful. Be more creatve. This is why I asked for you to provide options."
