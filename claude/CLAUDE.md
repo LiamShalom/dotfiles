@@ -189,6 +189,12 @@ shell scripts you're writing are unaffected.
 - **Symlink the gitignored env files in first.** Worktrees don't inherit them, and scripts fail
   on missing credentials in confusing ways. Link the main checkout's `.env.local` (and anything
   else that gets loaded) before doing anything else.
+- **Install a monorepo worktree with `~/.claude/bin/sideshift-setup`** (run from the worktree
+  root) when you will build or test there. It links `.env.local`, clones a cached install for
+  the same lockfile (or updates the nearest one with `npm install`), and runs
+  `npm run build:packages`. Run it again after `package-lock.json` changes or a rebase.
+- **Type errors arrive after each edit** (the `ts7-lsp` mod) with your next tool result. Fix
+  them as they appear; still run `npm run typecheck` once before you commit.
 - **Commit everything before you hand the branch back.** Uncommitted work is invisible to
   `git merge`, so it may as well not exist.
 - **Squash down to one commit** — three separate Bash calls: `git add -A`, then
@@ -298,6 +304,9 @@ heavy jobs wait for 20%. The agent preflight (`scripts/agent-preflight.mjs`) tak
 
 - **"heavy: all 2 slots are busy" or "only N% of memory is free" means wait, not fail.** Don't work around the queue or the
   worker cap (no `--maxWorkers` overrides, no `bash -c` wrappers) unless I ask.
+- **"disk-guard: only N GB free" means the disk is nearly full: stop and tell me.** It refuses
+  queued jobs, installs and dev servers below a floor (`~/.claude/bin/disk-guard status`).
+  Don't set `DISK_GUARD_OFF` or delete files to get past it unless I ask.
 - **While iterating, run the specific test files you changed.** Targeted runs skip the queue;
   save the full suite for the final check.
 

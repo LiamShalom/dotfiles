@@ -15,6 +15,30 @@ cmd=$(jq -r '.tool_input.command | if type == "string" then . else empty end' <<
 [ -n "$cmd" ] || exit 0
 log="/tmp/agent-heavy-$(id -u)/hook.log"
 
+# Installs and dev servers write gigabytes but are not queued jobs, so the disk
+# check for them happens here (queued jobs check it in bin/heavy).
+# Match only where a command starts (start of line or after ; & | ( ), optionally
+# after VAR=value prefixes, so a commit message or search text that names
+# `npm ci` is not refused.
+at_start='(^|[;&|(])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*'
+disk_level=""
+if [[ "$cmd" =~ ${at_start}(npm[[:space:]]+ci|(pnpm|yarn|bun)[[:space:]]+(install|i))([[:space:]]|$) ]]; then
+	disk_level=heavy
+elif [[ "$cmd" =~ ${at_start}(npm[[:space:]]+(install|i|add)|(pnpm|yarn|bun)[[:space:]]+add)([[:space:]]|$) ]]; then
+	dir=$(jq -r '.cwd // empty' <<<"$input")
+	[ -d "${dir:-$PWD}/node_modules" ] && disk_level=light || disk_level=heavy
+elif [[ "$cmd" =~ ${at_start}((npx[[:space:]]+)?next[[:space:]]+dev|(npm|pnpm|yarn|bun)[[:space:]]+(run[[:space:]]+)?dev)([[:space:]]|:|$) ]]; then
+	disk_level=light
+fi
+if [ -n "$disk_level" ] && [ -x "$HOME/.claude/bin/disk-guard" ]; then
+	reason=$("$HOME/.claude/bin/disk-guard" "$disk_level" 2>&1)
+	if [ $? -ne 0 ]; then
+		jq -nc --arg r "$reason" '{hookSpecificOutput: {hookEventName: "PreToolUse",
+			permissionDecision: "deny", permissionDecisionReason: $r}}'
+		exit 0
+	fi
+fi
+
 # Cheap filters first: almost every command never names one of these tools.
 case "$cmd" in
 	*next\ dev* | *run\ dev* | *pnpm\ dev* | *yarn\ dev* | *bun\ dev*)

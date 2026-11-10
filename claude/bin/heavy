@@ -39,6 +39,17 @@ if [ "${1:-}" = "--pool" ]; then
 	fi
 fi
 
+# Refuse when the disk is nearly full: unlike memory, it does not free itself
+# when other jobs end.
+case "$POOL" in
+	build) DISK_LEVEL=build ;;
+	xcode) DISK_LEVEL=heavy ;;
+	*) DISK_LEVEL=light ;;
+esac
+if [ -x "$HOME/.claude/bin/disk-guard" ]; then
+	"$HOME/.claude/bin/disk-guard" "$DISK_LEVEL" || exit 1
+fi
+
 # Wait for free memory, at most MEM_WAIT seconds; after that run anyway, so a
 # machine that stays full never blocks every agent for good.
 MEM_WAIT="${HEAVY_MEM_WAIT_SECS:-900}"

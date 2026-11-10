@@ -1,0 +1,347 @@
+#!/opt/homebrew/bin/python3.12 -I
+"""sideshift-setup: prepare a sideshift-monorepo worktree in one command.
+
+Run it from the worktree root. It links .env.local, gives the worktree its own
+node_modules, and builds the workspace packages (`npm run build:packages`).
+
+A finished install is kept in ~/.cache/sideshift/node-modules/<key> (key =
+package-lock.json + .npmrc + Node version). A later worktree with the same key
+gets an APFS clone of it in seconds. A worktree with a different lockfile
+clones the newest cached install (or, with an empty cache, the newest sibling
+worktree's install) and runs `npm install`, which changes only what differs.
+`npm ci` runs only when there is nothing to start from, or with --force.
+
+Adapted from Don's sideshift_setup.py (2026-11-10).
+"""
+import argparse
+import contextlib
+import ctypes
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+HOME = Path.home()
+PRIMARY = (HOME / 'sideshift-monorepo').resolve()
+NODE = '/opt/homebrew/opt/node@24/bin/node'
+NPM = '/opt/homebrew/opt/node@24/bin/npm'
+CACHE = HOME / '.cache' / 'sideshift' / 'node-modules'
+CACHE_KEEP = 3
+ENV_LOCAL = HOME / '.config' / 'sideshift' / 'env.local'
+DISK_GUARD = HOME / '.claude' / 'bin' / 'disk-guard'
+MARKER = '.sideshift-deps.json'
+
+_last = [time.monotonic()]
+
+
+def step(message):
+    now = time.monotonic()
+    print(f'==> {message}   (+{now - _last[0]:.0f}s)', flush=True)
+    _last[0] = now
+
+
+def git(cwd, *args):
+    return subprocess.check_output(['git', '-C', str(cwd), *args], text=True, stderr=subprocess.DEVNULL).strip()
+
+
+def env():
+    return dict(os.environ, PATH=os.pathsep.join([str(Path(NODE).parent), os.environ.get('PATH', '')]))
+
+
+def sh(args, cwd):
+    """Run quietly; on failure print the last lines, so agents see the error, not the build log."""
+    r = subprocess.run(args, cwd=cwd, env=env(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if r.returncode != 0:
+        print('\n'.join(r.stdout.splitlines()[-60:]), file=sys.stderr)
+        raise subprocess.CalledProcessError(r.returncode, args)
+
+
+def worktree_root(cwd):
+    try:
+        root = Path(git(cwd, 'rev-parse', '--show-toplevel')).resolve()
+        gitdir = Path(git(cwd, 'rev-parse', '--path-format=absolute', '--git-dir')).resolve()
+        common = Path(git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir')).resolve()
+    except subprocess.CalledProcessError:
+        raise SystemExit('sideshift-setup: not inside a git checkout.')
+    if common != PRIMARY / '.git':
+        raise SystemExit(f'sideshift-setup: not a worktree of {PRIMARY}.')
+    if gitdir == common:
+        raise SystemExit('sideshift-setup: this is the main checkout. Run it inside a worktree.')
+    return root
+
+
+def _key(lockfile, npmrc):
+    h = hashlib.sha256()
+    h.update(lockfile)
+    h.update(npmrc)
+    h.update(subprocess.check_output([NODE, '--version']))
+    return h.hexdigest()[:20]
+
+
+def dependency_key(root):
+    read = lambda name: (root / name).read_bytes() if (root / name).exists() else b''
+    return _key(read('package-lock.json'), read('.npmrc'))
+
+
+def ref_dependency_key(root, ref):
+    def show(name):
+        r = subprocess.run(['git', '-C', str(root), 'show', f'{ref}:{name}'], capture_output=True)
+        return r.stdout if r.returncode == 0 else None
+    lockfile = show('package-lock.json')
+    return _key(lockfile, show('.npmrc') or b'') if lockfile is not None else None
+
+
+def workspace_dirs(root):
+    patterns = json.loads((root / 'package.json').read_text()).get('workspaces') or []
+    if isinstance(patterns, dict):
+        patterns = patterns.get('packages') or []
+    dirs = set()
+    for pattern in patterns:
+        dirs.update(p.relative_to(root) for p in root.glob(pattern) if p.is_dir())
+    return sorted(dirs)
+
+
+def module_dirs(root):
+    """The root node_modules and every nested workspace node_modules npm created."""
+    found = [Path('node_modules')]
+    found += [d / 'node_modules' for d in workspace_dirs(root) if (root / d / 'node_modules').is_dir()]
+    return found
+
+
+_libc = ctypes.CDLL('/usr/lib/libSystem.dylib', use_errno=True)
+
+
+def clone_tree(src, dst):
+    """APFS clonefile(2) of a whole tree in one call: shares disk blocks until written."""
+    if _libc.clonefile(str(src).encode(), str(dst).encode(), 0) != 0:
+        err = ctypes.get_errno()
+        raise OSError(err, f'clonefile {src} -> {dst}: {os.strerror(err)}')
+
+
+def discard(path):
+    """Move a directory aside and delete it in the background."""
+    if not os.path.lexists(path):
+        return
+    trash = path.with_name(f'.{path.name}.discard-{os.getpid()}-{time.time_ns()}')
+    os.rename(path, trash)
+    subprocess.Popen(['nice', '-n', '10', 'rm', '-rf', str(trash)], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+@contextlib.contextmanager
+def key_lock(key):
+    CACHE.mkdir(parents=True, exist_ok=True)
+    with (CACHE / f'{key}.lock').open('a') as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def clone_dirs(root, source, dirs):
+    for rel in dirs:
+        target = root / rel
+        if not (source / rel).is_dir() or not target.parent.is_dir():
+            continue
+        discard(target)
+        clone_tree(source / rel, target)
+
+
+def clone_from_cache(root, entry):
+    clone_dirs(root, entry, json.loads((entry / 'manifest.json').read_text())['dirs'])
+
+
+def try_lock(name):
+    """Take an entry's lock without waiting; returns the open file, or None if another run holds it."""
+    f = (CACHE / f'{name}.lock').open('a')
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return f
+    except OSError:
+        f.close()
+        return None
+
+
+def save_to_cache(root, key, replace=False):
+    """Store this worktree's install as the entry for key. Caller holds key's lock."""
+    entry = CACHE / key
+    if entry.exists():
+        if not replace:
+            return
+        discard(entry)
+    temp = CACHE / f'{key}.tmp-{os.getpid()}'
+    shutil.rmtree(temp, ignore_errors=True)
+    dirs = [str(d) for d in module_dirs(root)]
+    for rel in dirs:
+        (temp / rel).parent.mkdir(parents=True, exist_ok=True)
+        clone_tree(root / rel, temp / rel)
+    (temp / 'manifest.json').write_text(json.dumps({'dirs': dirs, 'source': str(root), 'time': time.time()}, indent=2))
+    os.rename(temp, entry)
+    # Keep main's install even when it is not among the newest.
+    pinned = {key, ref_dependency_key(root, 'origin/main')}
+    entries = cache_entries()
+    kept = [p for p in entries if p.name in pinned]
+    for p in entries:
+        if p.name not in pinned and len(kept) < CACHE_KEEP:
+            kept.append(p)
+    for old in entries:
+        if old in kept:
+            continue
+        # Skip an entry another run is cloning from; it is evicted on a later save.
+        held = try_lock(old.name)
+        if held is None:
+            continue
+        with held:
+            discard(old)
+
+
+def cache_entries():
+    """Cached installs, most recently used first."""
+    if not CACHE.is_dir():
+        return []
+    return sorted((p for p in CACHE.iterdir() if p.is_dir() and '.tmp-' not in p.name and not p.name.startswith('.')),
+                  key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def newest_sibling_install(root):
+    """The sibling worktree whose npm install finished most recently, if any.
+
+    The main checkout is skipped on purpose: its install has been stale while its
+    lockfile matched (2026-10-20, missing mp4box and the workflow-flow link)."""
+    best = None
+    for line in git(root, 'worktree', 'list', '--porcelain').splitlines():
+        if not line.startswith('worktree '):
+            continue
+        path = Path(line[len('worktree '):]).resolve()
+        if path in (root, PRIMARY):
+            continue
+        # Some worktrees symlink node_modules to main's; that is main's install again.
+        if (path / 'node_modules').resolve().is_relative_to(PRIMARY / 'node_modules'):
+            continue
+        stamp = path / 'node_modules' / '.package-lock.json'
+        try:
+            mtime = stamp.stat().st_mtime
+        except OSError:
+            continue
+        if best is None or mtime > best[0]:
+            best = (mtime, path)
+    return best[1] if best else None
+
+
+def disk_ok(level):
+    if not DISK_GUARD.exists():
+        return True
+    return subprocess.run([str(DISK_GUARD), level]).returncode == 0
+
+
+def update_from(root, source, label):
+    """Clone another install, then let `npm install` change only what differs.
+
+    Returns False, with the clone discarded and the lockfile restored, when npm fails
+    or would rewrite package-lock.json; the caller then falls back to npm ci."""
+    lockfile = root / 'package-lock.json'
+    original = lockfile.read_bytes()
+    step(f'Cloning {label} and updating it to this lockfile')
+    try:
+        if (source / 'manifest.json').exists():
+            clone_from_cache(root, source)
+            os.utime(source)
+        else:
+            clone_dirs(root, source, [str(d) for d in module_dirs(source)])
+        if not disk_ok('light'):
+            raise SystemExit(1)
+        sh([NPM, 'install', '--no-audit', '--no-fund'], root)
+        if lockfile.read_bytes() == original:
+            return True
+        step('npm install would change package-lock.json; restoring it and using npm ci instead')
+    except subprocess.CalledProcessError as e:
+        step(f'npm install failed (exit {e.returncode}); using npm ci instead')
+    except OSError as e:
+        step(f'Could not clone {label} ({e}); using npm ci instead')
+    lockfile.write_bytes(original)
+    for d in module_dirs(root):
+        discard(root / d)
+    return False
+
+
+def install(root, key, force):
+    marker = root / 'node_modules' / MARKER
+    if not force and marker.exists() and json.loads(marker.read_text()).get('key') == key:
+        step('Dependencies already match package-lock.json')
+        return 'current'
+    with key_lock(key):
+        entry = CACHE / key
+        how = None
+        if entry.exists() and not force:
+            step('Cloning the cached npm install for this lockfile')
+            try:
+                clone_from_cache(root, entry)
+                os.utime(entry)
+                how = 'clone'
+            except (OSError, ValueError, KeyError) as e:
+                step(f'Could not clone the cached install ({e}); installing another way')
+                for d in module_dirs(root):
+                    discard(root / d)
+            if how:
+                sh([NPM, 'run', 'postinstall'], root)
+        if how is None:
+            source = None
+            if not force:
+                cached = next((p for p in cache_entries() if p.name != key), None)
+                source = (cached, f'cached install {cached.name}') if cached else None
+                if source is None:
+                    sibling = newest_sibling_install(root)
+                    source = (sibling, f'the install in {sibling.name}') if sibling else None
+            if source and update_from(root, *source):
+                how = f'clone of {source[1]} + npm install'
+            else:
+                if not disk_ok('heavy'):
+                    raise SystemExit(1)
+                step('Installing with npm ci (nothing to start from)')
+                for d in module_dirs(root):
+                    discard(root / d)
+                sh([NPM, 'ci', '--no-audit', '--no-fund'], root)
+                how = 'npm ci'
+            # After --force, the fresh npm ci replaces a cache entry that may be bad.
+            save_to_cache(root, key, replace=force)
+    marker.write_text(json.dumps({'key': key, 'how': how, 'time': time.time()}) + '\n')
+    return how
+
+
+def link_env(root):
+    target = root / '.env.local'
+    if ENV_LOCAL.exists() and not os.path.lexists(target):
+        target.symlink_to(ENV_LOCAL)
+        step(f'Linked .env.local -> {ENV_LOCAL}')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Prepare a sideshift-monorepo worktree.')
+    parser.add_argument('--force', action='store_true', help='reinstall with npm ci even if the cache matches')
+    parser.add_argument('--skip-build', action='store_true', help='skip npm run build:packages')
+    args = parser.parse_args()
+    started = time.monotonic()
+    root = worktree_root(Path.cwd())
+    link_env(root)
+    how = install(root, dependency_key(root), args.force)
+    if not args.skip_build:
+        step('Building workspace packages (npm run build:packages)')
+        sh([NPM, 'run', 'build:packages'], root)
+    print(f'\nsideshift-setup: ready in {time.monotonic() - started:.0f}s ({how}).')
+    print(f'  worktree  {root}')
+    print(f'  branch    {git(root, "branch", "--show-current") or "DETACHED HEAD"}')
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError as e:
+        print(f'sideshift-setup: step failed (exit {e.returncode}): {" ".join(map(str, e.cmd))}', file=sys.stderr)
+        sys.exit(e.returncode or 1)

@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# disk-guard — refuse a job that could fill the disk. Exits 0 when the home
+# volume has room for a job of the given size, 1 (with a message) when not.
+#
+#   disk-guard light   queued test suites, typecheck and lint, an incremental
+#                      `npm install`, a dev server (they write little)      (5 GB)
+#   disk-guard heavy   `npm ci` or an install into an empty tree (~6.5 GB),
+#                      iOS builds and tests                                 (15 GB)
+#   disk-guard build   `next build`                                         (20 GB)
+#   disk-guard status  print free space and the floors
+#
+# Called by bin/heavy (queued jobs), hooks/heavy-gate.sh (installs and dev
+# servers) and bin/sideshift-setup. The memory gate in bin/heavy waits because
+# memory frees itself when jobs end; disk does not, so this refuses instead.
+# On 2026-11-10 the 1.8 TB disk had 23 GB free.
+#
+# Floors (GB) can be changed with DISK_GUARD_LIGHT_GB / _HEAVY_GB / _BUILD_GB;
+# DISK_GUARD_OFF=1 skips the check.
+set -uo pipefail
+
+# A floor that is not a whole number falls back to its default.
+num() { [[ "$1" =~ ^[0-9]+$ ]] && echo "$1" || echo "$2"; }
+LIGHT=$(num "${DISK_GUARD_LIGHT_GB:-}" 5)
+HEAVY=$(num "${DISK_GUARD_HEAVY_GB:-}" 15)
+BUILD=$(num "${DISK_GUARD_BUILD_GB:-}" 20)
+level="${1:-light}"
+
+free_kb=$(df -k "$HOME" 2>/dev/null | awk 'NR==2 {print $4}')
+# If df cannot answer, never block work on it.
+[ -n "$free_kb" ] || exit 0
+free_gb=$((free_kb / 1048576))
+
+case "$level" in
+	light) need="$LIGHT" ;;
+	heavy) need="$HEAVY" ;;
+	build) need="$BUILD" ;;
+	status)
+		echo "disk-guard: ${free_gb} GB free on the home volume; floors light ${LIGHT} GB, heavy ${HEAVY} GB, build ${BUILD} GB"
+		exit 0
+		;;
+	*)
+		echo "usage: disk-guard light|heavy|build|status" >&2
+		exit 2
+		;;
+esac
+[ "${DISK_GUARD_OFF:-}" = "1" ] && exit 0
+[ "$free_gb" -ge "$need" ] && exit 0
+
+log="/tmp/agent-heavy-$(id -u)/disk-guard.log"
+mkdir -p "$(dirname "$log")" 2>/dev/null && printf '%s refused %s: %s GB free, need %s GB\n' "$(date '+%F %T')" "$level" "$free_gb" "$need" >>"$log"
+echo "disk-guard: only ${free_gb} GB free on the disk; a ${level} job needs ${need} GB. Not starting it, because a full disk breaks every session on this Mac. Tell Liam the disk is nearly full; do not delete files to make room unless he asks." >&2
+exit 1

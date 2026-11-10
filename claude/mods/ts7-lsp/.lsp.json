@@ -1,0 +1,23 @@
+{
+  "typescript": {
+    "command": "/opt/homebrew/bin/python3.12",
+    "args": ["-I", "${CLAUDE_PLUGIN_ROOT}/scripts/ts7_lsp_proxy.py"],
+    "extensionToLanguage": {
+      ".ts": "typescript",
+      ".tsx": "typescriptreact",
+      ".mts": "typescript",
+      ".cts": "typescript",
+      ".js": "javascript",
+      ".jsx": "javascriptreact",
+      ".mjs": "javascript",
+      ".cjs": "javascript"
+    },
+    "env": {
+      "TS7_LSP_MAX_WARM": "3",
+      "TS7_LSP_IDLE_SECONDS": "600",
+      "TS7_LSP_INACTIVE_ROOT_SECONDS": "180",
+      "TS7_LSP_MAX_MEMORY_MB": "6144"
+    },
+    "startupTimeout": 30000
+  }
+}
