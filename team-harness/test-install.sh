@@ -5,6 +5,10 @@ set -uo pipefail
 T="${TMPDIR:-/tmp}/harness-test-home.$$"
 rm -rf "$T"; mkdir -p "$T/.claude/hooks" "$T/Downloads"
 export HOME="$T"
+# A HOME with no login keychain makes every `security` write open macOS's "Keychain Not Found"
+# dialog on the real desktop. Claude Code finds `security` on PATH, so this stub keeps it on files.
+mkdir -p "$T/.bin"; printf '#!/bin/sh\nexit 1\n' >"$T/.bin/security"; chmod +x "$T/.bin/security"
+export PATH="$T/.bin:$PATH"
 echo "teammate ORIGINAL claude md" >"$T/.claude/CLAUDE.md"
 echo "echo mine" >"$T/.claude/hooks/my-hook.sh"
 mkdir -p "$T/.claude/skills/quick-fix"; echo "my own quick-fix" >"$T/.claude/skills/quick-fix/SKILL.md"
