@@ -16,8 +16,11 @@ case "$input" in
 	*) exit 0 ;;
 esac
 { IFS= read -r session; IFS= read -r cwd; IFS= read -r -d '' cmd; } < <(jq -r '(.session_id // "unknown"), (.cwd // ""), (.tool_input.command // "" | tostring)' <<<"$input" 2>/dev/null)
-# Quoted text (a commit message, a note) only mentions a merge; it does not run one.
-cmd=$(printf '%s' "$cmd" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+# A quoted message (-m, --body, --title ...) only mentions a merge; drop those. Other quoted text
+# can run one (bash -c "gh pr merge 1", "gh" pr merge), so only its quote marks are removed.
+cmd=$(printf '%s' "$cmd" |
+	sed -E "s/(-m|--message|-b|--body|-t|--title|--notes|--subject)([[:space:]]+|=)('[^']*'|\"[^\"]*\")/\1/g" |
+	tr -d "\"'")
 
 deny() {
 	jq -nc --arg r "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse",

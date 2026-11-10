@@ -276,7 +276,9 @@ def generate_html(
     if benchmark:
         embedded["benchmark"] = benchmark
 
-    data_json = json.dumps(embedded)
+    # Escaped so text in the outputs cannot close the <script> tag it is embedded in.
+    data_json = (json.dumps(embedded).replace("<", "\\u003c").replace(">", "\\u003e")
+                 .replace("&", "\\u0026").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
 
     return template.replace("/*__EMBEDDED_DATA__*/", f"const EMBEDDED_DATA = {data_json};")
 
@@ -360,6 +362,16 @@ class ReviewHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         if self.path == "/api/feedback":
+            # Only the page this server served may write feedback: another site (or a
+            # DNS-rebinding name) sends a different Origin or Host.
+            port = self.server.server_address[1]
+            local = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            origin = self.headers.get("Origin")
+            if (self.headers.get("Host") not in local
+                    or (origin is not None and origin.removeprefix("http://") not in local)
+                    or not self.headers.get("Content-Type", "").startswith("application/json")):
+                self.send_error(403)
+                return
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
             try:

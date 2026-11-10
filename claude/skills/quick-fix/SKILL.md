@@ -160,8 +160,8 @@ the range is uncertain rather than picking the number that fits your theory.
 on `contracts`) against its payout dates, and check the payout traps in
 `.claude/skills/investigate-slack-issue/references/evidence.md`. A terms edit after a payout
 changes what the earlier payment covered; the ledger alone cannot show that. (2026-11-10:
-EcoGPT's Nani Correa; I called a $575 top-up correct from the ledger, but a platform target
-added after the payout had re-cut the paid batch, and $875 was owed.)
+a creator's top-up looked correct from the ledger, but a platform target added after the
+payout had re-cut the paid batch, and more was owed.)
 
 Ruling a cause **out** counts as progress: showing the shared path works for 12 of 13
 comparable accounts is strong evidence the bug is account-specific.

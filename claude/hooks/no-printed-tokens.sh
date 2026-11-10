@@ -11,11 +11,9 @@ block() {
   echo "Blocked: this prints a live Google token into the transcript. Capture it inside \$(...) for the command that needs it (for example curl -H \"Authorization: Bearer \$(gcloud auth print-access-token)\"), or check identity with 'gcloud auth list'." >&2
   exit 2
 }
-# A capture handed to a printing command still prints it.
-if printf '%s' "$cmd" | grep -Eq "(echo|printf|cat|tee|print)[^|;&]*\\\$\([^)]*$token"; then
-  block
-fi
-rest=$(printf '%s' "$cmd" | sed -E "s/\\\$\([^)]*$token[^)]*\)//g")
+# Only a capture used directly as a Bearer header is allowed. A capture kept in a variable
+# or handed to another command can still be printed later in the same call.
+rest=$(printf '%s' "$cmd" | sed -E "s/Bearer[[:space:]]+\\\$\([^)]*$token[^)]*\)//g")
 if printf '%s' "$rest" | grep -Eq "$token"; then
   block
 fi
