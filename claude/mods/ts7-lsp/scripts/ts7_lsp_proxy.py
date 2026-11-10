@@ -150,6 +150,20 @@ def find_server(starts):
     return None
 
 
+TRUSTED_REPOS = [os.path.realpath(os.path.expanduser(p)) for p in
+                 os.environ.get("TS7_LSP_TRUSTED_REPOS", "~/sideshift-monorepo").split(":") if p]
+
+
+def trusted_root(root):
+    """True when root is a checkout or worktree of a repo in TS7_LSP_TRUSTED_REPOS."""
+    try:
+        common = subprocess.run(["git", "-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                                capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return bool(common) and os.path.realpath(common) in {os.path.join(r, ".git") for r in TRUSTED_REPOS}
+
+
 class Server:
     """One TS 7 server process for one worktree root, with that root's open files."""
 
@@ -431,7 +445,10 @@ class Proxy:
     def server(self, root):
         server = self.servers.get(root)
         if server is None:
-            exe = self.exe if root == self.default_root else (find_server([root]) or self.exe)
+            # A file opened elsewhere (a download, another repo) must not run a tsc binary
+            # planted in that folder's node_modules; only trusted repos' worktrees use their own.
+            own = find_server([root]) if root != self.default_root and trusted_root(root) else None
+            exe = own or self.exe
             server = Server(self, root, exe, len(self.servers))
             self.servers[root] = server
         return server
