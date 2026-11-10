@@ -81,7 +81,7 @@
         ]
       },
       {
-        "matcher": "mcp__slack__slack_send_message|mcp__slack__slack_schedule_message",
+        "matcher": "mcp__slack__slack_(send_message|send_message_draft|schedule_message|get_file_upload_url|complete_file_upload|add_reaction|create_canvas|update_canvas|create_list|update_list|add_list_record|update_list_record|create_conversation)",
         "hooks": [
           {
             "type": "command",

@@ -3,12 +3,13 @@
 # Posts made this way show as Liam with no "Sent using Claude" tag, which the Slack MCP adds.
 #   slack-as-liam chat.postMessage channel=C0123 text="Hello"
 #   slack-as-liam chat.postMessage channel=C0123 thread_ts=1712345678.123456 text="Reply"
+#   slack-as-liam upload <channel-id> <file> [comment] [thread_ts]   share a file in a channel or DM
 # Setup: ~/dotfiles/claude/slack/README.md
 set -euo pipefail
 
-# Only the methods needed to send as Liam; anything else (file uploads, admin calls) is refused.
+# Only the methods needed to send as Liam; anything else (admin calls) is refused.
 case "${1:-}" in
-  chat.postMessage|chat.scheduleMessage|chat.update|chat.delete|reactions.add|reactions.remove|conversations.open|users.lookupByEmail|auth.test) ;;
+  chat.postMessage|chat.scheduleMessage|chat.update|chat.delete|reactions.add|reactions.remove|conversations.open|users.lookupByEmail|auth.test|files.delete|upload) ;;
   *) echo "slack-as-liam: method '${1:-}' is not allowed" >&2; exit 2 ;;
 esac
 
@@ -18,4 +19,26 @@ if ! token=$(security find-generic-password -s claude-slack-user-token -w 2>/dev
 fi
 
 cd "$HOME"
+api() { SLACK_USER_TOKEN="$token" env -u SLACK_BOT_TOKEN slack api --skip-update "$@"; }
+
+if [ "$1" = upload ]; then
+  channel="${2:?usage: slack-as-liam upload <channel-id> <file> [comment] [thread_ts]}"
+  file="${3:?usage: slack-as-liam upload <channel-id> <file> [comment] [thread_ts]}"
+  comment="${4:-}"
+  thread="${5:-}"
+  name=$(basename "$file")
+  size=$(stat -f %z "$file")
+  r=$(api files.getUploadURLExternal filename="$name" length="$size")
+  [ "$(jq -r .ok <<<"$r")" = true ] || { echo "slack-as-liam: $(jq -r .error <<<"$r")" >&2; exit 1; }
+  url=$(jq -r .upload_url <<<"$r")
+  id=$(jq -r .file_id <<<"$r")
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$url" --data-binary @"$file")
+  [ "$code" = 200 ] || { echo "slack-as-liam: upload POST returned $code" >&2; exit 1; }
+  args=(files.completeUploadExternal "files=[{\"id\":\"$id\",\"title\":$(jq -Rn --arg t "$name" '$t')}]" channel_id="$channel")
+  [ -n "$comment" ] && args+=(initial_comment="$comment")
+  [ -n "$thread" ] && args+=(thread_ts="$thread")
+  api "${args[@]}"
+  exit
+fi
+
 SLACK_USER_TOKEN="$token" exec env -u SLACK_BOT_TOKEN slack api --skip-update "$@"
