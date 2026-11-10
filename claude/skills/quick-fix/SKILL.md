@@ -156,6 +156,13 @@ earlier measurement as a cross-check, put the two figures side by side and confi
 agree. When they don't, that disagreement is the finding. If you can't reconcile them, say
 the range is uncertain rather than picking the number that fits your theory.
 
+**Before you call a payout amount correct, read the contract's terms history** (`change_log`
+on `contracts`) against its payout dates, and check the payout traps in
+`.claude/skills/investigate-slack-issue/references/evidence.md`. A terms edit after a payout
+changes what the earlier payment covered; the ledger alone cannot show that. (2026-11-10:
+EcoGPT's Nani Correa; I called a $575 top-up correct from the ledger, but a platform target
+added after the payout had re-cut the paid batch, and $875 was owed.)
+
 Ruling a cause **out** counts as progress: showing the shared path works for 12 of 13
 comparable accounts is strong evidence the bug is account-specific.
 
