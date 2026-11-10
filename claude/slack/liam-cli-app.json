@@ -1,29 +1,7 @@
 {
   "display_information": {
     "name": "Liam CLI",
-    "description": "Lets Liam's local agents post to Slack as Liam, and starts Session Board triage chats."
-  },
-  "features": {
-    "bot_user": {
-      "display_name": "Liam CLI",
-      "always_online": false
-    },
-    "shortcuts": [
-      {
-        "name": "Triage in Session Board",
-        "type": "message",
-        "callback_id": "triage_message",
-        "description": "Start a Session Board chat that investigates this message"
-      }
-    ],
-    "slash_commands": [
-      {
-        "command": "/triage",
-        "description": "Start a Session Board chat that investigates a Slack message",
-        "usage_hint": "<message link> [note]",
-        "should_escape": false
-      }
-    ]
+    "description": "Lets Liam's local agents post to Slack as Liam."
   },
   "oauth_config": {
     "scopes": {
@@ -33,18 +11,12 @@
         "im:write",
         "users:read",
         "users:read.email"
-      ],
-      "bot": [
-        "commands"
       ]
     }
   },
   "settings": {
-    "interactivity": {
-      "is_enabled": true
-    },
     "org_deploy_enabled": false,
-    "socket_mode_enabled": true,
+    "socket_mode_enabled": false,
     "token_rotation_enabled": false
   }
 }
