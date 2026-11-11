@@ -62,6 +62,8 @@ ARCHIVE_DIR="$HOME/.claude/worktree-archive"
 # Claude Code background chats; each state.json names the folder the chat wakes in.
 JOBS_DIR="${JOBS_DIR:-$HOME/.claude/jobs}"
 CHAT_KEEP_DAYS="${CHAT_KEEP_DAYS:-14}"
+# Pass 5: a chat's own DerivedData copy is cleared after this long with no writes.
+JOB_DD_IDLE_MINUTES="${JOB_DD_IDLE_MINUTES:-120}"
 
 LOG_DIR="$HOME/.claude/logs"
 LOG="$LOG_DIR/worktree-janitor.log"
@@ -282,6 +284,18 @@ if [ "$MODE" = "full" ] && [ "$PRESSURE" = "1" ]; then
       CACHES_CLEARED=$((CACHES_CLEARED + 1))
     fi
   fi
+  # Background chats build iOS into their own temp folder ($CLAUDE_JOB_DIR/tmp/dd-*),
+  # often a fresh ~10GB copy per run: 55 copies held ~560GB on 2026-11-10. This runs
+  # even while xcodebuild runs elsewhere; a copy is kept while anything in it changed in
+  # the last JOB_DD_IDLE_MINUTES, so a build in progress keeps its own.
+  while IFS= read -r mc; do
+    [ -n "$mc" ] || continue
+    d=$(dirname "$mc")
+    [ -n "$(find "$d" -mmin "-${JOB_DD_IDLE_MINUTES}" -print -quit 2>/dev/null)" ] && continue
+    log "  clearing job DerivedData ($(du -sh "$d" 2>/dev/null | cut -f1)): $d"
+    run rm -rf "$d"
+    CACHES_CLEARED=$((CACHES_CLEARED + 1))
+  done <<< "$(find "$JOBS_DIR" -mindepth 4 -maxdepth 5 -type d -name ModuleCache.noindex -path "$JOBS_DIR/*/tmp/*" -prune 2>/dev/null)"
   # uv waits on its cache lock, so a live uv would stall the janitor while it holds its own lock.
   if command -v uv >/dev/null && [ -d "$HOME/.cache/uv" ] && ! pgrep -xq uv; then
     log "  clearing uv cache ($(du -sh "$HOME/.cache/uv" 2>/dev/null | cut -f1))"
