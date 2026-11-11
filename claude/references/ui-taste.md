@@ -111,6 +111,7 @@ secondary link over a second full button; a deep link over a "check" button.
 - 09-27 "instead of toggles… can it just be a small x to remove a component"
 - 10-01 "I like how it was where skip for now was a secondary option, not a whole button"
 - 11-05 contract editor, one 72px row with Edit/Preview, 15 formatting controls, Insert, Sign, Templates, Upload, Save and ⋮ (formatting scrolled sideways at 1280px): "need to redesign the UI, maybe making the button options on the right or something. The top header bar is too full". Adding a button to a full toolbar row is the moment to re-split the row, not to shrink the button to an icon
+- 11-10 creator sign-up opening screen (plane scene + Get started / I already have an account), ported from iOS: "how would a brand land on this page. They would land on this since from the onboarding they land on the login"; I answered the routing question and kept the screen. Then: "again this screen is unnecessary as creators will land on the create your free account screen from the landing page". When he asks how someone would reach a screen, or says where users already land instead, he is saying the screen has no job: remove it (and its Back button) in the same turn, then answer. A splash or intro screen ported from the app is not needed on web when the landing page already does its job.
 
 **9. Prompt or queue, don't error.** If the user can fix it, open the fix.
 - 09-30 "I wish it just opened a popup that prompted user to connect that specific account"
