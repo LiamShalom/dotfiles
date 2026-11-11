@@ -288,17 +288,19 @@ if [ "$MODE" = "full" ] && [ "$PRESSURE" = "1" ]; then
   # often a fresh ~10GB copy per run: 55 copies held ~560GB on 2026-11-10. This runs
   # even while xcodebuild runs elsewhere; a copy is kept while anything in it changed in
   # the last JOB_DD_IDLE_MINUTES, so a build in progress keeps its own.
-  # NUL-separated, and only a real folder inside a job's tmp/: chats name these folders.
+  # Some put it in ~/.cache/<name>-dd instead (five ~10GB copies on 2026-11-10).
+  # NUL-separated, and only a real folder inside a job's tmp/ or ~/.cache: chats name these.
   while IFS= read -r -d '' mc; do
     d=$(dirname "$mc")
-    case "$d" in "$JOBS_DIR"/*/tmp/?*) ;; *) continue ;; esac
+    case "$d" in "$JOBS_DIR"/*/tmp/?* | "$HOME/.cache"/?*) ;; *) continue ;; esac
     case "$d" in *$'\n'* | */../* | */..) continue ;; esac
     [ -L "$d" ] && continue
     [ -n "$(find "$d" -mmin "-${JOB_DD_IDLE_MINUTES}" -print -quit 2>/dev/null)" ] && continue
     log "  clearing job DerivedData ($(du -sh "$d" 2>/dev/null | cut -f1)): $d"
     run rm -rf "$d"
     CACHES_CLEARED=$((CACHES_CLEARED + 1))
-  done < <(find "$JOBS_DIR" -mindepth 4 -maxdepth 5 -type d -name ModuleCache.noindex -path "$JOBS_DIR/*/tmp/*" -prune -print0 2>/dev/null)
+  done < <(find "$JOBS_DIR" -mindepth 4 -maxdepth 5 -type d -name ModuleCache.noindex -path "$JOBS_DIR/*/tmp/*" -prune -print0 2>/dev/null
+           find "$HOME/.cache" -mindepth 2 -maxdepth 2 -type d -name ModuleCache.noindex -print0 2>/dev/null)
   # uv waits on its cache lock, so a live uv would stall the janitor while it holds its own lock.
   if command -v uv >/dev/null && [ -d "$HOME/.cache/uv" ] && ! pgrep -xq uv; then
     log "  clearing uv cache ($(du -sh "$HOME/.cache/uv" 2>/dev/null | cut -f1))"
