@@ -19,11 +19,30 @@ set -uo pipefail
 POOL="slot"
 SLOTS="${HEAVY_SLOTS:-2}"
 WHAT="test suites or builds"
-# A job starts only while the kernel reports at least this much memory free
-# (kern.memorystatus_level, percent). Slots alone count jobs, not gigabytes:
-# on 2026-11-04 a `next build` (~45 GB) beside three full typechecks
-# (6-12 GB each) filled all 128 GB.
-MIN_FREE="${HEAVY_MIN_FREE_PCT:-20}"
+# A job starts only while at least this much memory is free (percent). Slots
+# alone count jobs, not gigabytes: on 2026-11-04 a `next build` (~45 GB)
+# beside three full typechecks (6-12 GB each) filled all 128 GB.
+MIN_FREE="${HEAVY_MIN_FREE_PCT:-10}"
+
+# Percent of RAM that is not wired, app memory or the compressor's own pages.
+# kern.memorystatus_level is not used: it counts compressed memory as free, and
+# on 2026-11-11 read 48 while 227 MB was unused and swap was 91% full.
+mem_free_pct() {
+	vm_stat 2>/dev/null | awk -v total="$(sysctl -n hw.memsize 2>/dev/null)" '
+		/page size of/ { for (i = 1; i < NF; i++) if ($i == "of") ps = $(i + 1) }
+		/^Pages wired down/ { w = $NF }
+		/^Anonymous pages/ { a = $NF }
+		/^Pages occupied by compressor/ { c = $NF }
+		END {
+			if (!ps || !total || !a) exit 1
+			f = 100 - (w + a + c) * ps * 100 / total
+			printf "%d", (f < 0 ? 0 : f)
+		}'
+}
+if [ "${1:-}" = "--mem-free" ]; then
+	mem_free_pct && echo
+	exit
+fi
 if [ "${1:-}" = "--pool" ]; then
 	POOL="$2"
 	shift 2
@@ -35,7 +54,7 @@ if [ "${1:-}" = "--pool" ]; then
 		# only with room for it. The classifier also takes a normal slot after.
 		SLOTS="${HEAVY_BUILD_SLOTS:-1}"
 		WHAT="a next build"
-		MIN_FREE="${HEAVY_BUILD_MIN_FREE_PCT:-45}"
+		MIN_FREE="${HEAVY_BUILD_MIN_FREE_PCT:-35}"
 	fi
 fi
 
@@ -55,7 +74,7 @@ fi
 MEM_WAIT="${HEAVY_MEM_WAIT_SECS:-900}"
 waited=0
 while :; do
-	free=$(sysctl -n kern.memorystatus_level 2>/dev/null) || break
+	free=$(mem_free_pct) || break
 	[ -n "$free" ] && [ "$free" -lt "$MIN_FREE" ] || break
 	if [ "$waited" -ge "$MEM_WAIT" ]; then
 		echo "heavy: memory still ${free}% free after ${MEM_WAIT}s; running anyway" >&2

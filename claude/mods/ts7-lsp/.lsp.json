@@ -13,8 +13,8 @@
       ".cjs": "javascript"
     },
     "env": {
-      "TS7_LSP_MAX_WARM": "3",
-      "TS7_LSP_IDLE_SECONDS": "600",
+      "TS7_LSP_MAX_WARM": "2",
+      "TS7_LSP_IDLE_SECONDS": "300",
       "TS7_LSP_INACTIVE_ROOT_SECONDS": "180",
       "TS7_LSP_MAX_MEMORY_MB": "6144"
     },

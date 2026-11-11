@@ -10,18 +10,18 @@ TypeScript 7 native language server (`tsc --lsp --stdio`) in the project's `node
 - **Navigation.** The `LSP` tool's definitions, references, callers and symbols go straight to
   the server.
 - **One server per worktree.** Subagents share their session's connection but edit in their own
-  git worktrees, and a server keeps a full program (about 3.5 GB) for each worktree it has open
+  git worktrees, and a server keeps a full program (8-14 GB on the monorepo) for each worktree it has open
   files in. So the proxy runs one server per git root (the nearest directory with `.git`; files
   outside a repo go to the session's root). Subagents keep their type errors after edits.
 - **Memory limits.**
-  - The root the session used last stops after `TS7_LSP_IDLE_SECONDS` (600) idle and reopens
+  - The root the session used last stops after `TS7_LSP_IDLE_SECONDS` (300) idle and reopens
     its files on the next message.
   - Any other root stops `TS7_LSP_INACTIVE_ROOT_SECONDS` (180) after the session moves away
     from it, and forgets its files. A file the client mentions again is reopened from the
     client's text or from disk.
   - A server over `TS7_LSP_MAX_MEMORY_MB` (6144, Activity Monitor's figure) restarts when it
     is not busy.
-  - When more than `TS7_LSP_MAX_WARM` (3) servers run on the machine, the least recently
+  - When more than `TS7_LSP_MAX_WARM` (2) servers run on the machine, the least recently
     used stops (after 60 s idle).
   - Set these in `.lsp.json` under `env`. The first type check on a restarted server reloads
     the repo, which takes up to about 30 s.
