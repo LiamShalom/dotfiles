@@ -207,6 +207,22 @@ if (added.length) {
   }
 }
 
+// A phone's fixed canvas (390 x 844 and kin) drawn into a web screen. 11-11 pay explainers, ported
+// from iOS as a tall phone-shaped dialog: "On web it shouldnt be tall and thin it should be more boxy".
+const PHONE_CANVAS = /\b(?:375|390|393|402|430)\s*(?:x|×|\*|,)\s*(?:812|844|852|874|932)\b|\b(?:STAGE|CANVAS|DESIGN|ARTBOARD|PHONE)_?(?:WIDTH|W)\s*=\s*(?:375|390|393|402|430)\b/gi;
+const newPhone = kind === 'tsx'
+  ? pairs.reduce((n, [oldS, newS]) => n + Math.max(0, count(newS, PHONE_CANVAS) - count(oldS, PHONE_CANVAS)), 0)
+  : 0;
+if (newPhone > 0) {
+  log(`phone-canvas-on-web n=${newPhone}`);
+  notes.push(
+    'Phone canvas on web: this edit adds a fixed phone-sized frame (e.g. 390 x 844). A desktop window is wide and ' +
+    'short, so a screen ported from iOS is laid out for the window (copy and actions beside the visual, the web\'s ' +
+    'own type and components), and the phone frame is kept only below the phone breakpoint. Check the screen at ' +
+    '1280-1440 wide before showing it.',
+  );
+}
+
 if (!notes.length) process.exit(0);
 notes.push('Taste file: ~/dotfiles/claude/references/ui-taste.md.');
 process.stdout.write(
