@@ -70,7 +70,17 @@ new=""
 case "$cmd" in
 	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint* | *xcodebuild* | *agent-preflight*)
 		cwd=$(jq -r '.cwd // empty' <<<"$input")
-		new=$(node "$HOME/.claude/hooks/heavy-classify.mjs" "$cmd" "${cwd:-$PWD}" 2>/dev/null) || new=""
+		new=$(node "$HOME/.claude/hooks/heavy-classify.mjs" "$cmd" "${cwd:-$PWD}" 2>/dev/null)
+		rc=$?
+		# Exit 3: the classifier refuses the command (a whole-repo type check that CI runs).
+		if [ "$rc" -eq 3 ] && [ -n "$new" ]; then
+			mkdir -p "$(dirname "$log")"
+			printf '%s %s\n  refused: %s\n' "$(date '+%F %T')" "${1:-claude}" "$cmd" >>"$log"
+			jq -nc --arg r "$new" '{hookSpecificOutput: {hookEventName: "PreToolUse",
+				permissionDecision: "deny", permissionDecisionReason: $r}}'
+			exit 0
+		fi
+		[ "$rc" -eq 0 ] || new=""
 		;;
 esac
 

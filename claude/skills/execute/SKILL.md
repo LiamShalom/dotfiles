@@ -58,10 +58,11 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
 4. **Test as you go.** Run the test files next to changed code after each task. Fix failures
    in that task, not later.
 
-5. **Check locally.** `node scripts/agent-preflight.mjs` and `npm run typecheck` in the
-   worktree (the preflight skips the app type check, which the Vercel build runs), plus
-   `git diff --check`. Run all three again after any later code change, before you push:
-   ESLint and vitest do not type-check. Fix everything attributed to the change. Remove the
+5. **Check locally.** `node scripts/agent-preflight.mjs` in the worktree, plus
+   `git diff --check`. Run both again after any later code change, before you push. Neither
+   type-checks the repo: whole-repo type checks run in PR CI only (the heavy-gate hook
+   refuses them locally), so after the push read the `Typecheck` and `Typecheck (tests)`
+   jobs and fix what they report. Fix everything attributed to the change. Remove the
    `app/dev-<slug>-preview/` route if the real page now covers every state, unless the
    operator asked to keep it.
 

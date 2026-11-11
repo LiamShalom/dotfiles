@@ -16,7 +16,13 @@
 //    worker ("Clone 1..5 of x-ads-202", 1.5-3 GB each). Runs that choose their
 //    own parallel-testing flags are left alone.
 //
+//  - A whole-repo type check in the SideShift monorepo is refused: PR CI runs
+//    the app, tests and scripts checks on every push, and on this Mac each one
+//    holds about 10 GB (3,100 runs in the log by 2026-11-11). A `LOCAL_TYPECHECK=1`
+//    prefix runs it, queued, for the cases CI cannot cover.
+//
 // Prints the rewritten command, or nothing when the command is left alone.
+// Exits 3 and prints the reason when the command is refused.
 // Usage: heavy-classify.mjs <command> [cwd]
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
@@ -25,6 +31,14 @@ import { fileURLToPath } from "node:url";
 const VITEST_WORKERS = process.env.AGENT_VITEST_MAX_WORKERS || "4";
 const HEAVY_SCRIPTS = new Set(["build", "typecheck", "typecheck:tests", "typecheck:ts6", "lint", "test:firestore-writer-conformance"]);
 const VITEST_SCRIPTS = new Set(["test", "test:run", "test:coverage"]);
+const CI_TYPECHECK_SCRIPTS = new Set(["typecheck", "typecheck:tests", "typecheck:ts6"]);
+const CI_TYPECHECK_PROJECTS = /^(\.\/?|(\.\/)?tsconfig(\.tests)?\.json)$/;
+const CI_ONLY_REPO = /\/sideshift-monorepo(?![\w.-])/;
+export const CI_ONLY_REASON = "Whole-repo type checks do not run on this Mac: each holds about 10 GB and PR CI runs them "
+	+ "on every push (jobs Typecheck, Typecheck (tests), Typecheck (scripts) in pr.yml). Type errors in files you edit "
+	+ "arrive with your next tool result. Run the test files next to your change, push, and read the Typecheck job. "
+	+ "Do not report a type check as passed until that job is green. To reproduce a CI type error that the job log "
+	+ "does not explain, or when the operator asks for a local check, prefix the command with LOCAL_TYPECHECK=1.";
 const VITEST_VALUE_FLAGS = new Set([
 	"--config", "-c", "--project", "-t", "--testNamePattern", "--reporter", "--outputFile", "--maxWorkers",
 	"--environment", "--dir", "--root", "-r", "--shard", "--exclude", "--pool", "--mode", "--bail", "--retry",
@@ -95,6 +109,7 @@ const scriptIsVitest = (cwd, name) => scriptMatches(cwd, name, /^\s*vitest(\s|$)
 function analyse(cmd, seg, cwd, hasCd) {
 	let w = words(cmd, seg.start, seg.end);
 	const none = { heavy: false, insert: [] };
+	const ciOnlyRepo = !w.some((x) => x.text === "LOCAL_TYPECHECK=1") && CI_ONLY_REPO.test(cwd);
 	const skipPrefix = () => {
 		while (w.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0].text) || ["time", "env", "cross-env", "nice", "command", "exec"].includes(w[0].text))) w = w.slice(1);
 	};
@@ -154,7 +169,11 @@ function analyse(cmd, seg, cwd, hasCd) {
 		let script, scriptWord;
 		if (w[1]?.text === "test" || w[1]?.text === "t") { script = "test"; scriptWord = w[1]; }
 		else if (w[1]?.text === "run" || w[1]?.text === "run-script") { script = w[2]?.text; scriptWord = w[2]; }
+		// `npm run -s typecheck`, `pnpm typecheck`, `yarn typecheck` name the same scripts.
+		const named = w.slice(1).find((x) => !x.text.startsWith("-") && !["run", "run-script"].includes(x.text))?.text.replace(/\)+$/, "");
+		if (ciOnlyRepo && CI_TYPECHECK_SCRIPTS.has(named)) return { heavy: true, ciOnly: true, insert: [] };
 		if (!script) return none;
+		if (ciOnlyRepo && CI_TYPECHECK_SCRIPTS.has(script)) return { heavy: true, ciOnly: true, insert: [] };
 		if (HEAVY_SCRIPTS.has(script)) {
 			const nextBuild = !hasCd && scriptMatches(cwd, script, /(^|[\s"'])next build(?![\w:-])/);
 			return { heavy: true, pool: nextBuild ? "build" : null, insert: [] };
@@ -194,7 +213,15 @@ function analyse(cmd, seg, cwd, hasCd) {
 
 	if (base === "tsc" || base === "tsc6") {
 		if (flag(/^(--version|-v|--help|-h|--init|--watch|-w)$/)) return none;
+		if (flag(/^--lsp$/)) return none;
 		const files = args.some((a) => !a.text.startsWith("-") && /\.(ts|tsx|mts|cts)$/.test(a.text));
+		// A check of one service's own tsconfig is small; the root projects are the 10 GB ones.
+		const p = args.findIndex((a) => /^(-p|--project)$/.test(a.text));
+		const project = p >= 0 ? args[p + 1]?.text ?? "" : args.find((a) => /^--project=/.test(a.text))?.text.slice(10);
+		// An absolute path to a checkout's or worktree's own root tsconfig is the same project.
+		const local = project?.replace(/^.*\/sideshift-monorepo(\/\.claude\/worktrees\/[^/]+)?\/(?=[^/]*$)/, "");
+		const rootProject = project === undefined || CI_TYPECHECK_PROJECTS.test(local);
+		if (ciOnlyRepo && !files && rootProject && !flag(/^(--build|-b)$/)) return { heavy: true, ciOnly: true, insert: [] };
 		return { heavy: !files, insert: [] };
 	}
 
@@ -213,8 +240,16 @@ export function classify(cmd, cwd = process.cwd()) {
 	const hasCd = segs.some((s) => /^\s*cd(\s|$)/.test(cmd.slice(s.start, s.end)));
 	let heavy = false, pool = null;
 	const inserts = [];
+	// Text inside a heredoc body is data, and a `cd` moves later segments to another repo.
+	const bodies = [...cmd.matchAll(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n([\s\S]*?)\n[ \t]*\2[ \t]*(?=\n|$)/g)]
+		.map((m) => ({ from: m.index + m[0].indexOf("\n"), to: m.index + m[0].length }));
+	let dir = cwd;
 	for (const s of segs) {
-		const r = analyse(cmd, s, cwd, hasCd);
+		const cd = cmd.slice(s.start, s.end).match(/^[\s(]*cd\s+(?:--\s+)?["']?([^\s"';)]+)/);
+		if (cd) dir = /^[/~]/.test(cd[1]) ? cd[1] : join(dir, cd[1]);
+		const r = analyse(cmd, s, dir, hasCd);
+		if (r.ciOnly && bodies.some((b) => s.start >= b.from && s.start < b.to)) continue;
+		if (r.ciOnly) return { refuse: CI_ONLY_REASON };
 		heavy ||= r.heavy;
 		if (r.heavy && r.pool) pool = r.pool;
 		inserts.push(...r.insert);
@@ -235,5 +270,9 @@ export function classify(cmd, cwd = process.cwd()) {
 // Run as a script (via the ~/.claude/hooks symlink, so compare real paths).
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const out = classify(process.argv[2] ?? "", process.argv[3] || process.cwd());
+	if (out?.refuse) {
+		process.stdout.write(out.refuse);
+		process.exit(3);
+	}
 	if (out) process.stdout.write(out);
 }
