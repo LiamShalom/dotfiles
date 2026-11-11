@@ -25,6 +25,8 @@
 # Output: ~/.local/state/android-port/<run>/ (issues.json, report.md, claude.log) and runs.log beside them.
 set -uo pipefail
 export PATH="$HOME/.local/bin:/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# Unattended at 02:00 with its own AVD: one emulator a day session left running must not block it.
+export AGENT_MAX_EMULATORS=2
 
 repo_slug="SideShiftApp/sideshift-mobile"
 repo="$HOME/sideshift-mobile"

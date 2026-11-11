@@ -41,7 +41,7 @@ fi
 
 # Cheap filters first: almost every command never names one of these tools.
 case "$cmd" in
-	*next\ dev* | *run\ dev* | *pnpm\ dev* | *yarn\ dev* | *bun\ dev*)
+	*next\ dev* | *run\ dev* | *pnpm\ dev* | *yarn\ dev* | *bun\ dev* | *emulator\ *)
 		reason=$(node "$HOME/.claude/hooks/launch-gate.mjs" "$cmd" 2>/dev/null)
 		if [ -n "$reason" ]; then
 			mkdir -p "$(dirname "$log")"

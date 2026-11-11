@@ -33,7 +33,7 @@
 //                it. `docker start <name>` brings one back with its data.
 //                KEEP_CONTAINERS (comma list) and sideshift-pg-local are kept.
 //   sessions     Keep a background Claude session running until it has been idle
-//                for SESSION_AWAKE_HOURS (12). Claude Code stops one after an idle
+//                for SESSION_AWAKE_HOURS (1). Claude Code stops one after an idle
 //                hour (hard-coded) unless it is pinned, so the reaper pins each
 //                running session and unpins it once idle that long. A pin set or
 //                removed by hand (Ctrl+T in `claude agents`) is left alone.
@@ -63,7 +63,8 @@ const ORPHAN_MS = env("ORPHAN_MIN", 30) * 60e3;
 const CONTAINER_IDLE_MS = env("CONTAINER_IDLE_HOURS", 24) * 3600e3;
 const CONTAINER_ACTIVE_BYTES = 16 * 1024;
 const KEEP_CONTAINERS = new Set(["sideshift-pg-local", ...(process.env.KEEP_CONTAINERS ?? "").split(",").filter(Boolean)]);
-const AWAKE_MS = env("SESSION_AWAKE_HOURS", 12) * 3600e3;
+// 1 h since 2026-11-11 (was 12): an idle session holds 0.4-1 GB, and memory limits how many agents run.
+const AWAKE_MS = env("SESSION_AWAKE_HOURS", 1) * 3600e3;
 const CLAUDE = join(HOME, ".local/bin/claude");
 const JOBS = join(HOME, ".claude/jobs");
 const PINS = join(JOBS, "pins.json");
