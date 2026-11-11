@@ -35,8 +35,8 @@ const CI_TYPECHECK_SCRIPTS = new Set(["typecheck", "typecheck:tests", "typecheck
 const CI_TYPECHECK_PROJECTS = /^(\.\/?|(\.\/)?tsconfig(\.tests)?\.json)$/;
 const CI_ONLY_REPO = /\/sideshift-monorepo(?![\w.-])/;
 export const CI_ONLY_REASON = "Whole-repo type checks do not run on this Mac: each holds about 10 GB and PR CI runs them "
-	+ "on every push (jobs Typecheck, Typecheck (tests), Typecheck (scripts) in pr.yml). Type errors in files you edit "
-	+ "arrive with your next tool result. Run the test files next to your change, push, and read the Typecheck job. "
+	+ "on every push (jobs Typecheck app, Typecheck tests and Typecheck (scripts) in pr.yml). Type errors in files you edit "
+	+ "arrive with your next tool result. Run the test files next to your change, push, and read those jobs. "
 	+ "Do not report a type check as passed until that job is green. To reproduce a CI type error that the job log "
 	+ "does not explain, or when the operator asks for a local check, prefix the command with LOCAL_TYPECHECK=1.";
 const VITEST_VALUE_FLAGS = new Set([

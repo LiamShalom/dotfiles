@@ -61,7 +61,7 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
 5. **Check locally.** `node scripts/agent-preflight.mjs` in the worktree, plus
    `git diff --check`. Run both again after any later code change, before you push. Neither
    type-checks the repo: whole-repo type checks run in PR CI only (the heavy-gate hook
-   refuses them locally), so after the push read the `Typecheck` and `Typecheck (tests)`
+   refuses them locally), so after the push read the `Typecheck app` and `Typecheck tests`
    jobs and fix what they report. Fix everything attributed to the change. Remove the
    `app/dev-<slug>-preview/` route if the real page now covers every state, unless the
    operator asked to keep it.
