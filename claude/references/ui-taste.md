@@ -286,3 +286,5 @@ buttons around it.
   Round 4 (old full-width row skeleton under the new list+panel; the old "Google Ads setup is incomplete" card with Discard / Choose Account left under the list): "fix the skeelton" / "this doesnt align with the UI". When a page changes layout, its loading skeleton and every leftover card under it move to the new shape too; a state that needs action becomes a row in the new list, not a separate old-style card.
 
 - 11-09 job listing popup (PR #9229, edit job as a centred popup): "no reason to have age or format since those would be derived from the campaign". A listing attached to a campaign asks only what the campaign does not own; derive the rest (format from campaign type), never re-ask it.
+
+- 11-11 campaign page header (PR #9137): picked one row of "<- Campaigns | Overview Brief Creators ... Edit v + Add Creators" over two rows, and "Edit campaigns dropdown can just be edit". Drop a menu row the page already offers as a card (Marketplace = Job Listing card). Tabs beside buttons: centre their labels on the buttons and keep the underline on the bar line. Short labels; the page already says what is being edited.
