@@ -29,7 +29,10 @@ https://api.slack.com/apps?new_app=1&manifest_json=%7B%22display_information%22%
 The app's scopes are in `liam-cli-app.json`. To add one: app settings, **OAuth & Permissions**,
 add the user scope, **Reinstall to Workspace**, copy the new User OAuth Token, and store it
 again with `security add-generic-password -U -s claude-slack-user-token -a liam -w`.
-`files:write` (for `upload`) was added 2026-11-10.
+On 2026-11-11 the app was given every non-admin user scope (61, listed in `liam-cli-app.json`)
+and reinstalled. `admin.*` scopes are left out: they need an org-level install. `openid`, `profile`
+and `email` are left out: Slack does not allow them with other scopes. The `slack-as-liam`
+method allowlist still limits what agents can call.
 
 ## How agents are kept off the MCP send
 
