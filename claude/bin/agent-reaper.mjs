@@ -9,6 +9,10 @@
 //                simctl, log stream) and no app runs in it. An app left open
 //                with no tool attached keeps it up for SIM_APP_HOURS (4) at
 //                most. Test clones go once no xcodebuild has run for 5 minutes.
+//                A shut-down simulator whose last user (~/.cache/agent-sims) is a
+//                Claude session that has ended goes with that session, as its
+//                Chrome window does: deleted, or emptied (`simctl erase`) when
+//                tools ask for it by name.
 //   dev servers  Stop an agent's `next dev` that uses more than DEV_MAX_GB (12)
 //                of memory, or that has had no client connected for
 //                DEV_IDLE_HOURS (2). A server started from your own terminal is
@@ -40,7 +44,7 @@
 // Usage:  agent-reaper.mjs             act; actions go to ~/.claude/logs/agent-reaper.log
 //         agent-reaper.mjs --dry-run   print every decision, stop nothing
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -65,6 +69,11 @@ const PINS = join(JOBS, "pins.json");
 const DOCKER_SOCK = join(HOME, ".colima/default/docker.sock");
 const CHROME = `http://127.0.0.1:${process.env.AGENT_CHROME_PORT || 9222}`;
 const STATE = join(HOME, ".cache/agent-reaper/state.json");
+// session-board/scripts/sim-owner.mjs writes the id of the session that last used each simulator here.
+const SIM_USERS = join(HOME, ".cache/agent-sims");
+const SIM_OWNER_GRACE_MS = env("SIM_OWNER_GRACE_MIN", 60) * 60e3;
+// Simulators that tools ask for by name: emptied, never deleted.
+const SHARED_SIMS = new Set(["SideShift iPhone 17 Pro (PiP)"]);
 const LOG = join(HOME, ".claude/logs/agent-reaper.log");
 // The Command Line Tools xcrun has no simctl.
 const XCODE_ENV = { ...process.env, DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer" };
@@ -139,6 +148,64 @@ export function bootedSims(procs = processes()) {
 		s.client = client ? client.pid : s.set === "testing" ? xcodebuild?.pid : anyBooted?.pid;
 	}
 	return sims;
+}
+
+// The ids of every running Claude session: the current id, and for a background
+// session its job's id and the ids it started and resumed under. null when Claude
+// Code does not answer or lists no running session, so nothing is judged ended.
+export function liveSessionIds(list = null) {
+	try {
+		list ??= JSON.parse(run(CLAUDE, ["agents", "--json"], { timeout: 30000 }));
+	} catch {
+		return null;
+	}
+	if (!Array.isArray(list)) return null;
+	const ids = new Set();
+	for (const a of list) {
+		if (!a.pid) continue;
+		for (const id of [a.sessionId, a.id]) if (id) ids.add(id);
+		if (a.kind !== "background" || !a.id) continue;
+		try {
+			const st = JSON.parse(readFileSync(join(JOBS, a.id, "state.json"), "utf8"));
+			for (const id of [st.sessionId, st.resumeSessionId]) if (id) ids.add(id);
+		} catch {}
+	}
+	return ids.size ? ids : null;
+}
+
+// Shut-down simulators whose last user was a Claude session that has ended, as
+// the session's agent-Chrome window closes with it. One a tool asks for by name
+// (Xcode's own "iPhone 17 Pro", the PiP one) is emptied with `simctl erase`; one an
+// agent made for its task is deleted. A simulator no Claude session recorded (yours,
+// Codex's) is left alone, and so is one used in the last SIM_OWNER_GRACE_MS, since a
+// recompact gives a running session a new id that its next use records.
+export function endedSessionSims(live, now = Date.now(), usersDir = SIM_USERS, list = null) {
+	if (!live) return [];
+	let devices, types;
+	try {
+		list ??= JSON.parse(simctl(["list", "-j", "devices", "devicetypes"]));
+		devices = Object.values(list.devices ?? {}).flat();
+		types = new Map((list.devicetypes ?? []).map((t) => [t.identifier, t.name]));
+	} catch {
+		return [];
+	}
+	const out = [];
+	for (const d of devices) {
+		if (d.state !== "Shutdown" || d.isAvailable === false) continue;
+		const file = join(usersDir, d.udid);
+		let owner, usedAt;
+		try {
+			owner = readFileSync(file, "utf8").trim();
+			usedAt = statSync(file).mtimeMs;
+		} catch {
+			continue;
+		}
+		if (!owner || live.has(owner) || [...live].some((id) => id.length === 8 && owner.startsWith(`${id}-`))) continue;
+		if (now - usedAt < SIM_OWNER_GRACE_MS) continue;
+		const shared = SHARED_SIMS.has(d.name) || types.get(d.deviceTypeIdentifier) === d.name;
+		out.push({ udid: d.udid, name: d.name, owner, usedAt, file, action: shared ? "erase" : "delete" });
+	}
+	return out;
 }
 
 function lsofFields(pids, args) {
@@ -451,6 +518,16 @@ async function main() {
 		else why = untended > SIM_APP_MS && `an app has sat open with no tool attached for ${ago(untended)}`;
 		if (why) act(`SHUTDOWN ${label}: ${why}`, () => simctl([...(s.set === "testing" ? ["--set", "testing"] : []), "shutdown", s.udid]));
 		else if (dry) say(`keep ${label}: ${s.client ? `in use (pid ${s.client})` : s.appRunning ? "app running" : `idle ${ago(idle)}`}`);
+	}
+
+	for (const s of endedSessionSims(liveSessionIds())) {
+		const label = `simulator "${s.name}" (${s.udid}), last used ${ago(now - s.usedAt)} ago by ended session ${s.owner}`;
+		const verb = s.action === "erase" ? "ERASE" : "DELETE";
+		act(`${verb} ${label}`, () => {
+			// A 49 GB simulator takes longer than simctl()'s 30 s to delete.
+			run("/usr/bin/xcrun", ["simctl", s.action, s.udid], { env: XCODE_ENV, timeout: 600000 });
+			rmSync(s.file, { force: true });
+		});
 	}
 
 	for (const s of devServers(procs)) {
