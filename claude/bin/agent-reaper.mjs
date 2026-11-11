@@ -12,7 +12,8 @@
 //                A shut-down simulator whose last user (~/.cache/agent-sims) is a
 //                Claude session that has ended goes with that session, as its
 //                Chrome window does: deleted, or emptied (`simctl erase`) when
-//                tools ask for it by name.
+//                tools ask for it by name. An Android emulator whose last user
+//                ended is stopped, and its phone (AVD) wiped to factory data.
 //   dev servers  Stop an agent's `next dev` that uses more than DEV_MAX_GB (12)
 //                of memory, or that has had no client connected for
 //                DEV_IDLE_HOURS (2). A server started from your own terminal is
@@ -44,7 +45,7 @@
 // Usage:  agent-reaper.mjs             act; actions go to ~/.claude/logs/agent-reaper.log
 //         agent-reaper.mjs --dry-run   print every decision, stop nothing
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -74,6 +75,24 @@ const SIM_USERS = join(HOME, ".cache/agent-sims");
 const SIM_OWNER_GRACE_MS = env("SIM_OWNER_GRACE_MIN", 60) * 60e3;
 // Simulators that tools ask for by name: emptied, never deleted.
 const SHARED_SIMS = new Set(["SideShift iPhone 17 Pro (PiP)"]);
+const AVD_DIR = join(HOME, ".android/avd");
+const ADB = "/opt/homebrew/share/android-commandlinetools/platform-tools/adb";
+// A phone's own data. The emulator rebuilds these from the system image on its next boot,
+// as `-wipe-data` does (checked 2026-11-11: a wiped sideshift-api26 booted in 20 s).
+const AVD_DATA = [
+	"userdata-qemu.img",
+	"userdata-qemu.img.qcow2",
+	"cache.img",
+	"cache.img.qcow2",
+	"encryptionkey.img",
+	"encryptionkey.img.qcow2",
+	"snapshots",
+	"data",
+	"tmpAdbCmds",
+	"bootcompleted.ini",
+	"read-snapshot.txt",
+	"multiinstance.lock",
+];
 const LOG = join(HOME, ".claude/logs/agent-reaper.log");
 // The Command Line Tools xcrun has no simctl.
 const XCODE_ENV = { ...process.env, DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer" };
@@ -200,10 +219,69 @@ export function endedSessionSims(live, now = Date.now(), usersDir = SIM_USERS, l
 		} catch {
 			continue;
 		}
-		if (!owner || live.has(owner) || [...live].some((id) => id.length === 8 && owner.startsWith(`${id}-`))) continue;
+		if (!owner || isLive(live, owner)) continue;
 		if (now - usedAt < SIM_OWNER_GRACE_MS) continue;
 		const shared = SHARED_SIMS.has(d.name) || types.get(d.deviceTypeIdentifier) === d.name;
 		out.push({ udid: d.udid, name: d.name, owner, usedAt, file, action: shared ? "erase" : "delete" });
+	}
+	return out;
+}
+
+const isLive = (live, owner) => live.has(owner) || [...live].some((id) => id.length === 8 && owner.startsWith(`${id}-`));
+
+// Each Android phone's (AVD's) last launch: the port it ran on (-port, else the
+// emulator's first, 5554) and when. emu-launch-params.txt holds the arguments, one a line.
+export function avdLaunches(dir = AVD_DIR) {
+	const out = [];
+	let names;
+	try {
+		names = readdirSync(dir).filter((f) => f.endsWith(".ini")).map((f) => f.slice(0, -4));
+	} catch {
+		return out;
+	}
+	for (const name of names) {
+		const path = join(dir, `${name}.avd`);
+		try {
+			const file = join(path, "emu-launch-params.txt");
+			const args = readFileSync(file, "utf8").split("\n").map((s) => s.trim());
+			const i = args.indexOf("-port");
+			out.push({ name, path, port: i >= 0 ? Number(args[i + 1]) : 5554, launchedAt: statSync(file).mtimeMs });
+		} catch {}
+	}
+	return out;
+}
+
+// Android phones whose last user was a Claude session that has ended, as for
+// simulators. An emulator is recorded by port (android:emulator-<port>); the phone
+// is the one last launched on that port before that use, and a later launch of it
+// was someone else's. Phones are started by name (the nightly job's
+// sideshift-api36-e), so one is wiped back to factory data, never deleted; a
+// running one is stopped first and wiped on a later run.
+export function endedSessionAvds(live, now = Date.now(), usersDir = SIM_USERS, launches = avdLaunches(), procs = processes()) {
+	if (!live) return [];
+	let files;
+	try {
+		files = readdirSync(usersDir).filter((f) => /^android:emulator-\d+$/.test(f));
+	} catch {
+		return [];
+	}
+	const out = [];
+	for (const f of files) {
+		const port = Number(f.slice("android:emulator-".length));
+		const file = join(usersDir, f);
+		let owner, usedAt;
+		try {
+			owner = readFileSync(file, "utf8").trim();
+			usedAt = statSync(file).mtimeMs;
+		} catch {
+			continue;
+		}
+		if (!owner || isLive(live, owner) || now - usedAt < SIM_OWNER_GRACE_MS) continue;
+		const avd = launches.filter((l) => l.port === port && l.launchedAt <= usedAt).sort((a, b) => b.launchedAt - a.launchedAt)[0];
+		if (!avd) continue;
+		const avdArg = new RegExp(`\\s-avd\\s+${avd.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`);
+		const proc = procs.find((p) => avdArg.test(p.cmd));
+		out.push({ ...avd, owner, usedAt, file, serial: `emulator-${port}`, running: proc ? proc.pid : null });
 	}
 	return out;
 }
@@ -520,7 +598,22 @@ async function main() {
 		else if (dry) say(`keep ${label}: ${s.client ? `in use (pid ${s.client})` : s.appRunning ? "app running" : `idle ${ago(idle)}`}`);
 	}
 
-	for (const s of endedSessionSims(liveSessionIds())) {
+	const live = liveSessionIds();
+	for (const a of endedSessionAvds(live, now, SIM_USERS, avdLaunches(), procs)) {
+		const label = `Android phone "${a.name}" (${a.serial}), last used ${ago(now - a.usedAt)} ago by ended session ${a.owner}`;
+		if (a.running)
+			act(`STOP ${label}`, () => {
+				if (existsSync(ADB)) run(ADB, ["-s", a.serial, "emu", "kill"], { timeout: 30000 });
+				else process.kill(a.running, "SIGTERM");
+			});
+		else
+			act(`WIPE ${label}`, () => {
+				for (const f of AVD_DATA) rmSync(join(a.path, f), { recursive: true, force: true });
+				rmSync(a.file, { force: true });
+			});
+	}
+
+	for (const s of endedSessionSims(live)) {
 		const label = `simulator "${s.name}" (${s.udid}), last used ${ago(now - s.usedAt)} ago by ended session ${s.owner}`;
 		const verb = s.action === "erase" ? "ERASE" : "DELETE";
 		act(`${verb} ${label}`, () => {
