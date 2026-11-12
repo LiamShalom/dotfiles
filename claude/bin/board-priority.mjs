@@ -11,7 +11,8 @@
 // MCP servers, hooks); the agents' shared services (headless agent Chrome, MCP bridges); iOS
 // simulators and the Docker VM; and heavy tools that run detached from any terminal (a Gradle
 // daemon, the Android emulator). Untouched: the session processes themselves (they draw the
-// terminal you type into), the board, and anything you start yourself from a terminal or app.
+// terminal you type into), the board, and what you start yourself from a terminal. Also in the
+// background: every iOS simulator and any Gradle daemon, whoever started them.
 // Children inherit background priority, so a process is changed once. launchd keeps this running
 // (launchd/com.sideshift.board-priority.plist).
 //
@@ -55,7 +56,9 @@ export function isAgentService(row) {
 export function isHeavy(row) {
   // Java only as a build daemon: an IDE such as Android Studio also runs as java.
   if (row.name === 'java') return /GradleDaemon|KotlinCompileDaemon|org\.gradle\./.test(row.args)
-  return /^(qemu-system-[\w-]+|emulator|tsc|next-server.*|gradle)$/.test(row.name)
+  // tsc and Next run as node: match them by their arguments.
+  if (row.name === 'node') return /\/tsc( |$)|next-server|\/next (dev|start)/.test(row.args)
+  return /^(qemu-system-[\w-]+|emulator|gradle)$/.test(row.name)
 }
 
 // Which processes to move to the background: rows of { pid, ppid, name, args }.
