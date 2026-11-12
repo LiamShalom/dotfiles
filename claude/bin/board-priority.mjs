@@ -8,10 +8,12 @@
 // the CPU. Agents use the CPU you leave idle; builds and emulators run slower while you work.
 //
 // Background: every process a Claude or Codex session starts (shells, builds, tests, dev servers,
-// emulators, MCP servers, hooks), and heavy tools that have left their session's process tree.
-// Untouched: the session processes themselves (they draw the terminal you type into), the board,
-// your own shells and every other app. Children inherit background priority, so a process is
-// changed once. launchd keeps this running (launchd/com.sideshift.board-priority.plist).
+// MCP servers, hooks); the agents' shared services (headless agent Chrome, MCP bridges); iOS
+// simulators and the Docker VM; and heavy tools that run detached from any terminal (a Gradle
+// daemon, the Android emulator). Untouched: the session processes themselves (they draw the
+// terminal you type into), the board, and anything you start yourself from a terminal or app.
+// Children inherit background priority, so a process is changed once. launchd keeps this running
+// (launchd/com.sideshift.board-priority.plist).
 //
 // Usage:  board-priority.mjs           run forever
 //         board-priority.mjs --once    one pass, print what it changed
@@ -23,43 +25,81 @@ import { promisify } from 'node:util'
 
 const run = promisify(execFile)
 const EVERY_MS = 5000
+const CALL_TIMEOUT_MS = 10_000
+// Younger processes are left alone: most agent commands end within seconds, and changing each one
+// would start a process for nothing. Long work is caught on the next pass.
+const MIN_AGE_S = 5
 const LOG = join(homedir(), '.claude', 'logs', 'board-priority.log')
 const LOG_MAX = 1024 * 1024
-// The priority macOS gives a process in the background band.
-const BACKGROUND_PRI = 4
 
-// A Claude or Codex session: Claude Code's binary (claude, or its versioned name like 2.1.322),
-// its daemon and terminal hosts ("claude bg-pty-host"), and Codex.
-export function isSession(args) {
-  const name = basename(args.split(' ')[0])
-  return /^(claude|codex)$/.test(name) || /^\d+\.\d+\.\d+$/.test(name) || /\/codex( |$)|codex-darwin|@openai\/codex/.test(args)
+// A Claude or Codex session: Claude Code's binary (claude, or its versioned name like 2.1.322,
+// wherever it is installed), its daemon's helpers ("claude bg-pty-host" carries what you type to a
+// background session) and the Codex binary.
+export function isSession(row) {
+  return /^(claude|codex)( |$)/.test(row.name) || /^\d+\.\d+\.\d+$/.test(row.name)
 }
 
-// Work that loads the Mac and may have left its session's tree (a Gradle daemon, an emulator).
-export function isHeavy(args) {
-  const name = basename(args.split(' ')[0])
-  return /^(java|qemu-system-[\w-]+|emulator|swift-frontend|swift-build|xcodebuild|clang|tsc|next-server.*|gradle)$/.test(name)
+// Work that serves agents but is not started inside a session's process tree.
+export function isAgentService(row) {
+  return (
+    row.name === 'launchd_sim' ||
+    row.name === 'limactl' ||
+    row.name === 'com.apple.Virtualization.VirtualMachine' ||
+    /agent-chrome\/profile/.test(row.args) ||
+    /\/mcp-http-bridge\.mjs/.test(row.args)
+  )
 }
 
-// Which processes to move to the background: rows of { pid, ppid, pri, args }.
+// Heavy tools. Demoted only when they run detached from any terminal or app (a Gradle daemon, an
+// emulator): the same tool started from your own shell stays at full speed.
+export function isHeavy(row) {
+  // Java only as a build daemon: an IDE such as Android Studio also runs as java.
+  if (row.name === 'java') return /GradleDaemon|KotlinCompileDaemon|org\.gradle\./.test(row.args)
+  return /^(qemu-system-[\w-]+|emulator|tsc|next-server.*|gradle)$/.test(row.name)
+}
+
+// Which processes to move to the background: rows of { pid, ppid, name, args }.
 export function toDemote(rows) {
   const byPid = new Map(rows.map((row) => [row.pid, row]))
-  const underSession = (row) => {
-    const seen = new Set()
+  const ancestors = (row) => {
+    const chain = []
+    const seen = new Set([row.pid])
     for (let up = byPid.get(row.ppid); up && !seen.has(up.pid); up = byPid.get(up.ppid)) {
       seen.add(up.pid)
-      if (isSession(up.args)) return true
+      chain.push(up)
     }
-    return false
+    return chain
   }
-  return rows.filter((row) => row.pri > BACKGROUND_PRI && !isSession(row.args) && (underSession(row) || isHeavy(row.args)))
+  return rows.filter((row) => {
+    if (isSession(row)) return false
+    const chain = ancestors(row)
+    if (isAgentService(row) || chain.some((up) => isSession(up) || isAgentService(up))) return true
+    // Detached: every process above it is another heavy tool (the emulator above its qemu). Rows
+    // of other users and launchd itself are not listed, so a chain ends there.
+    return isHeavy(row) && chain.every(isHeavy)
+  })
+}
+
+// ps elapsed time, [[dd-]hh:]mm:ss, in seconds.
+export function seconds(etime) {
+  const [days, clock] = etime.includes('-') ? etime.split('-') : ['0', etime]
+  return Number(days) * 86400 + clock.split(':').reduce((total, part) => total * 60 + Number(part), 0)
 }
 
 async function processes() {
-  const { stdout } = await run('/bin/ps', ['-U', String(process.getuid()), '-o', 'pid=,ppid=,pri=,args='], { maxBuffer: 32 * 1024 * 1024 })
-  return stdout.split('\n').flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line)
-    return match ? [{ pid: Number(match[1]), ppid: Number(match[2]), pri: Number(match[3]), args: match[4] }] : []
+  const ps = (columns) => run('/bin/ps', ['-U', String(process.getuid()), '-o', columns], { maxBuffer: 64 * 1024 * 1024, timeout: CALL_TIMEOUT_MS })
+  // Two listings: the program path and the arguments can each contain spaces.
+  const [comm, args] = await Promise.all([ps('pid=,ppid=,etime=,comm='), ps('pid=,args=')])
+  const argsOf = new Map()
+  for (const line of args.stdout.split('\n')) {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line)
+    if (match) argsOf.set(Number(match[1]), match[2])
+  }
+  return comm.stdout.split('\n').flatMap((line) => {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)
+    if (!match) return []
+    const pid = Number(match[1])
+    return [{ pid, ppid: Number(match[2]), ageS: seconds(match[3]), name: basename(match[4]), args: argsOf.get(pid) ?? '' }]
   })
 }
 
@@ -73,20 +113,29 @@ function log(line) {
   }
 }
 
+// Processes already moved, by pid, with their arguments to tell a reused pid apart.
+const moved = new Map()
+
 async function pass() {
-  const demote = toDemote(await processes())
-  const moved = []
-  for (const row of demote) {
+  const rows = await processes()
+  const live = new Set(rows.map((row) => row.pid))
+  for (const pid of moved.keys()) if (!live.has(pid)) moved.delete(pid)
+  const changed = []
+  for (const row of toDemote(rows)) {
+    if (row.ageS < MIN_AGE_S) continue
+    if (moved.get(row.pid) === row.args) continue
     // A process that ended in between fails here; that is fine.
-    const ok = await run('/usr/sbin/taskpolicy', ['-b', '-p', String(row.pid)]).then(() => true, () => false)
-    if (ok) moved.push(basename(row.args.split(' ')[0]))
+    const ok = await run('/usr/sbin/taskpolicy', ['-b', '-p', String(row.pid)], { timeout: CALL_TIMEOUT_MS }).then(() => true, () => false)
+    if (!ok) continue
+    moved.set(row.pid, row.args)
+    changed.push(row.name)
   }
-  if (moved.length) {
+  if (changed.length) {
     const counts = new Map()
-    for (const name of moved) counts.set(name, (counts.get(name) ?? 0) + 1)
-    log(`background ${moved.length}: ${[...counts].map(([name, n]) => `${name}×${n}`).join(' ')}`)
+    for (const name of changed) counts.set(name, (counts.get(name) ?? 0) + 1)
+    log(`background ${changed.length}: ${[...counts].map(([name, n]) => `${name}×${n}`).join(' ')}`)
   }
-  return moved
+  return changed
 }
 
 if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {

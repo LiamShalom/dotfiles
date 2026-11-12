@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Template: install.sh replaces __HOME__ and loads it. See claude/bin/board-priority.mjs. -->
-<!-- Standard priority on purpose: a background helper would wait behind the work it demotes. -->
+<!-- Interactive on purpose: a lower-priority helper would wait behind the work it demotes. -->
 <plist version="1.0">
 <dict>
 	<key>Label</key>
 	<string>com.sideshift.board-priority</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/opt/homebrew/opt/node@24/bin/node</string>
+		<string>/usr/bin/env</string>
+		<string>node</string>
 		<string>__HOME__/.claude/bin/board-priority.mjs</string>
 	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>KeepAlive</key>
@@ -18,7 +24,7 @@
 	<key>ThrottleInterval</key>
 	<integer>30</integer>
 	<key>ProcessType</key>
-	<string>Standard</string>
+	<string>Interactive</string>
 	<key>StandardOutPath</key>
 	<string>__HOME__/.claude/logs/board-priority.launchd.log</string>
 	<key>StandardErrorPath</key>
