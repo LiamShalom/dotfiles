@@ -69,6 +69,7 @@ LINKS=(
 	"claude/bin/maintenance.sh:.claude/bin/maintenance.sh"
 	"claude/bin/chrome-reaper.sh:.claude/bin/chrome-reaper.sh"
 	"claude/bin/agent-reaper.mjs:.claude/bin/agent-reaper.mjs"
+	"claude/bin/board-priority.mjs:.claude/bin/board-priority.mjs"
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
 	"claude/bin/open-in-pane.sh:.claude/bin/open-in-pane.sh"
 	"claude/bin/chrome-devtools-mcp.sh:.claude/bin/chrome-devtools-mcp.sh"
