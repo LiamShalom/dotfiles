@@ -29,6 +29,14 @@ only for staff tasks and `SideShift Test Creator` for creator tasks. No vault we
 or new approval are needed for an authorized test on that verified preview. An actual
 provider refusal still follows the one-failed-sign-in rule.
 
+**The staff account (`SideShift User`, liam@sideshift.app) has two-step verification on
+(2026-11-12).** After the password, the app asks for a 6-digit authenticator code: run the
+adapter again with the six "Digit n of 6" boxes as `code` (the item holds the code
+generator). Emailed login codes and magic links are refused for it. In agent Chrome, open a
+preview signed in as staff with `node ~/.claude/bin/agent-signin.mjs --as staff <url>`.
+Firebase takes each code once and rate-limits code checks (`QUOTA_EXCEEDED` after about
+seven sign-ins in a few minutes), so sign in once and reuse the tab.
+
 
 ## Safari in iOS Simulator
 
