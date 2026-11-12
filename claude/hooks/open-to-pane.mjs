@@ -24,8 +24,27 @@ try {
 }
 const cmd = input?.tool_input?.command
 // A run of the script, not a commit message or grep that only names it.
-if (typeof cmd === 'string' && /\bnode\s+\S*board-browser\.mjs(\s|$)/.test(cmd) && !cmd.includes('--simulator')) boardBrowserCheck(cmd)
+const runsBoardBrowser = typeof cmd === 'string' && /\bnode\s+\S*board-browser\.mjs(\s|$)/.test(cmd)
+// In the Claude desktop app the operator looks at the app's own browser pane, not Session Board's: a
+// hand-off to the board, or an `open` the board would take (below), lands where they are not looking.
+const inDesktop = process.env.CLAUDE_CODE_ENTRYPOINT === 'claude-desktop'
+if (inDesktop && runsBoardBrowser) desktopDeny()
+if (runsBoardBrowser && !cmd.includes('--simulator')) boardBrowserCheck(cmd)
 if (typeof cmd !== 'string' || !/^\s*open\s/.test(cmd)) process.exit(0)
+
+function desktopDeny() {
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason:
+          'This session runs in the Claude desktop app: the operator looks at its own browser pane, not Session Board, so board-browser.mjs and `open` do not reach them. Instead: a page (preview, sign-in, consent, artifact URL) -> mcp__Claude_Browser__preview_start with the url (load the tools with ToolSearch "mcp__Claude_Browser__" if deferred), then tabs_context to check the pane is showing. A file (screenshot, PDF, report) -> SendUserFile with display "render"; an HTML page -> publish it as an Artifact. An iOS simulator -> mcp__Claude_Code_iOS_Simulator__control action "attach" with the device. An Android emulator -> ask the operator to use the emulator window. A SideShift page signed in as a test account for your own checks -> node ~/.claude/bin/agent-signin.mjs [--as creator] <url> (agent Chrome tab, not shown to the operator).',
+      },
+    }),
+  )
+  process.exit(0)
+}
 
 // A board-browser.mjs hand-off. On 10-21 and 10-22 Liam could not see a page the agent said was in the pane: the
 // agent closed the tab the board opened, or overrode CLAUDE_CODE_SESSION_ID so the tab went outside his pane, and
@@ -35,7 +54,14 @@ if (typeof cmd !== 'string' || !/^\s*open\s/.test(cmd)) process.exit(0)
 // preview"). It opens only when the operator asked for that route or to compare directions: DEV_PREVIEW_OK=1.
 function boardBrowserCheck(command) {
   const devRoute = /\/dev-[a-z0-9-]+-preview\b/i.test(command) && !/\bDEV_PREVIEW_OK=1\b/.test(command)
-  const out = /\bCLAUDE_CODE_SESSION_ID=/.test(command)
+  // 11-07, 11-10, 11-12: an artifact URL in the pane shows "Page not found" (its claude.ai login is another account).
+  const artifactUrl = /claude\.ai\/(code\/)?artifact\//i.test(command)
+  const out = artifactUrl
+    ? {
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'The pane is signed in to claude.ai as a different account, so a private artifact link shows "Page not found" there. Open the same local .html file you published instead: node ~/session-board/scripts/board-browser.mjs <path/to/file.html> "<what to look at>". Give the operator the artifact link in chat as well.',
+      }
+    : /\bCLAUDE_CODE_SESSION_ID=/.test(command)
     ? {
         permissionDecision: 'deny',
         permissionDecisionReason: 'Do not override CLAUDE_CODE_SESSION_ID for board-browser.mjs: the board then opens the tab outside the pane the operator is looking at. Run it as it is; the tab it opens is the pane\'s tab.',
@@ -118,6 +144,9 @@ for (const { text } of parsed.slice(1)) {
   }
 }
 if (!targets.length) process.exit(0)
+// The desktop pane shows no folders, so `open <folder>` there stays Finder's.
+if (inDesktop && targets.some((t) => /^https?:/i.test(t) || !statSync(t).isDirectory())) desktopDeny()
+if (inDesktop) process.exit(0)
 
 const board = join(homedir(), 'Library', 'Application Support', 'Session Board', 'browser-requests', 'board.pid')
 try {
