@@ -28,6 +28,7 @@ Long values get a copy button, not the value. An action that fits as an icon is 
 - 10-23 "you dont need the small text simply [tiktok logo] TiktOk Spark Ads Connect Tiktok button"
 - 10-29 Discover creator card, narrow tile showing Invite as a bare "+": "invite button should be a message icon". An icon-only action uses the icon of what it does (inviting = sending a message), never a generic +
 - 10-26 onboarding call popup, title + bonus checklist + Skip / I've booked over an embedded calendar: "Can we just remove that popup thing, it looks bad". Shipped as the bare calendar with an x
+- 11-12 partnership-ads You're in checklist: "move the allow for tiktok inline weith the logo. Also for ads it doesnt make sense to show new account and warmup". A row's action sits beside its logo even when a field sits under it (the field submits through that button), and tips meant for one campaign type (posting: new account, warm-up) are hidden where they do not apply
 
 **2. No banners, notice blocks or callouts, yellow above all.** Not for empty states, not for
 caveats, not for "no page selected". Fix the state in the UI itself.
