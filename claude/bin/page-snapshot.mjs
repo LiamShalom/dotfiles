@@ -149,12 +149,23 @@ const CAPTURE = `(() => {
   // Artifacts cannot embed other sites; keep the frame's box, drop its content.
   root.querySelectorAll('iframe').forEach((f) => { f.removeAttribute('src'); f.removeAttribute('srcdoc') })
   root.querySelectorAll('[style]').forEach((el) => el.setAttribute('style', fixCss(el.getAttribute('style'))))
+  root.querySelectorAll('noembed, noframes, xmp, plaintext').forEach((el) => el.remove())
   root.querySelectorAll('script, noscript, style, link[rel~="stylesheet"], link[rel="preload"], link[rel="modulepreload"], link[rel="prefetch"], link[rel="preconnect"], link[rel="dns-prefetch"], link[rel="manifest"], base, meta[http-equiv]').forEach((el) => el.remove())
   root.querySelectorAll('[nonce]').forEach((el) => el.removeAttribute('nonce'))
   // The copy runs in the pane with the artifact runtime: no code may come with the page itself.
-  for (const el of root.querySelectorAll('*')) {
+  // A link or source keeps only a web, mail or same-page address, or an image as data.
+  const safeUrl = (value) => {
+    if (value.trim().startsWith('#')) return true
+    try {
+      const url = new URL(value, location.href)
+      return ['http:', 'https:', 'mailto:', 'blob:'].includes(url.protocol) || (url.protocol === 'data:' && /^data:image[/](png|jpe?g|gif|webp|avif|svg[+]xml)[;,]/i.test(url.href))
+    } catch {
+      return false
+    }
+  }
+  for (const el of [root, ...root.querySelectorAll('*')]) {
     for (const { name, value } of [...el.attributes]) {
-      if (/^on/i.test(name) || (/^(href|src|action|formaction|xlink:href)$/i.test(name) && /^(javascript|vbscript|data:text.html)/i.test(value.trim()))) el.removeAttribute(name)
+      if (/^on/i.test(name) || (/^(href|src|action|formaction|xlink:href|data|poster|background|to|from|by|values)$/i.test(name) && !safeUrl(value))) el.removeAttribute(name)
     }
   }
   root.querySelectorAll('a[href]').forEach((a) => a.setAttribute('href', abs(a.getAttribute('href'))))
