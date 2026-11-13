@@ -332,7 +332,10 @@ def main():
     how = install(root, dependency_key(root), args.force)
     if not args.skip_build:
         step('Building workspace packages (npm run build:packages)')
-        sh([NPM, 'run', 'build:packages'], root)
+        # The data-repos declaration build holds about 3 GB; five worktrees ran it at once on
+        # 2026-11-13, so it waits for a slot in the machine-wide heavy-job queue.
+        heavy = HOME / '.claude/bin/heavy'
+        sh(([str(heavy)] if heavy.exists() else []) + [NPM, 'run', 'build:packages'], root)
     print(f'\nsideshift-setup: ready in {time.monotonic() - started:.0f}s ({how}).')
     print(f'  worktree  {root}')
     print(f'  branch    {git(root, "branch", "--show-current") or "DETACHED HEAD"}')

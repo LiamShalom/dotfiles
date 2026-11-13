@@ -59,6 +59,12 @@ const SIM_CLONE_MS = 5 * 60e3;
 const DEV_MAX_KB = env("DEV_MAX_GB", 12) * 1024 * 1024;
 const DEV_IDLE_MS = env("DEV_IDLE_HOURS", 2) * 3600e3;
 const TAB_IDLE_MS = env("TAB_IDLE_HOURS", 2) * 3600e3;
+// An emulator's host memory grows while it runs: a 4 GB phone reached 35 GB in 24 h (2026-11-13).
+const EMU_MAX_KB = env("EMU_MAX_GB", 12) * 1024 * 1024;
+const EMU_IDLE_MS = env("EMU_IDLE_MIN", 10) * 60e3;
+// One Kotlin compiler daemon serves every Gradle build and stays up while any build uses it
+// at least every 2 h; it reached 7 GB after 18 h (2026-11-13).
+const KOTLIN_MAX_KB = env("KOTLIN_MAX_GB", 5) * 1024 * 1024;
 const ORPHAN_MS = env("ORPHAN_MIN", 30) * 60e3;
 const CONTAINER_IDLE_MS = env("CONTAINER_IDLE_HOURS", 24) * 3600e3;
 const CONTAINER_ACTIVE_BYTES = 16 * 1024;
@@ -319,6 +325,38 @@ function footprintKB(pids) {
 	return out;
 }
 
+// Running emulators, with the session tool that last named each one (sim-owner.mjs) and
+// whether a test run or adb command is using it now.
+export function bloatedEmulators(procs = processes(), now = Date.now(), usersDir = SIM_USERS) {
+	const out = [];
+	for (const p of procs) {
+		if (!/\/qemu-system-[\w-]+\s.*-avd\s/.test(p.cmd)) continue;
+		const port = Number(p.cmd.match(/\s-port\s+(\d+)/)?.[1] ?? 5554);
+		const serial = `emulator-${port}`;
+		let usedAt = null;
+		try {
+			usedAt = statSync(join(usersDir, `android:${serial}`)).mtimeMs;
+		} catch {}
+		// Session Board's screen stream (android-stream.mjs) stays open for as long as its tab does, so it is not use.
+		const busy = procs.some((q) => q.pid !== p.pid && !/android-stream\.mjs/.test(q.cmd)
+			&& (q.cmd.includes(serial) || /connected\w*AndroidTest|(^|\/)maestro\s/.test(q.cmd)));
+		out.push({ pid: p.pid, avd: p.cmd.match(/\s-avd\s+(\S+)/)?.[1], serial, usedAt, busy });
+	}
+	return out;
+}
+
+// CPU seconds each process has used so far (ps TIME: [[dd-]hh:]mm:ss.ss).
+function cpuSeconds(pids) {
+	const out = {};
+	for (const line of run("/bin/ps", ["-o", "pid=,time=", "-p", pids.join(",")]).split("\n")) {
+		const [pid, t] = line.trim().split(/\s+/);
+		if (!pid || !t) continue;
+		const [d, rest] = t.includes("-") ? t.split("-") : ["0", t];
+		out[+pid] = rest.split(":").reduce((s, x) => s * 60 + Number(x), 0) + Number(d) * 86400;
+	}
+	return out;
+}
+
 export function devServers(procs = processes()) {
 	const byPid = new Map(procs.map((p) => [p.pid, p]));
 	const servers = [];
@@ -564,7 +602,7 @@ async function main() {
 	try {
 		state = JSON.parse(readFileSync(STATE, "utf8"));
 	} catch {}
-	const next = { sims: {}, dev: {}, tabs: {}, orphans: {}, containers: {} };
+	const next = { sims: {}, dev: {}, tabs: {}, orphans: {}, containers: {}, kotlin: {} };
 	const lines = [];
 	const pending = [];
 	const say = (line) => lines.push(line);
@@ -612,6 +650,38 @@ async function main() {
 				for (const f of AVD_DATA) rmSync(join(a.path, f), { recursive: true, force: true });
 				rmSync(a.file, { force: true });
 			});
+	}
+
+	const big = bloatedEmulators(procs, now);
+	const emuKB = big.length ? footprintKB(big.map((e) => e.pid)) : {};
+	for (const e of big) {
+		const kb = emuKB[e.pid] ?? 0;
+		const label = `Android emulator ${e.serial} (AVD ${e.avd}, pid ${e.pid}, ${gb(kb)}), last used ${e.usedAt ? `${ago(now - e.usedAt)} ago` : "never recorded"}`;
+		const idle = !e.usedAt || now - e.usedAt > EMU_IDLE_MS;
+		if (kb > EMU_MAX_KB && idle && !e.busy)
+			act(`STOP ${label}: over the ${gb(EMU_MAX_KB)} limit; its session gets a fresh one on its next launch`, () => {
+				if (existsSync(ADB)) run(ADB, ["-s", e.serial, "emu", "kill"], { timeout: 30000 });
+				else process.kill(e.pid, "SIGTERM");
+			});
+		else if (dry) say(`keep ${label}: ${kb <= EMU_MAX_KB ? "under the limit" : e.busy ? "a build or test is using it" : "used recently"}`);
+	}
+
+	const kotlin = procs.filter((p) => /KotlinCompileDaemon|kotlin-daemon/.test(p.cmd));
+	const ktKB = kotlin.length ? footprintKB(kotlin.map((p) => p.pid)) : {};
+	const ktCpu = kotlin.length ? cpuSeconds(kotlin.map((p) => p.pid)) : {};
+	for (const p of kotlin) {
+		const kb = ktKB[p.pid] ?? 0;
+		const prev = state.kotlin?.[p.pid];
+		const cpu = ktCpu[p.pid] ?? 0;
+		// Idle = no compile since the last run: CPU time moved by under 2 s.
+		const quiet = prev && cpu - prev.cpu < 2;
+		const since = quiet ? prev.quietSince ?? prev.seenAt : now;
+		next.kotlin[p.pid] = { cpu, seenAt: now, quietSince: since };
+		const label = `Kotlin compiler daemon (pid ${p.pid}, ${gb(kb)}, up ${ago(p.ageSec * 1000)})`;
+		if (kb > KOTLIN_MAX_KB && quiet && now - since >= 4 * 60e3)
+			act(`STOP ${label}: over the ${gb(KOTLIN_MAX_KB)} limit and no compile for ${ago(now - since)}; the next build starts a new one`, () =>
+				process.kill(p.pid, "SIGTERM"));
+		else if (dry) say(`keep ${label}: ${kb <= KOTLIN_MAX_KB ? "under the limit" : quiet ? `quiet ${ago(now - since)}` : "compiling"}`);
 	}
 
 	for (const s of endedSessionSims(live)) {

@@ -59,6 +59,11 @@ test("LOCAL_TYPECHECK=1 runs the check, queued", () => {
 	assert.ok(queued("LOCAL_TYPECHECK=1 npx tsc --noEmit"));
 });
 
+test("the shared-package build is queued", () => {
+	assert.ok(queued("npm run build:packages"));
+	assert.ok(!refused("npm run build:packages"));
+});
+
 test("other repos keep the queue", () => {
 	assert.ok(queued("npm run typecheck", OTHER));
 	assert.ok(queued("npx tsc --noEmit", OTHER));

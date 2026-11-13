@@ -29,7 +29,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const VITEST_WORKERS = process.env.AGENT_VITEST_MAX_WORKERS || "4";
-const HEAVY_SCRIPTS = new Set(["build", "typecheck", "typecheck:tests", "typecheck:ts6", "lint", "test:firestore-writer-conformance"]);
+const HEAVY_SCRIPTS = new Set(["build", "build:packages", "typecheck", "typecheck:tests", "typecheck:ts6", "lint", "test:firestore-writer-conformance"]);
 const VITEST_SCRIPTS = new Set(["test", "test:run", "test:coverage"]);
 const CI_TYPECHECK_SCRIPTS = new Set(["typecheck", "typecheck:tests", "typecheck:ts6"]);
 const CI_TYPECHECK_PROJECTS = /^(\.\/?|(\.\/)?tsconfig(\.tests)?\.json)$/;
