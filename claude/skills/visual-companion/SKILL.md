@@ -1,32 +1,82 @@
 ---
 name: visual-companion
-description: "Show the operator mockups, wireframes, diagrams, flowcharts and side-by-side visual options in a live browser tab, and read back which option they clicked. Use in any session, at any stage (brainstorm, design, execute, quick-fix, debugging, plain questions), whenever seeing something would be clearer than reading it: a UI layout choice, a before/after, an architecture or data-flow diagram, a state machine. Open it without asking first."
+description: "Show the operator mockups, wireframes, diagrams, flowcharts and side-by-side visual options, and read back what they chose. For UI design rounds you choose the surface: a Session Board canvas (board-canvas.mjs), where the operator draws and writes and you read it back, or the preview route or a local page when the choice needs clicking; other visuals go in a live browser tab. Use in any session, at any stage (brainstorm, design, execute, quick-fix, debugging, plain questions), whenever seeing something would be clearer than reading it: a UI layout choice, a before/after, an architecture or data-flow diagram, a state machine. Open it without asking first."
 ---
 
 # Visual Companion
 
-## Artifacts first
+## UI design: choose the surface
 
-Publish each screen as a claude.ai Artifact (the `Artifact` tool) by default, and use the
-local server below only as the fallback. An artifact keeps one URL across iterations, works
-on the operator's phone, can be shared with the team, and returns comments to this session.
+For each round of product UI (layout directions, screens, flows, wireframes, before/after,
+design feedback), choose where to show it and say your choice in one line:
+
+- **Canvas** when the operator will mark up static screens (compare options, sketch, point with
+  arrows) or the rounds should stay together as history. It is an infinite tldraw canvas in
+  this session's pane, one per feature, each round under the last. The operator draws, writes
+  sticky notes and points with arrows on it, and you read all of that back (steps below).
+- **Preview route or a local HTML page in the pane** (`board-browser.mjs`) when the decision
+  depends on clicking, states or motion, which the canvas cannot show.
+
+Canvas steps:
+
+1. Screenshot the real UI: the preview route (`design` skill) at 1280 and 390 wide, and the
+   reference screen. Never draw product UI by hand.
+2. Write the round to `$CLAUDE_JOB_DIR/tmp/<feature>-round-<n>.json`. Image paths are relative
+   to that file. Give each option a letter, and put your pick and why in `note`:
+
+   ```json
+   { "title": "Round 1 · Pricing page",
+     "note": "My pick: B. The plan cards read first; the table stays one click away.",
+     "options": [
+       { "label": "A · Table first", "images": ["a-1280.png", "a-390.png"], "link": "<preview url>?d=a" },
+       { "label": "B · Cards first", "images": ["b-1280.png", "b-390.png"], "text": "Cards, then the table", "link": "<preview url>?d=b" } ] }
+   ```
+3. `node ~/session-board/scripts/board-canvas.mjs add "<feature>" <round.json> "<what to look at
+   and decide>"`. The canvas opens in front of this session's pane. When the operator is looking
+   at another chat, the output says so: tell them where it is.
+4. Ask for the answer in the terminal ("A, B or C?"). Before the next round, and whenever they
+   say they marked something, run `board-canvas.mjs read "<feature>"`. It prints every shape as
+   JSON (`"by": "you"` is the operator's: a note's text, the frame it is on, what an arrow points
+   from and to) and saves a PNG of the canvas. Look at the PNG for sketches that have no text;
+   `--frame "<label>"` gives one option up close.
+5. The next round is another `add` to the same canvas. `board-canvas.mjs list` shows every
+   canvas, including ones the operator drew on their own; read those the same way when they ask
+   you to build what they sketched.
+
+When board-canvas.mjs says Session Board is not running, publish the round as a claude.ai
+Artifact (the `Artifact` tool: each option's screenshots, your pick and why, the preview links),
+give the operator its link, and say why in one line.
+
+## Artifact pages first
+
+For everything visual that is not a UI design round (diagrams, flowcharts, review and approval
+pages, a clickable prototype the operator asked to click through):
+
+Write each screen as a local HTML page and open it in Session Board's pane by default; use the
+local server below only as the fallback. In the pane the page gets the claude.ai Artifact
+runtime (`window.claude.use`: `db`, `comments`, `sample`, `artifact`, `user`, `downloads`; the same
+API, see "Pages that work like Claude artifacts" in `~/session-board/README.md`), a Comment
+button whose comments arrive in this session as prompts, and a reload whenever the file changes.
 
 1. Load the `artifact-design` skill (and `artifact-diagramming` for a diagram) before you
-   write the page. Write a full page to `$CLAUDE_JOB_DIR/tmp/<topic>.html` (or the session
-   scratchpad), not a fragment: the frame template and `toggleSelect` do not exist there.
+   write the page. Write a complete page (doctype, head, body) to
+   `$CLAUDE_JOB_DIR/tmp/<topic>.html` (or the session scratchpad).
 2. Give each option a letter and a heading, and put your pick and its reason at the top.
-   For product UI, publish a clickable copy captured with `~/.claude/bin/page-snapshot.mjs`
+   For product UI, use a clickable copy captured with `~/.claude/bin/page-snapshot.mjs`
    (the preview route, the reference screen), with working buttons and states in JS, not
-   a hand-drawn lookalike. Screenshots in `files` are fine for static comparisons.
-3. Publish, then open the URL in the pane in the same turn:
-   `node ~/session-board/scripts/board-browser.mjs <artifact-url> "<what to look at and decide>"`.
-4. Ask for the answer in the terminal ("A, B or C?"). Read comments on the page with
-   `ArtifactComments`. For the next round, republish the same file path, so the URL in the
-   pane stays the same. Never open a new artifact for each iteration.
+   a hand-drawn lookalike.
+3. Open it in the pane in the same turn:
+   `node ~/session-board/scripts/board-browser.mjs <file.html> "<what to look at and decide>"`.
+4. To read the operator's choice back, have the page save it with `db`
+   (`(await claude.use('db'))?.doc('choice/current').set({ option: 'B' })`), and read it with
+   `node ~/session-board/scripts/artifact.mjs db <file.html> get choice/current`. Their
+   comments come to you as prompts (`Comment on <file> at "<element>" …`); all of them:
+   `artifact.mjs comments <file.html>`. For the next round, edit the same file: the pane
+   reloads it. Never open a new file for each iteration.
 
-Use the local server instead when the `Artifact` tool is missing or refuses (for example
-"Artifacts need a claude.ai login"), or when the operator must click options and you must
-read the clicks back from `state_dir/events`. Say in one line why you used the fallback.
+Publish a claude.ai Artifact (the `Artifact` tool) only when someone other than the operator
+must open the page. Use the local server when Session Board is not running (board-browser.mjs
+says so). Say in one line why you used the fallback.
 
 ## Local server (fallback)
 
@@ -40,12 +90,13 @@ running one) and show the screen in the same turn. Scripts live in
 
 Decide per-question, not per-session. The test: **would the user understand this better by seeing it than reading it?**
 
-**Use the browser** when the content itself is visual:
+**Show it** when the content itself is visual. UI design goes on the surface you chose (above); the rest
+goes on a page:
 
-- **UI mockups** — wireframes, layouts, navigation structures, component designs
+- **UI mockups** (canvas) — wireframes, layouts, navigation structures, component designs
 - **Architecture diagrams** — system components, data flow, relationship maps
-- **Side-by-side visual comparisons** — comparing two layouts, two color schemes, two design directions
-- **Design polish** — when the question is about look and feel, spacing, visual hierarchy
+- **Side-by-side visual comparisons** (canvas, for UI) — comparing two layouts, two color schemes, two design directions
+- **Design polish** (canvas) — when the question is about look and feel, spacing, visual hierarchy
 - **Spatial relationships** — state machines, flowcharts, entity relationships rendered as diagrams
 
 **Use the terminal** when the content is text or tabular:
@@ -56,7 +107,7 @@ Decide per-question, not per-session. The test: **would the user understand this
 - **Technical decisions** — API design, data modeling, architectural approach selection
 - **Clarifying questions** — anything where the answer is words, not a visual preference
 
-A question *about* a UI topic is not automatically a visual question. "What kind of wizard do you want?" is conceptual — use the terminal. "Which of these wizard layouts feels right?" is visual — use the browser.
+A question *about* a UI topic is not automatically a visual question. "What kind of wizard do you want?" is conceptual — use the terminal. "Which of these wizard layouts feels right?" is visual — show it (canvas or preview).
 
 ## How It Works
 
@@ -68,9 +119,9 @@ The server watches a directory for HTML files and serves the newest one to the b
 
 For SideShift product UI, route through the `design` skill before writing a screen. Read
 `~/dotfiles/claude/references/ui-taste.md` and `unslop.md`, identify the shared components,
-and render those React components on a development preview route. Use this companion for
-diagrams, wireframes, and comparison framing; do not substitute hand-built HTML lookalikes
-for product UI. The comparison should embed or link to the real preview. A chosen direction
+and render those React components on a development preview route. Show them on the surface you
+chose (above); use this local server only for diagrams when Session Board is not running, and
+never substitute hand-built HTML lookalikes for product UI. The comparison should embed or link to the real preview. A chosen direction
 stays chosen when the operator rejects its visual finish.
 
 ```bash

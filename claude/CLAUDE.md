@@ -293,6 +293,26 @@ window in it: its tabs never mix with another chat's.
   until I say I'm done, then find the tab with `list_pages`. If the command fails (the board is
   not running), open the page in a background tab of the agent Chrome, tell me the URL and what
   to do, and wait. Never route browser or computer-use work to Codex.
+- **For a UI design round, pick the surface that fits; the Session Board canvas is one
+  option.** Use the canvas when I will want to mark up static screens (compare options,
+  sketch, point with arrows) or when the rounds should stay together as history. Use the
+  preview route itself, or a local HTML page in the pane, when the decision depends on
+  clicking, states or motion. Say which one you picked in one line. Either way, show the real
+  preview route at 1280 and 390 wide, never a hand-drawn lookalike. On the canvas, add each
+  round to the feature's canvas with `node ~/session-board/scripts/board-canvas.mjs add "<feature>"
+  <round.json> "<what to decide>"`. One canvas per feature; each round goes under the last. I
+  sketch, write notes and point with arrows on it: before each next round, read that back with
+  `board-canvas.mjs read "<feature>"` (JSON of what I added, plus a PNG to look at). The round
+  format and steps are in the `visual-companion` skill.
+- **A page made for me to look at or decide on is a local HTML file in the pane** (diagrams,
+  review and approval pages, reports, a prototype I asked to click through): `board-browser.mjs
+  <file.html> "<what to look at>"`. There it gets the claude.ai Artifact runtime
+  (`window.claude.use`: db, comments, sample, artifact.publish; same API, see the "Pages that
+  work like Claude artifacts" section of `~/session-board/README.md`). My comments on it arrive
+  in your session as prompts; read what I did on the page with `node
+  ~/session-board/scripts/artifact.mjs db|comments <file.html>`. Edit the same file each round:
+  the pane reloads it. Publish a claude.ai Artifact (the `Artifact` tool) only for a page
+  someone else has to open.
 
 ## Heavy commands: two machine-wide slots
 
@@ -337,6 +357,11 @@ emulator handoffs. This section takes precedence over the shared agent Chrome to
 - **Files:** show generated review pages, screenshots, PDFs, reports, and folders in native
   browser tabs using a supported preview. Do not stop at a path in chat. If the browser cannot
   display the file, report that limitation instead of opening another browser or app.
+- **UI design rounds:** when Session Board is running and you pick the canvas (see the rules
+  above), add the round to the feature's canvas with `board-canvas.mjs`, so it stays with the
+  earlier rounds, and read my marks back with `board-canvas.mjs read`. Also show that round's screenshots, your pick and
+  the preview links as a local page in a native browser tab. When the board is not running, that
+  page is the whole round.
 - **Simulators and emulators:** show the changed screen through a supported mirror in a native
   browser tab. Keep the device running until I say I am done. If the native browser cannot
   show it, report the blocker; do not use the floating mini screen preview.

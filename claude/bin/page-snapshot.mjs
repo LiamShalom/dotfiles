@@ -15,8 +15,9 @@
 // (settle time before capture, default 1500), --max-asset-kb <n> (larger assets stay as absolute
 // URLs, default 4000).
 //
-// The output is in Artifact form (no <html>/<head>/<body> of its own; the publish step adds them),
-// so publish it as is with the Artifact tool. Opened directly as a file it renders in quirks mode.
+// The output is a complete page: open it in Session Board's pane, where it gets the artifact runtime
+// (window.claude.use: db, comments, sample…). With --artifact it is in claude.ai Artifact form instead
+// (no <html>/<head>/<body> of its own; the Artifact tool's publish adds them).
 import { execFileSync } from 'node:child_process'
 import dns from 'node:dns'
 import http from 'node:http'
@@ -40,9 +41,12 @@ const who = opt('--as', 'brand')
 const title = opt('--title')
 const waitMs = Number(opt('--wait', '1500'))
 const maxAssetBytes = Number(opt('--max-asset-kb', '4000')) * 1024
+const artifactAt = args.indexOf('--artifact')
+const artifactForm = artifactAt !== -1
+if (artifactForm) args.splice(artifactAt, 1)
 const [url] = args
 if (!out || (!tab && !url)) {
-  console.error('usage: page-snapshot.mjs (--tab <targetId> | [--as brand|creator] <url>) --out <file.html> [--wait ms] [--max-asset-kb n]')
+  console.error('usage: page-snapshot.mjs (--tab <targetId> | [--as brand|creator] <url>) --out <file.html> [--wait ms] [--max-asset-kb n] [--artifact]')
   process.exit(1)
 }
 
@@ -311,10 +315,12 @@ for (const u of [...new Set(page.urls)].sort((a, b) => b.length - a.length)) {
 if (openedHere) await call('Page.close').catch(() => {})
 ws.close()
 
+// A complete page unless --artifact: a file opened as is needs its own doctype, or it renders in quirks mode.
+if (!artifactForm) html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${html}</body></html>`
 writeFileSync(resolve(out), html)
 const mb = (Buffer.byteLength(html) / 1048576).toFixed(2)
 console.log(`Saved ${page.href} ("${page.title}") to ${resolve(out)}: ${mb} MB, ${inlined} assets inlined.`)
 if (Number(mb) > 16) console.log('WARNING: over the 16 MB Artifact limit. Lower --max-asset-kb or remove large images.')
 if (tooBig.length) console.log(`Replaced with a blank pixel (over --max-asset-kb):\n  ${tooBig.join('\n  ')}`)
 if (missed.length) console.log(`Could not load, replaced with a blank pixel (the live page may not have loaded them yet; raise --wait or scroll them into view and capture again):\n  ${[...new Set(missed)].join('\n  ')}`)
-console.log('Scripts were removed. Add the interactions with inline JS and fixture state before you publish.')
+console.log(`Scripts were removed. Add the interactions with inline JS and fixture state, then ${artifactForm ? 'publish it with the Artifact tool' : 'open it with board-browser.mjs'}.`)

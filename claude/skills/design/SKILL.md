@@ -105,13 +105,19 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
 7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
    (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
    Show the directions from step 4 side by side and say which you would pick and why.
-   **Put that comparison on an Artifact** (see `visual-companion`, "Artifacts first"): one
-   page with a screenshot of each direction from the preview route at 1280 and 390 wide, the
-   reference screen beside them, your pick at the top, and the preview link for each. Open it in
-   the Session Board pane with `board-browser.mjs`. Republish the same file each round, so the
-   operator keeps one URL. Make each direction clickable in the artifact: capture the preview
-   route with `~/.claude/bin/page-snapshot.mjs <url> --out <file>` and wire its buttons and
-   states with fixture data in JS. Do
+   **Put that comparison on the feature's canvas** (see `visual-companion`, "UI design: the
+   canvas first"): screenshot each direction from the preview route at 1280 and 390 wide, and
+   the reference screen, and add them as one round with `node
+   ~/session-board/scripts/board-canvas.mjs add "<feature>" <round.json> "<what to decide>"`:
+   one option per direction with its preview link, the reference as its own option, and your
+   pick and why in the round's note. It opens in front of this session's pane. The operator
+   answers on the canvas (sticky notes, arrows, sketches over a screenshot) or in chat; before
+   you change anything, run `board-canvas.mjs read "<feature>"`, look at the PNG it saves, and
+   treat every item with `"by": "you"` as feedback. Each later round is another `add` to the
+   same canvas, so the history stays in view. When a choice depends on interaction (a modal
+   flow, a hover or form state), put a screenshot of each state in its option. Build a
+   clickable local page (`visual-companion`, "Artifact pages first", with
+   `~/.claude/bin/page-snapshot.mjs`) only when the operator asks to click through. Do
    not redraw product UI by hand. Keep the preview link beside each direction. Once
    one is chosen, delete the others and iterate on feedback until they approve. **Build the
    chosen option exactly as it was mocked, plus only the changes the operator named.** Never
