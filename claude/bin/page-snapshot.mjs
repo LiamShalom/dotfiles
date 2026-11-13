@@ -151,6 +151,12 @@ const CAPTURE = `(() => {
   root.querySelectorAll('[style]').forEach((el) => el.setAttribute('style', fixCss(el.getAttribute('style'))))
   root.querySelectorAll('script, noscript, style, link[rel~="stylesheet"], link[rel="preload"], link[rel="modulepreload"], link[rel="prefetch"], link[rel="preconnect"], link[rel="dns-prefetch"], link[rel="manifest"], base, meta[http-equiv]').forEach((el) => el.remove())
   root.querySelectorAll('[nonce]').forEach((el) => el.removeAttribute('nonce'))
+  // The copy runs in the pane with the artifact runtime: no code may come with the page itself.
+  for (const el of root.querySelectorAll('*')) {
+    for (const { name, value } of [...el.attributes]) {
+      if (/^on/i.test(name) || (/^(href|src|action|formaction|xlink:href)$/i.test(name) && /^(javascript|vbscript|data:text.html)/i.test(value.trim()))) el.removeAttribute(name)
+    }
+  }
   root.querySelectorAll('a[href]').forEach((a) => a.setAttribute('href', abs(a.getAttribute('href'))))
   root.querySelectorAll('svg use').forEach((u) => {
     for (const name of ['href', 'xlink:href']) {
@@ -284,7 +290,7 @@ for (const href of page.blocked) {
 const escapeText = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;')
 const pageTitle = title || page.title || 'Page copy'
 let html = `<title>${escapeText(pageTitle)}</title>
-<style>${css}</style>
+<style>${css.replace(/<(?=\/style|!--)/gi, '\\3c ')}</style>
 <script>(() => {
   const set = (el, attrs) => { for (const [k, v] of Object.entries(attrs)) if (k !== 'style' || !el.getAttribute('style')) el.setAttribute(k, v) }
   set(document.documentElement, ${JSON.stringify(page.htmlAttrs).replaceAll('<', '\\u003c')})
