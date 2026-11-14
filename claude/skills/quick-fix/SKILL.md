@@ -239,6 +239,13 @@ reporter knows and you can't observe:
 
 When you ask, ask everything at once, with what you already found attached.
 
+**A product-rule question names where in the flow the rule applies.** A rule about what a
+user must have or do ("needs every account", "needs a card") applies at one point: signing,
+joining or going live, posting, paying. Each option says that point, or ask that first. Do
+not put your guess about it into every option. (2026-11-14: options for "creators sign
+without Facebook" all applied the rule at signing; Liam picked "require all", #10232 merged,
+then "they dont need any accounts to sign. Only to join the campaign"; reverted in #10352.)
+
 **An access refusal ("you don't have access") is not proof that the permission is right.**
 Before you hide an entry point to match a server gate, decide which permission the feature
 should follow: the one for the data it acts on (a post's video edits follow Posts access, not
