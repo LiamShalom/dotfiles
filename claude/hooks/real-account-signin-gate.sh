@@ -45,7 +45,7 @@ esac
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""')
 cwd=$(printf '%s' "$input" | jq -r '.cwd // ""')
 # Cheap exit: a mint for a specific person needs a uid-shaped literal (28 chars) or a minting call.
-printf '%s' "$cmd" | grep -qE '[A-Za-z0-9]{28}|createCustomToken|signInWithCustomToken|mint' || exit 0
+printf '%s' "$cmd" | grep -qE '[A-Za-z0-9]{20}|createCustomToken|create_custom_token|signInWithCustomToken|mint' || exit 0
 
 # The command plus any script it runs, so `node seed.mjs <uid>` is read like the script itself.
 text="$cmd"
@@ -53,9 +53,11 @@ for f in $(printf '%s' "$cmd" | grep -oE '[^[:space:]"'"'"'=]+\.(mjs|cjs|js|ts|m
   case "$f" in /*) p="$f" ;; *) p="$cwd/$f" ;; esac
   [ -f "$p" ] && text="$text"$'\n'"$(head -c 200000 "$p")"
 done
-printf '%s' "$text" | grep -qE 'createCustomToken|signInWithCustomToken|mint-id-token' || exit 0
+printf '%s' "$text" | grep -qE 'createCustomToken|create_custom_token|signInWithCustomToken|mint-id-token' || exit 0
 
-uids=$(printf '%s' "$text" | perl -nle 'print for /(?<![A-Za-z0-9])([A-Za-z0-9]{28})(?![A-Za-z0-9])/g' | grep -E '[0-9]' | grep -E '[A-Za-z]' | sort -u)
+# Firebase uids are not always 28 characters (LIVFRESH's is 20). The preload
+# firebase-mint-guard.cjs is the backstop for uids this text check cannot see.
+uids=$(printf '%s' "$text" | perl -nle 'print for /(?<![A-Za-z0-9])([A-Za-z0-9]{20,128})(?![A-Za-z0-9])/g' | grep -E '[0-9]' | grep -E '[a-z]' | grep -E '[A-Z]' | sort -u)
 [ -n "$uids" ] || exit 0
 
 # shellcheck disable=SC2086
@@ -66,7 +68,8 @@ real=$(printf '%s\n' "$result" | awk '$3 == "real" { print $1 " (" $2 ")" }')
 [ -n "$real" ] || exit 0
 
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:];])SIDESHIFT_REAL_ACCOUNT_OK=1([[:space:]]|$)'; then
-  if printf '%s' "$text" | grep -qiE "$nonprod"; then
+  # 127.0.0.1:9222 is the agent Chrome's DevTools port, which a prod repro script talks to.
+  if printf '%s' "${text//127.0.0.1:9222/}" | grep -qiE "$nonprod"; then
     deny "SIDESHIFT_REAL_ACCOUNT_OK does not cover a preview or local build. A real customer's session may only load https://app.sideshift.app (merged code). Real account: $real."
   fi
   mkdir -p "$lockdir"
