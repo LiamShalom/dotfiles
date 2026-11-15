@@ -21,8 +21,10 @@ try {
     let email = null;
     try {
       email = (await admin.auth().getUser(uid)).email ?? null;
-    } catch {
+    } catch (error) {
       // Not an auth user (a company or document id that only looks like a uid): nothing to sign in as.
+      // Any other failure exits 1 so the gate refuses.
+      if (error?.code !== 'auth/user-not-found') throw error;
       console.log(`${uid} - none`);
       continue;
     }
@@ -30,7 +32,8 @@ try {
     console.log(`${uid} ${email ?? '-'} ${test ? 'test' : 'real'}`);
   }
   process.exit(0);
-} catch (error) {
-  console.error(`lookup failed: ${error instanceof Error ? error.message : error}`);
+} catch {
+  // Fixed text: an error message here can quote the service-account JSON.
+  console.error('lookup failed (credentials or network)');
   process.exit(1);
 }

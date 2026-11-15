@@ -32,8 +32,8 @@ mcp__chrome-devtools__navigate_page|mcp__chrome-devtools__new_page)
   if [ -z "$url" ] && [ "$type" != "url" ]; then
     deny "This session holds a real customer's session ($(cat "$lock")). Reload/back/forward could land on a preview or local build. Navigate by an explicit https://app.sideshift.app URL instead."
   fi
-  if printf '%s' "$url" | grep -qiE "$nonprod"; then
-    deny "This session minted a real customer's session ($(cat "$lock")), so it may not open a preview or local build ($url). Those run unmerged code against production data: on 2026-11-14 loading the messaging-spaces preview as Triips' owner created a real channel with ~1,590 of their creators. Use https://app.sideshift.app only, or switch to a test account in a fresh session."
+  if ! printf '%s' "$url" | grep -qE '^(https://app\.sideshift\.app(/|\?|#|$)|about:blank$)'; then
+    deny "This session minted a real customer's session ($(cat "$lock")), so it may open only https://app.sideshift.app, not $url. Those run unmerged code against production data: on 2026-11-14 loading the messaging-spaces preview as Triips' owner created a real channel with ~1,590 of their creators. Use https://app.sideshift.app only, or switch to a test account in a fresh session."
   fi
   exit 0
   ;;
@@ -58,8 +58,8 @@ uids=$(printf '%s' "$text" | perl -nle 'print for /(?<![A-Za-z0-9])([A-Za-z0-9]{
 [ -n "$uids" ] || exit 0
 
 # shellcheck disable=SC2086
-if ! result=$(${REAL_ACCOUNT_LOOKUP:-node "$here/real-account-lookup.mjs"} $uids 2>&1); then
-  deny "Could not check whether the account you are minting a session for is a test account ($result). Use a test account through ~/.claude/bin/agent-signin.mjs instead."
+if ! result=$(${REAL_ACCOUNT_LOOKUP:-node "$here/real-account-lookup.mjs"} $uids 2>/dev/null); then
+  deny "Could not check whether the account you are minting a session for is a test account (lookup failed: credentials or network). Use a test account through ~/.claude/bin/agent-signin.mjs instead."
 fi
 real=$(printf '%s\n' "$result" | awk '$3 == "real" { print $1 " (" $2 ")" }')
 [ -n "$real" ] || exit 0

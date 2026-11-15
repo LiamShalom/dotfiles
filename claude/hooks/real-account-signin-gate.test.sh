@@ -54,6 +54,8 @@ expect allow 'override for a prod repro Liam asked for' "$(bash_json "SIDESHIFT_
 expect deny  '...then that session opens a preview' "$(nav_json https://sideshift-web-git-feat-messaging-spaces-side-shift.vercel.app/messages s3)"
 expect deny  '...or a local server' "$(nav_json http://localhost:3000/messages s3)"
 expect deny  '...or reloads (could be a preview tab)' "$(jq -nc '{tool_name:"mcp__chrome-devtools__navigate_page",session_id:"s3",tool_input:{type:"reload"}}')"
+expect deny  '...or a lookalike host' "$(nav_json https://app.sideshift.app.evil.example/x s3)"
+expect deny  '...or a preview on a custom domain' "$(nav_json https://staging.sideshift.app/messages s3)"
 expect allow '...but production is fine' "$(nav_json https://app.sideshift.app/messages s3)"
 
 if [ "${1:-}" = "--live" ]; then
