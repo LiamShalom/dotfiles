@@ -56,6 +56,7 @@ expect deny  '...or a local server' "$(nav_json http://localhost:3000/messages s
 expect deny  '...or reloads (could be a preview tab)' "$(jq -nc '{tool_name:"mcp__chrome-devtools__navigate_page",session_id:"s3",tool_input:{type:"reload"}}')"
 expect deny  '...or a lookalike host' "$(nav_json https://app.sideshift.app.evil.example/x s3)"
 expect deny  '...or a preview on a custom domain' "$(nav_json https://staging.sideshift.app/messages s3)"
+expect deny  '...or a preview hidden behind a newline' "$(nav_json $'https://sideshift-web-git-x.vercel.app/m\nhttps://app.sideshift.app/' s3)"
 expect allow '...but production is fine' "$(nav_json https://app.sideshift.app/messages s3)"
 
 if [ "${1:-}" = "--live" ]; then

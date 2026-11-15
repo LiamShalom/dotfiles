@@ -32,7 +32,8 @@ mcp__chrome-devtools__navigate_page|mcp__chrome-devtools__new_page)
   if [ -z "$url" ] && [ "$type" != "url" ]; then
     deny "This session holds a real customer's session ($(cat "$lock")). Reload/back/forward could land on a preview or local build. Navigate by an explicit https://app.sideshift.app URL instead."
   fi
-  if ! printf '%s' "$url" | grep -qE '^(https://app\.sideshift\.app(/|\?|#|$)|about:blank$)'; then
+  prod_re='^(https://app\.sideshift\.app([/?#][^[:cntrl:]]*)?|about:blank)$'
+  if [[ ! $url =~ $prod_re ]]; then
     deny "This session minted a real customer's session ($(cat "$lock")), so it may open only https://app.sideshift.app, not $url. Those run unmerged code against production data: on 2026-11-14 loading the messaging-spaces preview as Triips' owner created a real channel with ~1,590 of their creators. Use https://app.sideshift.app only, or switch to a test account in a fresh session."
   fi
   exit 0
