@@ -22,9 +22,12 @@ const TEST_EMAIL = [
   /^testingonboard[^@]*@gmail\.com$/i,
 ];
 const isTestEmail = (email) => Boolean(email) && TEST_EMAIL.some((re) => re.test(email));
+// Read once at start, so a script cannot turn them on for itself.
+const OVERRIDE = process.env.SIDESHIFT_REAL_ACCOUNT_OK === '1';
+const EMULATOR = Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
 
 async function guard(auth, uid) {
-  if (process.env.FIREBASE_AUTH_EMULATOR_HOST) return; // emulator accounts are never real customers
+  if (EMULATOR) return; // emulator accounts are never real customers
   let email;
   try {
     email = (await auth.getUser(uid)).email ?? null;
@@ -33,7 +36,7 @@ async function guard(auth, uid) {
     throw new Error('Refused createCustomToken: could not check whether this uid is a test account (lookup failed).');
   }
   if (isTestEmail(email)) return;
-  if (process.env.SIDESHIFT_REAL_ACCOUNT_OK === '1') {
+  if (OVERRIDE) {
     const sid = process.env.CLAUDE_CODE_SESSION_ID;
     if (sid) {
       const dir = process.env.REAL_ACCOUNT_LOCK_DIR || path.join(os.homedir(), '.cache', 'real-account-signin');

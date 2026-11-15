@@ -57,7 +57,7 @@ printf '%s' "$text" | grep -qE 'createCustomToken|create_custom_token|signInWith
 
 # Firebase uids are not always 28 characters (LIVFRESH's is 20). The preload
 # firebase-mint-guard.cjs is the backstop for uids this text check cannot see.
-uids=$(printf '%s' "$text" | perl -nle 'print for /(?<![A-Za-z0-9])([A-Za-z0-9]{20,128})(?![A-Za-z0-9])/g' | grep -E '[0-9]' | grep -E '[a-z]' | grep -E '[A-Z]' | sort -u)
+uids=$(printf '%s' "$text" | perl -nle 'print for /(?<![A-Za-z0-9])([A-Za-z0-9]{20,128})(?![A-Za-z0-9])/g' | grep -E '[0-9]' | grep -E '[A-Za-z]' | sort -u)
 [ -n "$uids" ] || exit 0
 
 # shellcheck disable=SC2086

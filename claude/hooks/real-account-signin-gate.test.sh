@@ -95,6 +95,9 @@ EOF
   [ "$got" = "refused refused minted" ] && echo "ok   LIVE preload: node refuses Triips + LIVFRESH, mints test brand" || { echo "FAIL LIVE preload node ($got)"; fail=1; }
   got=$(NODE_OPTIONS="$guard" /Users/liamshalom/sideshift-monorepo/node_modules/.bin/tsx "$tmp/run.mjs")
   [ "$got" = "refused refused minted" ] && echo "ok   LIVE preload: tsx too" || { echo "FAIL LIVE preload tsx ($got)"; fail=1; }
+  printf '%s\n' "process.env.SIDESHIFT_REAL_ACCOUNT_OK = '1';" "await import('./run.mjs');" >"$tmp/self-override.mjs"
+  got=$(NODE_OPTIONS="$guard" node "$tmp/self-override.mjs")
+  [ "$got" = "refused refused minted" ] && echo "ok   LIVE preload: a script cannot set the override for itself" || { echo "FAIL LIVE self-override ($got)"; fail=1; }
   got=$(node "$tmp/run.mjs")
   [ "$got" = "minted minted minted" ] && echo "ok   LIVE control: without the preload all three mint" || { echo "FAIL LIVE control ($got)"; fail=1; }
 fi
