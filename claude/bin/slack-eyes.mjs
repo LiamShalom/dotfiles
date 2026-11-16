@@ -291,6 +291,7 @@ async function listSet(file, { status, note }) {
         { row_id: job.rowId, column_id: c.note, rich_text: richText(note ?? '') },
       ]
       await slackJson('slackLists.items.update', { list_id: list.listId, cells })
+      updateJob(file, { rowStatus: status })
     } else {
       const reporter = reporterOf(job.hit.author)
       const fields = [
@@ -301,11 +302,50 @@ async function listSet(file, { status, note }) {
         ...(note ? [{ column_id: c.note, rich_text: richText(note) }] : []),
       ]
       const made = await slackJson('slackLists.items.create', { list_id: list.listId, initial_fields: fields })
-      updateJob(file, { rowId: made.item?.id ?? made.id })
+      updateJob(file, { rowId: made.item?.id ?? made.id, rowStatus: status })
     }
   } catch (error) {
     log('list_failed', { key: job.hit.key, status, error: String(error.message ?? error) })
   }
+}
+
+// Every ack the watcher can post, so a thread's ack is not taken for an answer.
+const knownAcks = () => {
+  let acks = DEFAULT_ACKS
+  try { acks = [...acksFromVoice(readFileSync(VOICE, 'utf8')), ...DEFAULT_ACKS] } catch {}
+  return new Set(acks.map((a) => a.trim().toLowerCase()))
+}
+
+// Whether the thread has its answer: Liam (by hand, or the automation posting as him) replied after
+// the :eyes: message with something other than the ack, and no other person posted after that reply.
+// The row follows this, not the session: a board chat often never reports back.
+export function isAnswered(thread, hitTs, acks) {
+  const after = thread.filter((m) => Number(m.ts) > Number(hitTs) && !m.subtype)
+  const replies = after.filter((m) => m.user === LIAM && !acks.has(String(m.text ?? '').trim().toLowerCase()))
+  if (!replies.length) return false
+  const last = latestTs(replies)
+  const later = after.filter((m) => Number(m.ts) > Number(last) && m.user !== LIAM && !m.bot_id && /^[UW][A-Z0-9]+$/.test(m.user ?? '') && m.user !== 'USLACKBOT')
+  // A closing "thanks" / "got it" with no question does not reopen it.
+  return !later.length || isThanks(later.at(-1).text)
+}
+export const isThanks = (text) => !String(text ?? '').includes('?') && /\b(thanks?|thank you|thx|ty|tysm|appreciate[sd]?|got it|makes sense|perfect|all good|works now|sounds good)\b/i.test(String(text ?? ''))
+
+// The row status for a job that is still unanswered.
+const rowStatusOf = (job) => ({ on_board: 'needs_you', handing_off: 'needs_you', board_waiting: 'waiting', waiting_reporter: 'waiting' })[job.status] ?? 'triaging'
+
+// An answered thread leaves the list (the job stays open: a later reply brings the row back).
+// An unanswered one has a row with its current status.
+async function syncRow(file, thread) {
+  const job = readJob(file)
+  if (isAnswered(thread, job.hit.ts, knownAcks())) {
+    if (job.rowId) {
+      await listRemove(file)
+      log('row_answered', { key: job.hit.key, name: job.name })
+    }
+    return
+  }
+  const status = rowStatusOf(job)
+  if (!job.rowId || job.rowStatus !== status) await listSet(file, { status, note: status === 'triaging' ? '' : job.question ?? '' })
 }
 
 // A finished job leaves the list.
@@ -573,6 +613,8 @@ async function pollOpen() {
   for (const file of jobFiles()) {
     let job
     try { job = readJob(file) } catch { continue }
+    // A job still being worked has a row too (jobs from before the list had none).
+    if (['running', 'handing_off'].includes(job.status) && !job.rowId) await listSet(file, { status: rowStatusOf(job) })
     if (!OPEN.includes(job.status) || !job.sessionId) continue
     if (isArchived(job, archive)) {
       updateJob(file, { status: 'archived', undelivered: null })
@@ -616,7 +658,10 @@ async function pollOpen() {
     const fresh = peopleAfter(thread, job.seenTs, reporterOf(job.hit.author))
     const messages = [...(job.undelivered ?? []), ...fresh].filter((m, i, all) => all.findIndex((o) => o.ts === m.ts) === i)
     updateJob(file, { seenTs: latestTs(thread) })
-    if (!messages.length) continue
+    if (!messages.length) {
+      await syncRow(file, thread)
+      continue
+    }
     if (fresh.length) log('thread_follow_up', { key: job.hit.key, messages: fresh.length, status: job.status, board: Boolean(job.boardId) })
     if (!job.boardId) {
       if ((job.turns ?? 0) >= MAX_TURNS) {
@@ -642,11 +687,13 @@ async function pollOpen() {
       }
       if (how === 'wait') {
         updateJob(file, { undelivered: messages })
-        if (fresh.length) await listSet(file, { status: 'needs_you', note: 'new message in the thread; it goes to the chat once the chat is idle' })
+        if (isAnswered(thread, job.hit.ts, knownAcks())) await syncRow(file, thread)
+        else if (fresh.length) await listSet(file, { status: 'needs_you', note: 'new message in the thread; it goes to the chat once the chat is idle' })
         continue
       }
       updateJob(file, { status: 'on_board', undelivered: null, deliveryFailures: 0 })
-      await listSet(file, { status: 'triaging', note: 'new message in the thread' })
+      if (isAnswered(thread, job.hit.ts, knownAcks())) await syncRow(file, thread)
+      else await listSet(file, { status: 'triaging', note: 'new message in the thread' })
       log('board_follow_up', { key: job.hit.key, how, messages: messages.length })
     } catch (error) {
       const failures = (job.deliveryFailures ?? 0) + 1
