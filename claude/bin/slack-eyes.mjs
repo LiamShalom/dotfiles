@@ -68,32 +68,40 @@ const log = (event, fields = {}) => {
 // Liam's user token, the one slack-as-liam uses. Called directly: the slack CLI sometimes stalls
 // for 30 s or more under launchd, which would delay the acknowledgement.
 let token
-const slack = async (method, params) => {
+// One Slack Web API call, tried up to 3 times. A runner sits in a minutes-long claude run between
+// calls, and the first POST after that goes out on a keep-alive socket Slack already closed, which
+// fetch does not retry ("fetch failed"). A 429 waits for its Retry-After.
+async function slackCall(method, contentType, body) {
   token ??= execFileSync('security', ['find-generic-password', '-s', 'claude-slack-user-token', '-w'], { encoding: 'utf8', timeout: 10_000 }).trim()
-  const response = await fetch(`https://slack.com/api/${method}`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])),
-    signal: AbortSignal.timeout(15_000),
-  })
-  const json = await response.json()
-  if (!json.ok) throw new Error(`${method}: ${json.error}`)
-  return json
+  for (let attempt = 1; ; attempt++) {
+    let response
+    try {
+      response = await fetch(`https://slack.com/api/${method}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': contentType },
+        body,
+        signal: AbortSignal.timeout(15_000),
+      })
+    } catch (error) {
+      if (attempt >= 3) throw error
+      await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt))
+      continue
+    }
+    if (response.status === 429 && attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(Number(response.headers.get('retry-after')) || 5, 60) * 1_000))
+      continue
+    }
+    const json = await response.json()
+    if (!json.ok) throw new Error(`${method}: ${json.error}`)
+    return json
+  }
 }
 
+const slack = (method, params) =>
+  slackCall(method, 'application/x-www-form-urlencoded', new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])))
+
 // The Lists API takes nested arguments, so JSON.
-const slackJson = async (method, body) => {
-  token ??= execFileSync('security', ['find-generic-password', '-s', 'claude-slack-user-token', '-w'], { encoding: 'utf8', timeout: 10_000 }).trim()
-  const response = await fetch(`https://slack.com/api/${method}`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15_000),
-  })
-  const json = await response.json()
-  if (!json.ok) throw new Error(`${method}: ${json.error}`)
-  return json
-}
+const slackJson = (method, body) => slackCall(method, 'application/json; charset=utf-8', JSON.stringify(body))
 
 const SIDESHIFT_TEAM = 'T0697U57YTY'
 
@@ -388,7 +396,9 @@ async function runJob(file) {
   for (;;) {
     // Everything up to now is known to the session (it reads the thread); later posts are new.
     let before = job.seenTs ?? '0'
-    try { before = latestTs(await threadOf(job)) } catch {}
+    try { before = latestTs(await threadOf(job)) } catch (error) {
+      log('thread_read_failed', { key: job.hit.key, when: 'before_turn', error: String(error.message ?? error) })
+    }
     job = updateJob(file, { turns: (job.turns ?? 0) + 1, pending: null })
     log('run_started', { key: job.hit.key, sessionId: job.sessionId, turn: job.turns, followUps: messages?.length ?? 0 })
     turn = headlessTurn(job, messages)
@@ -399,7 +409,9 @@ async function runJob(file) {
       const thread = await threadOf(job)
       fresh = peopleAfter(thread, before, reporterOf(job.hit.author))
       seenTs = latestTs(thread)
-    } catch {}
+    } catch (error) {
+      log('thread_read_failed', { key: job.hit.key, when: 'after_turn', error: String(error.message ?? error) })
+    }
     job = updateJob(file, { seenTs })
     if (turn.failure || !fresh.length || job.turns >= MAX_TURNS) break
     log('new_context', { key: job.hit.key, messages: fresh.length })
