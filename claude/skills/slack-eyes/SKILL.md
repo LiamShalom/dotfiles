@@ -133,6 +133,9 @@ What the reply says depends on the outcome:
 - **Fixed and deployed:** it is fixed, and what they do now (refresh, try again). Say
   "fixed" only after the production deploy is READY and you checked the fix there.
 - **Fix held for review:** you found it and a fix is on the way. Give no date.
+- **Held for Liam's decision (access, money, anything not a built fix):** only the proven facts.
+  Do not promise or hint at a next step ("looking into a way to…") that depends on his answer;
+  if he says no, the reply has promised the customer something that will not happen.
 - **Answer:** the answer, in one or two short sentences.
 - **Needs their input:** one specific question.
 - **Customer action:** what they must do.
