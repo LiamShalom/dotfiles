@@ -7,7 +7,11 @@ description: "Handle a Slack message that Liam marked with :eyes: from start to 
 
 Liam put :eyes: on a Slack message. The watcher already replied in its thread as Liam ("taking
 a look") and started this session. Your job: find out what the message needs, do it, and reply
-in the thread as Liam. Nobody will answer questions. Finish the whole job.
+in the thread as Liam. Finish the whole job without asking.
+
+This session is a row in Session Board. It starts as `eyes: <first words of the message>`, and the
+session-namer mod soon renames it to `#channel sender · topic`. Liam sees it there, and the board notifies him when the session ends its turn on a question ("Needs you").
+That is how you reach him: never through Slack.
 
 ## What the :eyes: approves, and what it does not
 
@@ -111,15 +115,19 @@ Check that the output has `"ok":true`. Post one reply, not a running commentary.
 
 ## 6. Tell Liam when something is held
 
-When step 4 held a merge or a repair, or you could not prove the cause, send Liam a Slackbot
-reminder. A message to his own DM would not notify him.
+When step 4 held a merge or a repair, or you could not prove the cause, end your turn on the
+one question Liam must answer. Session Board then shows the session under "Needs you" and
+notifies him. Put above the question, in a few lines: the message link, what you found, the PR
+link or the repair command, and the reply you already posted. Stay in the session: Liam answers
+in its tile, and you carry on from his answer (merge, run the repair, post a follow-up in the
+thread).
 
-```sh
-~/.claude/bin/slack-as-liam reminders.add text="<summary>" time="in 1 minute"
-```
+For a held UI change, show Liam the change before you ask: follow the UI-approval step in
+`~/.claude/CLAUDE.md` (a clickable copy of the changed page, opened in the board pane with
+`board-browser.mjs`).
 
-Write it in 2-4 lines: the message link, what you found, the PR link or the repair command, and
-the one thing he must decide. Send nothing when everything merged and the reply went out.
+When everything merged and the reply went out, end with the short report in step 7 and no
+question.
 
 ## 7. Finish
 
