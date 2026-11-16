@@ -37,7 +37,7 @@ async function guard(auth, uid) {
   }
   if (isTestEmail(email)) return;
   if (OVERRIDE) {
-    const sid = process.env.CLAUDE_CODE_SESSION_ID;
+    const sid = process.env.CLAUDE_CODE_SESSION_ID || process.env.CODEX_THREAD_ID;
     if (sid) {
       const dir = process.env.REAL_ACCOUNT_LOCK_DIR || path.join(os.homedir(), '.cache', 'real-account-signin');
       fs.mkdirSync(dir, { recursive: true });

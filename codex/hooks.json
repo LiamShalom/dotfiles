@@ -1,5 +1,5 @@
 {
-  "description": "Cap Vitest workers and queue heavy jobs (claude/hooks/heavy-gate.sh), same as Claude Code.",
+  "description": "Queue heavy jobs and check completion evidence before Codex stops.",
   "hooks": {
     "PreToolUse": [
       {
@@ -9,6 +9,24 @@
             "type": "command",
             "command": "bash \"$HOME/.claude/hooks/heavy-gate.sh\" --codex",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/hooks/real-account-signin-gate.sh\"",
+            "timeout": 20,
+            "statusMessage": "Checking for a real-customer sign-in"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.codex/hooks/finish-gate.mjs\"",
+            "timeout": 180,
+            "statusMessage": "Checking completion evidence"
           }
         ]
       }
