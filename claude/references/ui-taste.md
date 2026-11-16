@@ -310,3 +310,6 @@ buttons around it.
   Later 11-11: "put the switcher across the top for the different platforms" -> built as SlidingTabs pill layout (logo, name, count; count red while one needs setup), one platform's cards at a time. Long stacked lists of cards want a switcher, not a scroll.
   Later 11-12: "No need to have the text for each just show the logos" -> platform switcher tabs are logos only (name + counts stay as the spoken name). A row of well-known brand logos needs no labels.
 - 11-14 SideChat "Reply to" share: the plain range input (components/ui/slider.tsx, thin 8px track + blue dot) was rejected: "I don't like the slider component". For a few fixed choices use components/ui/stepped-slider.tsx (Sidekick's model-picker pill: 24px track, a white dot per stop, white thumb that settles on a stop). Reach for it before the plain Slider whenever the values are discrete.
+
+- 11-16 Jobs-moved popup: a three-row explainer was "too much text"; the fix was title + one sentence + the real job card (SideShift's listing) on its own. A card nested inside a drawn mini page "looks formatted awkwardly": show the real component bare.
+- 11-16 Campaign page: replacing Pay structure, Campaign rules and Contracts with a trimmed "Campaign details" card "removed a whole important section". Keep those three live-page cards; they belong on both the Overview and the Brief tab.
