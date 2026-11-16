@@ -49,6 +49,7 @@ const RESULT_SCHEMA = JSON.stringify({
     name: { type: 'string', description: '"<brand>: <issue in 2-5 words>", lowercase' },
     summary: { type: 'string' },
     question: { type: 'string', description: 'needs_liam: the one thing Liam must answer. needs_reporter: the question you posted in the thread' },
+    hold_reason: { type: 'string', enum: ['large_merge_held', 'only_liam_can', 'cause_unproven'], description: 'needs_liam only: large_merge_held = a large feature or large UI merge; only_liam_can = a sign-in, 2FA or card that agent-login cannot supply, or an account owner action; cause_unproven = full investigation done and the cause is still not proven. Doing what the message asks (add a member, grant access, change a role or setting, a repair, a refund) is none of these: do it and return done' },
   },
   required: ['status', 'name', 'summary'],
 })
@@ -373,8 +374,14 @@ function handOff(file, { reason, failure, question, summary }) {
 }
 
 // One turn of the job's headless session: the first prompt, or new thread messages on a resume.
-function headlessTurn(job, messages) {
-  const input = messages
+// A needs_liam with no held step named is the run asking permission the :eyes: already gave.
+export const HOLD_REASONS = ['large_merge_held', 'only_liam_can', 'cause_unproven']
+export const notAHoldPrompt = `You returned needs_liam without a hold_reason from the list. Liam's :eyes: is his approval to do what the message asks: adding a member, granting access, changing a role or a setting, fixing the requester's own account. Do it now, verify it, reply in the thread, and return done. Return needs_liam again only with a hold_reason that applies.`
+
+function headlessTurn(job, messages, text) {
+  const input = text
+    ? ['-p', text, '--resume', job.sessionId]
+    : messages
     ? ['-p', followUpPrompt(messages, job.permalink), '--resume', job.sessionId]
     : ['-p', prompt(job.hit, job.permalink), '--session-id', job.sessionId]
   const run = claude([...input, '--dangerously-skip-permissions', '--output-format', 'json', '--json-schema', RESULT_SCHEMA], RUN_TIMEOUT_MS)
@@ -402,6 +409,11 @@ async function runJob(file) {
     job = updateJob(file, { turns: (job.turns ?? 0) + 1, pending: null })
     log('run_started', { key: job.hit.key, sessionId: job.sessionId, turn: job.turns, followUps: messages?.length ?? 0 })
     turn = headlessTurn(job, messages)
+    if (turn.out?.status === 'needs_liam' && !HOLD_REASONS.includes(turn.out.hold_reason) && job.turns < MAX_TURNS) {
+      log('hold_refused', { key: job.hit.key, question: turn.out.question })
+      job = updateJob(file, { turns: job.turns + 1 })
+      turn = headlessTurn(job, null, notAHoldPrompt)
+    }
     if (turn.out?.name?.trim()) job = updateJob(file, { name: turn.out.name.trim() })
     let fresh = []
     let seenTs = before
