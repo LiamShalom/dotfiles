@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: install.sh replaces __HOME__ and loads it. See claude/bin/slack-eyes.mjs.
+     Pause: touch ~/.claude/state/slack-eyes.PAUSED -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.sideshift.slack-eyes</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/env</string>
+		<string>node</string>
+		<string>__HOME__/.claude/bin/slack-eyes.mjs</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>HOME</key>
+		<string>__HOME__</string>
+	</dict>
+	<key>StartInterval</key>
+	<integer>30</integer>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>__HOME__/.claude/logs/slack-eyes.launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>__HOME__/.claude/logs/slack-eyes.launchd.log</string>
+</dict>
+</plist>

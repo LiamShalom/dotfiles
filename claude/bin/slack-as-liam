@@ -10,6 +10,8 @@ set -euo pipefail
 # Only the methods needed to send as Liam; anything else (admin calls) is refused.
 case "${1:-}" in
   chat.postMessage|chat.scheduleMessage|chat.update|chat.delete|reactions.add|reactions.remove|conversations.open|users.lookupByEmail|auth.test|files.delete|upload) ;;
+  # slack-eyes tells Liam about held work with a Slackbot reminder: a DM to himself does not notify.
+  reminders.add) ;;
   *) echo "slack-as-liam: method '${1:-}' is not allowed" >&2; exit 2 ;;
 esac
 
