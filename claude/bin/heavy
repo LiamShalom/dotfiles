@@ -69,6 +69,14 @@ if [ -x "$HOME/.claude/bin/disk-guard" ]; then
 	"$HOME/.claude/bin/disk-guard" "$DISK_LEVEL" || exit 1
 fi
 
+DIR="/tmp/agent-heavy-$(id -u)"
+# Present while this job waits for memory or a slot, gone once it starts:
+# Session Board keeps a chat whose task only waits here in Working, not in
+# Needs you once it has waited an hour.
+queued="$DIR/queued.$$"
+mkdir -p "$DIR" 2>/dev/null && : > "$queued" 2>/dev/null
+trap 'rm -f "$queued"' EXIT
+
 # Wait for free memory, at most MEM_WAIT seconds; after that run anyway, so a
 # machine that stays full never blocks every agent for good.
 MEM_WAIT="${HEAVY_MEM_WAIT_SECS:-900}"
@@ -84,11 +92,11 @@ while :; do
 	sleep 10
 	waited=$((waited + 10))
 done
-DIR="/tmp/agent-heavy-$(id -u)"
 started="$DIR/started.$$"
 
 unqueued() {
 	echo "heavy: cannot use the job slots in $DIR; running without the queue" >&2
+	rm -f "$queued"
 	exec "$@"
 }
 mkdir -p "$DIR" 2>/dev/null && [ -w "$DIR" ] || unqueued "$@"
@@ -99,7 +107,7 @@ while :; do
 		rm -f "$started"
 		# lockf exits 75 when the slot is busy; the marker file tells that apart
 		# from the job itself exiting 75.
-		lockf -s -t 0 "$DIR/$POOL.$i" /bin/sh -c ': > "$1"; shift; exec "$@"' sh "$started" "$@"
+		lockf -s -t 0 "$DIR/$POOL.$i" /bin/sh -c ': > "$1"; rm -f "$2"; shift 2; exec "$@"' sh "$started" "$queued" "$@"
 		rc=$?
 		if [ -e "$started" ]; then
 			rm -f "$started"
