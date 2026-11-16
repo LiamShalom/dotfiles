@@ -120,7 +120,8 @@ What the reply says depends on the outcome:
 Every fact in the reply must match your evidence.
 
 Start the reply by tagging the person who raised the issue: the author of the message Liam put
-:eyes: on, as `<@USERID>` (its `user` field). The watcher's first reply tagged them too. Do not
+:eyes: on, as `<@USERID>`. The watcher's prompt names them on its "Tag in your answer" line. Only this reply tags them: the watcher's
+"taking a look" does not. Do not
 tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a message with a `bot_id`
 or the subtype `bot_message` came from an app, so tag nobody. Send it:
 

@@ -108,9 +108,9 @@ export function eyesItems(items) {
     }))
 }
 
-// Tags the person who raised the issue (the author of the :eyes: message), never Liam or a bot.
-export function withMention(author, text) {
-  return author && author !== LIAM && author !== 'USLACKBOT' && /^[UW][A-Z0-9]+$/.test(author) ? `<@${author}> ${text}` : text
+// The person the answer tags: the author of the :eyes: message, never Liam, Slackbot or a bot.
+export function reporterOf(author) {
+  return author && author !== LIAM && author !== 'USLACKBOT' && /^[UW][A-Z0-9]+$/.test(author) ? author : null
 }
 
 // The Session Board row name (fallback when the run gives none): the message's first words, so Liam can tell the runs apart.
@@ -142,6 +142,7 @@ Message: ${permalink}
 Channel: ${hit.channel}
 Message ts: ${hit.ts}
 Thread ts (reply here): ${hit.threadTs}
+Tag in your answer: ${reporterOf(hit.author) ? `<@${reporterOf(hit.author)}> (the person who raised it)` : 'nobody (Liam, a bot, or no person)'}
 
 ${headless
     ? 'This run is headless: it is not on Session Board, and nobody sees it until it ends. Work without asking. When the skill says to hold something for Liam, stop there and return status "needs_liam" with your question; the watcher then puts this session on Session Board for him.'
@@ -311,7 +312,8 @@ async function main() {
     if (dryRun) { log('would_handle', { key: hit.key, threadTs: hit.threadTs, ack }); continue }
     writeState(state)
     try {
-      await slack('chat.postMessage', { channel: hit.channel, thread_ts: hit.threadTs, text: withMention(hit.author, ack) })
+      // No tag here: only the real answer tags the person who raised the issue (the skill's step 5).
+      await slack('chat.postMessage', { channel: hit.channel, thread_ts: hit.threadTs, text: ack })
       log('acked', { key: hit.key, ack })
     } catch (error) {
       log('ack_failed', { key: hit.key, error: String(error.message ?? error) })
