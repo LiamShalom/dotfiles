@@ -9,11 +9,12 @@ Liam put :eyes: on a Slack message. The watcher already replied in its thread as
 a look") and started this session. Your job: find out what the message needs, do it, and reply
 in the thread as Liam. Finish the whole job without asking.
 
-**How Liam sees this session.** The watcher runs it headless (`claude -p`): nobody sees it
-while it works. When it ends, it returns a result (step 7). A `done` result stays out of sight.
-A `needs_liam` result makes the watcher resume this same session in the background, so it
-appears in Session Board named by your `name`, and asks Liam your question there. Never reach
-Liam through Slack.
+**How Liam sees this session.** The watcher runs it headless (`claude -p`). Session Board
+leaves headless runs off the board, so nobody sees it while it works. When it ends, it returns
+a result (step 7). A `done` result stays out of sight. A `needs_liam` result, or a run that
+stops early, makes the watcher resume this same session in the background. Then it is a
+Session Board row named by your `name`, and the watcher sends it one more turn: brief Liam and
+end on the question. Never reach Liam through Slack.
 
 If this session was started some other way (Liam typed `/slack-eyes`, or it is already a
 Session Board row), Liam is watching: end your turn on the question instead of returning.
@@ -120,7 +121,8 @@ Every fact in the reply must match your evidence.
 
 Start the reply by tagging the person who raised the issue: the author of the message Liam put
 :eyes: on, as `<@USERID>` (its `user` field). The watcher's first reply tagged them too. Do not
-tag Liam (in his self-DM there is nobody to tag) or a bot. Send it:
+tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a message with a `bot_id`
+or the subtype `bot_message` came from an app, so tag nobody. Send it:
 
 ```sh
 ~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"
@@ -135,14 +137,15 @@ when the only safe next step is his. Do everything up to that point first: post 
 reply (step 5), and have the PR ready or the repair dry-run done. Then return `needs_liam`
 (step 7) with the one question he must answer. Do not wait or poll for him.
 
-When Liam opens the session, he sees it in Session Board, where the watcher asks you to brief
-him. Then give him, in a few lines, the message link, what you found, the PR link or the repair
-command, and the reply you posted. End your turn on the question, and carry on from his answer:
-merge, run the repair, or post a follow-up in the thread.
+After you return, the watcher moves this session onto the board and sends you one more turn.
+In it, give Liam, in a few lines, the message link, what you found, the PR link or the repair
+command, and the reply you posted. End that turn on the question: the board shows the session
+under "Needs you" and notifies him. Carry on from his answer: merge, run the repair, or post a
+follow-up in the thread.
 
 For a held UI change, prepare the approval page that `~/.claude/CLAUDE.md` describes (a clickable
 copy of the changed page) before you return. Open it in the board pane with `board-browser.mjs`
-once Liam is in the session.
+in that last turn, before the question.
 
 ## 7. Finish
 
