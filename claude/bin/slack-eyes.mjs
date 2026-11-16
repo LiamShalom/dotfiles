@@ -154,7 +154,9 @@ const startJob = (hit, permalink) => {
   child.unref()
 }
 
-const claude = (argv, timeout) => spawnSync(CLAUDE, argv, {
+// Every run, headless or on the board, is Opus at medium effort.
+const MODEL_ARGS = ['--model', 'opus', '--effort', 'medium']
+const claude = (argv, timeout) => spawnSync(CLAUDE, [...argv, ...MODEL_ARGS], {
   cwd: REPO, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, PATH: CHILD_PATH },
 })
