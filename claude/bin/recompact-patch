@@ -1,0 +1,96 @@
+#!/bin/bash
+# Keep Liam's local patch on the segment-recompact plugin across its auto-updates.
+#
+# The patch (../recompact/quiet-twins.patch) makes a compacted session keep its exact title
+# (no " (recompact N)" suffix) and writes the long orientation note and ledger as hidden
+# records: the model still reads them, the screen does not show them.
+#
+# The plugin's launcher runs `<plugin root>/target/release/recompact` when it exists, so this
+# builds the patched binary there for the installed plugin version. Until it is built, the
+# stock binary runs.
+#
+#   recompact-patch          build now if the installed version lacks the patched binary
+#   recompact-patch --hook   SessionStart hook: cheap check, builds in the background
+#   recompact-patch --force  rebuild even if a patched binary is present
+set -u
+
+DOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PATCH="$DOT/recompact/quiet-twins.patch"
+WORK="$HOME/.claude/recompact/patched"
+LOG="$HOME/.claude/logs/recompact-patch.log"
+mode="${1:-}"
+
+root="$(sed -n 's/.*"installPath": *"\([^"]*segment-recompact[^"]*\)".*/\1/p' \
+  "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null | head -n 1)"
+[ -n "$root" ] && [ -d "$root/src" ] && [ -f "$PATCH" ] || exit 0
+
+stamp="$(shasum -a 256 "$PATCH" | cut -c1-16)"
+bin="$root/target/release/recompact"
+version="$(basename "$root")"
+failed="$WORK/failed-$version-$stamp"
+
+if [ "$mode" != "--force" ] && [ -x "$bin" ] && [ "$(cat "$bin.patch" 2>/dev/null)" = "$stamp" ]; then
+  exit 0
+fi
+
+if [ "$mode" = "--hook" ]; then
+  if [ -e "$failed" ]; then
+    # Say it once per version, then stay quiet.
+    if [ ! -e "$failed.told" ]; then
+      touch "$failed.told"
+      printf '{"systemMessage":"recompact %s: the local quiet-twins patch did not apply, so compacted sessions are renamed and show the orientation note again. See %s"}\n' \
+        "$version" "$LOG"
+    fi
+    exit 0
+  fi
+  mkdir -p "$(dirname "$LOG")"
+  nohup "$0" >>"$LOG" 2>&1 </dev/null &
+  exit 0
+fi
+
+mkdir -p "$WORK" "$(dirname "$LOG")"
+lock="$WORK/lock"
+if ! mkdir "$lock" 2>/dev/null; then
+  # Another build is running; a lock older than 30 minutes is stale.
+  if [ -n "$(find "$lock" -maxdepth 0 -mmin +30 2>/dev/null)" ]; then
+    rm -rf "$lock"
+    mkdir "$lock" 2>/dev/null || exit 0
+  else
+    exit 0
+  fi
+fi
+trap 'rm -rf "$lock"' EXIT
+
+echo "$(date '+%F %T') building patched recompact $version"
+tree="$WORK/src-$version"
+rm -rf "$tree"
+mkdir -p "$tree"
+cp -R "$root/src" "$root/Cargo.toml" "$root/Cargo.lock" "$tree/"
+
+if ! patch -d "$tree" -p1 -F2 --no-backup-if-mismatch --forward -s <"$PATCH"; then
+  echo "patch did not apply to $version"
+  touch "$failed"
+  exit 1
+fi
+# A fuzzy apply can land in the wrong place: check the three changes are where they belong.
+if ! grep -q '"customTitle": base,' "$tree/src/lib.rs" ||
+  [ "$(grep -c '"isMeta": true,' "$tree/src/lib.rs")" -lt 2 ]; then
+  echo "patch applied to $version but the result is not the expected code"
+  touch "$failed"
+  exit 1
+fi
+
+if ! (cd "$tree" && CARGO_TARGET_DIR="$WORK/target" cargo build --release -q); then
+  # Not marked failed: a build can fail for a passing reason (no network), so the next
+  # session start tries again.
+  echo "cargo build failed for $version"
+  exit 1
+fi
+
+# New inode, then rename: macOS kills an executable overwritten in place after it has run.
+mkdir -p "$(dirname "$bin")"
+cp "$WORK/target/release/recompact" "$bin.new.$$"
+chmod +x "$bin.new.$$"
+mv -f "$bin.new.$$" "$bin"
+echo "$stamp" >"$bin.patch"
+echo "$(date '+%F %T') installed $bin"

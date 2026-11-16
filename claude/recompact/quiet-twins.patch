@@ -1,0 +1,174 @@
+diff --git a/src/brief.rs b/src/brief.rs
+index 9356fa2..a5229f5 100644
+--- a/src/brief.rs
++++ b/src/brief.rs
+@@ -617,33 +617,24 @@ pub fn format_utc(secs: i64) -> String {
+     )
+ }
+ 
+-/// The newest twin in `transcript`'s project dir whose custom title is `title`.
++/// The newest twin in `transcript`'s project dir whose custom title is `title`. Twins keep their
++/// session's plain title, so only the newest transcripts are read: a fork's twin is the session
++/// that was just open.
+ fn twin_by_title(transcript: &str, title: &str) -> Option<String> {
+-    if !title.contains("(recompact") {
+-        return None;
+-    }
+     let dir = Path::new(transcript).parent()?;
+     let needle = serde_json::to_string(&json!({ "customTitle": title })).ok()?;
+     let needle = needle.trim_start_matches('{').trim_end_matches('}');
+-    let mut best: Option<(std::time::SystemTime, String)> = None;
+-    for e in std::fs::read_dir(dir).ok()?.flatten() {
+-        let p = e.path();
+-        if p.extension().and_then(|x| x.to_str()) != Some("jsonl") {
+-            continue;
+-        }
+-        let Ok(t) = e.metadata().and_then(|m| m.modified()) else {
+-            continue;
+-        };
+-        if best.as_ref().is_some_and(|(bt, _)| *bt >= t) {
+-            continue;
+-        }
+-        if let Ok(raw) = std::fs::read_to_string(&p) {
+-            if raw.contains(needle) && raw.contains("\"recompactPreamble\"") {
+-                best = Some((t, raw));
+-            }
+-        }
+-    }
+-    best.map(|(_, raw)| raw)
++    let mut files: Vec<(std::time::SystemTime, std::path::PathBuf)> = std::fs::read_dir(dir)
++        .ok()?
++        .flatten()
++        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("jsonl"))
++        .filter_map(|e| Some((e.metadata().and_then(|m| m.modified()).ok()?, e.path())))
++        .collect();
++    files.sort_by(|a, b| b.0.cmp(&a.0));
++    files.into_iter().take(40).find_map(|(_, p)| {
++        let raw = std::fs::read_to_string(&p).ok()?;
++        (raw.contains(needle) && raw.contains("\"recompactPreamble\"")).then_some(raw)
++    })
+ }
+ 
+ /// SessionStart hook body. Silent (no output) unless the session being resumed is a twin.
+@@ -657,7 +648,7 @@ pub fn session_start_context(input: &Value) -> Option<String> {
+     let raw = match std::fs::read_to_string(path) {
+         Ok(r) if r.contains("\"recompactPreamble\"") => r,
+         // A fork's transcript is not written until its first turn, after this hook runs; the
+-        // session title (a twin's carries "(recompact N)") names the twin it was forked from.
++        // session title names the twin it was forked from.
+         _ => twin_by_title(path, input.get("session_title").and_then(|v| v.as_str())?)?,
+     };
+     let records: Vec<Value> = raw
+@@ -744,7 +735,7 @@ pub fn session_start_context(input: &Value) -> Option<String> {
+     }
+     if since.is_empty() {
+         lines.push(
+-            "The final assistant message is the orientation note: read its \"State when compacted\" list before acting. \
++            "The last message before this resume is the orientation note: read its \"State when compacted\" list before acting. \
+              Summaries and that list are a snapshot: re-check anything external (PRs, deploys, database rows, running jobs) \
+              before relying on it. For an exact detail a summary dropped, call the recall tool (query= to search, selector= for a marker) \
+              instead of re-running the work."
+diff --git a/src/lib.rs b/src/lib.rs
+index 03f5d3f..c5e4fed 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -2443,9 +2443,9 @@ fn ledger_collapse_warning(records: &[Value], new_ledger: &str) {
+     }
+ }
+ 
+-/// The session's display title, carried to the twin with a generation suffix. Twins used to carry
+-/// none, so `claude --resume "<title>"` silently reopened the uncompacted original.
+-fn title_record(records: &[Value], new_session: &str, generation: u64) -> Option<Value> {
++/// The session's display title, carried to the twin unchanged so compaction never renames a
++/// session. A " (recompact N)" suffix left by an older build is stripped.
++fn title_record(records: &[Value], new_session: &str, _generation: u64) -> Option<Value> {
+     let title = records.iter().rev().find_map(|r| match rec_type(r) {
+         "custom-title" => r.get("customTitle").and_then(|v| v.as_str()),
+         "agent-name" => r.get("agentName").and_then(|v| v.as_str()),
+@@ -2458,17 +2458,22 @@ fn title_record(records: &[Value], new_session: &str, generation: u64) -> Option
+             .find(|r| rec_type(r) == "ai-title")
+             .and_then(|r| r.get("aiTitle").and_then(|v| v.as_str()))
+     })?;
+-    let base = match title.rfind(" (recompact") {
+-        Some(i) if title.ends_with(')') => &title[..i],
+-        _ => title,
+-    };
++    let base = strip_recompact_suffix(title);
+     Some(json!({
+         "type": "custom-title",
+-        "customTitle": format!("{base} (recompact {generation})"),
++        "customTitle": base,
+         "sessionId": new_session,
+     }))
+ }
+ 
++/// A title without the " (recompact N)" suffix older builds added.
++fn strip_recompact_suffix(title: &str) -> &str {
++    match title.rfind(" (recompact") {
++        Some(i) if title.ends_with(')') => &title[..i],
++        _ => title,
++    }
++}
++
+ /// The session's `/rename` name and `/color`, carried to the twin unchanged. Claude Code restores
+ /// both from the resumed session's own records, so a twin without them lost its prompt-bar label
+ /// and color.
+@@ -2483,6 +2488,7 @@ fn identity_records(records: &[Value], new_session: &str) -> Vec<Value> {
+                 .and_then(|r| r.get(field))
+                 .and_then(|v| v.as_str())
+                 .filter(|v| !v.is_empty())?;
++            let value = strip_recompact_suffix(value);
+             Some(json!({ "type": kind, field: value, "sessionId": new_session }))
+         })
+         .collect()
+@@ -2854,11 +2860,13 @@ fn run_assemble(args: &[String]) -> Result<Option<(String, PathBuf)>, i32> {
+         constraints: constraint_lane(&records),
+         last_check: last_check(&records),
+     });
++    // A meta user record: the model reads it, the screen does not show it.
+     let preamble = json!({
+         "parentUuid": Value::Null,
+         "isSidechain": false,
+         "userType": "external",
+-        "type": "assistant",
++        "type": "user",
++        "isMeta": true,
+         "uuid": uuid_v4(),
+         // Last record, so it carries the latest timestamp in the file (the `last-prompt` tail
+         // has none) — a first-record timestamp here would read as out-of-order history.
+@@ -2874,11 +2882,7 @@ fn run_assemble(args: &[String]) -> Result<Option<(String, PathBuf)>, i32> {
+         "recompactSnapshot": snapshot.clone().unwrap_or(Value::Null),
+         "recompactCalibration": profile.stamp(),
+         "message": {
+-            "id": format!("msg_recompact_{}", uuid_v4().replace('-', "")),
+-            "role": "assistant",
+-            "model": model,
+-            "type": "message",
+-            "stop_reason": "end_turn",
++            "role": "user",
+             "content": [{ "type": "text", "text": preamble_text }]
+         }
+     });
+@@ -2907,7 +2911,8 @@ fn run_assemble(args: &[String]) -> Result<Option<(String, PathBuf)>, i32> {
+             "parentUuid": Value::Null,
+             "isSidechain": false,
+             "userType": "external",
+-            "type": "assistant",
++            "type": "user",
++            "isMeta": true,
+             "uuid": uuid_v4(),
+             "timestamp": ts,
+             "sessionId": new_session,
+@@ -2916,11 +2921,7 @@ fn run_assemble(args: &[String]) -> Result<Option<(String, PathBuf)>, i32> {
+             "version": version,
+             "recompactLedger": true,
+             "message": {
+-                "id": format!("msg_recompact_{}", uuid_v4().replace('-', "")),
+-                "role": "assistant",
+-                "model": model,
+-                "type": "message",
+-                "stop_reason": "end_turn",
++                "role": "user",
+                 "content": [{ "type": "text", "text": format!("Standing constraints, corrections, and decisions for this session (recompact ledger; supersedes any earlier ledger):\n{text}") }]
+             }
+         })
