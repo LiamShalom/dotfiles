@@ -56,13 +56,21 @@ its whole thread, the channel around it, and every file. Read with the Slack MCP
 Write down who asked, whether they are internal or external (Slack Connect), and what they
 actually need.
 
+**The thread keeps moving while you work.** People add context, answer each other, or post a
+new detail. Read the thread again before each big step: before you settle on a cause, before
+you fix, before you merge, and before you reply. Use what is new. If a later turn starts with
+"New messages in the Slack thread", read them as context or as answers, and carry on from where
+you were.
+
 ## 2. Decide what the message needs
 
 - **A question** (how does X work, where do I click, what does this mean): find the answer
   in the code and the data, prove it, and go to step 5.
 - **A problem** (something is broken, wrong, missing, stuck): investigate it. Go to step 3.
 - **A change request** (copy, a small tweak): go to step 4.
-- **Nothing for Liam** (already answered, an FYI, a joke): post nothing more. Go to step 6.
+- **Nothing for Liam** (already answered, an FYI, a joke): post nothing more. Go to step 7.
+- **Not enough to go on** (no account named, no screenshot of the error, an unclear ask), and
+  your own lookups cannot fill the gap: ask the reporter (step 5b).
 
 ## 3. Investigate
 
@@ -131,6 +139,15 @@ or the subtype `bot_message` came from an app, so tag nobody. Send it:
 
 Check that the output has `"ok":true`. Post one reply, not a running commentary.
 
+## 5b. Ask the reporter for more
+
+When you need a fact only the reporter has, first try to find it yourself: look the account up
+by name, email, handle, company, or a screenshot detail. If you still cannot, ask in the thread,
+as Liam, in his voice, tagging the reporter: one short message with the one or two things you
+need (for example "whats her email or handle on sideshift"). Then return `needs_reporter` with
+that question (step 7). Do not wait or poll. The watcher reads the thread and resumes you with
+their reply. Ask again only for something new; never repeat a question already in the thread.
+
 ## 6. When something needs Liam
 
 Liam is needed when step 4 held a merge or a repair, when you could not prove the cause, or
@@ -154,8 +171,21 @@ Clean up what you started (dev servers, tabs, test records), as `~/.claude/CLAUD
 Then return the result the watcher asks for:
 
 - `status`: `done` when the job is finished (the reply went out, any fix merged and deployed,
-  or nothing was needed). `needs_liam` when step 6 applies.
+  or nothing was needed). `needs_liam` when step 6 applies. `needs_reporter` after you asked
+  the reporter something (step 5b).
 - `name`: `<brand>: <issue>`, as defined at the top.
 - `summary`: two or three sentences: the cause, the PR and whether it merged, and the reply
   you posted.
-- `question`: for `needs_liam`, the one thing Liam must answer.
+- `question`: for `needs_liam`, the one thing Liam must answer; for `needs_reporter`, the
+  question you posted.
+
+## Liam's to-do list
+
+Every :eyes: job has a row in Liam's "Eyes triage" Slack List: Triaging, Needs you, or Waiting
+on reporter, with the thread link and a note. In a headless run the watcher keeps the row from
+your result, and removes it when you return `done`. In a Session Board session you keep it
+yourself, with the job key from your first prompt:
+
+- the job is finished: `~/.claude/bin/slack-eyes.mjs --set <job key> done`
+- you asked the reporter something: `~/.claude/bin/slack-eyes.mjs --set <job key> waiting "<question>"`.
+  The watcher then marks the row "Needs you" when they reply, and you carry on when Liam tells you.
