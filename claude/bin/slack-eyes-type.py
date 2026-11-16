@@ -7,6 +7,7 @@
 import fcntl
 import os
 import pty
+import re
 import select
 import signal
 import struct
@@ -81,8 +82,11 @@ else:
 if b'has exited' in output:
     done(1, 'the session has exited')
 
-# Newlines become ESC CR, which Claude Code reads as a line break inside one prompt.
-os.write(fd, text.replace('\r\n', '\n').replace('\n', '\x1b\r').encode('utf8'))
+# The prompt carries Slack text other people wrote: every control character except the newline is
+# dropped, so nothing in it reaches the session as a key (Enter, Escape, a mode switch). Newlines
+# become ESC CR, which Claude Code reads as a line break inside one prompt.
+clean = re.sub(r'[\x00-\x09\x0b-\x1f\x7f\x80-\x9f]', '', text.replace('\r\n', '\n'))
+os.write(fd, clean.replace('\n', '\x1b\r').encode('utf8'))
 if not pump(0.4):
     done(1, 'the attach ended while typing')
 os.write(fd, b'\r')

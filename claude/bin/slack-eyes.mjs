@@ -129,7 +129,10 @@ export function peopleAfter(messages, after, reporter) {
 }
 
 // Slack text inside a <slack_message> wrapper must not be able to close it and pass as instructions.
-export const asData = (text) => String(text).replace(/<(\/?)slack_message/gi, '‹$1slack_message')
+// Control characters are dropped too: this text can be typed into a terminal session.
+export const asData = (text) => String(text)
+  .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '')
+  .replace(/<(\/?)slack_message/gi, '‹$1slack_message')
 
 const threadOf = async (job) => (await slack('conversations.replies', { channel: job.hit.channel, ts: job.hit.threadTs, limit: 200 })).messages ?? []
 const latestTs = (messages) => messages.reduce((max, m) => (Number(m.ts) > Number(max) ? m.ts : max), '0')
