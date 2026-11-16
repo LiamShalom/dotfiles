@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isAnswered, isThanks } from './slack-eyes.mjs'
+import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt } from './slack-eyes.mjs'
 
 const LIAM = 'U0B78R52DFT'
 const REPORTER = 'U0REPORTER1'
@@ -83,4 +83,23 @@ test('isThanks', () => {
 test("each person's latest post decides: a question then the same person's thanks closes it", () => {
   const answered = [eyes, agent('102.0', 'fixed it')]
   assert.equal(isAnswered([...answered, person('103.0', 'want to confirm, both settings are on?'), person('104.0', 'ty both for help!')], job(), acks), true)
+})
+
+test('a Sonnet run may return needs_opus; an Opus run may not', () => {
+  assert.ok(JSON.parse(resultSchema('sonnet')).properties.status.enum.includes('needs_opus'))
+  assert.ok(!JSON.parse(resultSchema('opus')).properties.status.enum.includes('needs_opus'))
+})
+
+test('Sonnet moves to Opus on needs_opus or an unproven cause, never on a real hold', () => {
+  assert.equal(wantsOpus('sonnet', { status: 'needs_opus' }), true)
+  assert.equal(wantsOpus('sonnet', { status: 'needs_liam', hold_reason: 'cause_unproven' }), true)
+  assert.equal(wantsOpus('sonnet', { status: 'needs_liam', hold_reason: 'large_merge_held' }), false)
+  assert.equal(wantsOpus('sonnet', { status: 'done' }), false)
+  assert.equal(wantsOpus('opus', { status: 'needs_liam', hold_reason: 'cause_unproven' }), false)
+})
+
+test('the Opus turn carries what the Sonnet pass found', () => {
+  const text = opusPrompt({ summary: 'the invite query skips archived seats', question: 'fix the query and reply' })
+  assert.match(text, /invite query skips archived seats/)
+  assert.match(text, /fix the query and reply/)
 })
