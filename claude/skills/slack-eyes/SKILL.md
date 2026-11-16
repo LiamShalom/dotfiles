@@ -27,20 +27,30 @@ use the teammate's first name: `drew: campaign card stats`.
 
 ## What the :eyes: approves, and what it does not
 
-Approved, for this message only:
+Triage is meant to run as close to autonomous as possible. The :eyes: is Liam's standing
+approval for everything the message needs. It replaces the "ask me first" cases in
+`~/.claude/CLAUDE.md` (real money, real customer data, messages to real people, merges) for
+this job.
+
+Approved, for this message:
 
 - Read anything: Slack, production data (read replica, Firestore, logs), code, PRs.
 - Fix code, open a PR, verify it, and merge it when the merge rule below says so.
-- Change test accounts and test data, billing included: waive or discount an invoice, change
-  a plan or subscription on a test brand (`isTest: true`). Charging nothing is not "real money".
-- Post replies in **this thread only**, as Liam, with `~/.claude/bin/slack-as-liam`.
+- Repair a real customer's data (a repair, a refund, a status change). Do the dry run and
+  manifest from `investigate-slack-issue` `references/repair.md` first, then run it.
+- Move real money when the message needs it: fix a failed payment, add or swap a card, pay or
+  retry a bill on SideShift's own accounts (Google Ads, Meta, Stripe, vendors), refund or
+  credit a customer. Use a card or login from 1Password (`agent-login`). Keep the amount to
+  what the message asks for.
+- Change test accounts and test data, billing included.
+- Post as Liam (`~/.claude/bin/slack-as-liam`) in this thread, and send other messages or
+  emails that the fix needs (for example, a vendor's support form, or a teammate who must act).
 
-Not approved. Do the work up to that step, then hold it for Liam (see step 6):
+Still held for Liam (do the work up to that step, then see step 6):
 
-- A write to a real customer's data (a repair, a refund, a status change).
-- Anything that moves real money.
-- A message anywhere else: another channel, a DM, an email.
-- A merge that the merge rule holds.
+- A merge of a large feature or a large UI change (the merge rule below).
+- A step that needs something only Liam has: a sign-in or 2FA that `agent-login` cannot do,
+  a card that is not in 1Password, or an account owner's action.
 
 **When the message is in Liam's DM with himself** (channel `D0B70K2EB9R`), Liam pasted the issue
 there to hand it off. The work is the same, but the thread to reply in is that self-DM thread.
@@ -86,19 +96,14 @@ branch off `origin/main`. Its size check and Phase 9 are the merge rule:
 - **Merge** when the fix is small, verified on the preview, the skeptical verifier passes,
   every CI check is green, and `/code-review` found nothing left. Then wait until the
   production deploy is READY.
-- **Hold** (leave the PR open, ready for review) when it is a large UI change, a large
-  feature, a schema migration, or real money. Also hold when the diff changes crucial logic,
-  even if it is small:
-  - payments, payouts, billing, or the wallet
-  - auth, permissions, or roles
-  - a messaging wire shape that the iOS or Android app reads
-  - deletes or rewrites of stored data
-  - ads spend
+- **Hold** (leave the PR open, ready for review) only when it is a large UI change or a large
+  feature. A small diff in crucial logic (payments, payouts, billing, the wallet, auth, roles,
+  messaging wire shapes, stored-data rewrites, ads spend) merges like any other fix, but run
+  `blast-radius` on it first, and for a messaging shape the `messaging-compat` check. A schema
+  migration ships through `/ship-migration`.
 
-  If you are not sure, hold.
-
-A data repair on a real customer account is always held: prepare it with a dry run and a
-manifest (`investigate-slack-issue` `references/repair.md`), then hold it.
+A data repair on a real customer account: do the dry run and manifest
+(`investigate-slack-issue` `references/repair.md`), check the manifest, then run it.
 
 ## 5. Reply as Liam
 
