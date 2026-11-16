@@ -7,8 +7,9 @@ const pane = (name: string | null) => ({ title: name ?? 'zsh', sessionId: name, 
 const CLEAR = { role: 'user', text: '<command-name>/clear</command-name>', toolUses: [] }
 const REPLY = { role: 'assistant', text: 'done', toolUses: [] }
 
-function engine(on: On, history: object[], tab: object, reply: string) {
+function engine(on: On, history: object[], tab: object, reply: string, entrypoint = 'cli') {
   const commands: string[] = []
+  on('env.get', (_$, e) => ({ value: e.name === 'CLAUDE_CODE_ENTRYPOINT' ? entrypoint : undefined }))
   on('session.messages', () => ({ value: history }))
   on('session.id', () => ({ value: 'S1' }))
   on('process.run', () => ({ value: { exitCode: 0, stdout: JSON.stringify(tab), stderr: '' } }))
@@ -39,6 +40,14 @@ test('first prompt renames the session and does not color it', async ($, on) => 
   await $.prompt.submit({ text: 'fix the wallet funding gate' })
   await clock.advance(0)
   expect(commands).toEqual(['/rename wallet gate'])
+})
+
+test('a headless run (claude -p) is not renamed', async ($, on) => {
+  const clock = mock.clock(on)
+  const commands = engine(on, [], { tab: [] }, '{"name": "wallet gate"}', 'sdk-cli')
+  await $.prompt.submit({ text: 'fix the wallet funding gate' })
+  await clock.advance(0)
+  expect(commands).toEqual([])
 })
 
 test('later prompts and slash commands are left alone', async ($, on) => {

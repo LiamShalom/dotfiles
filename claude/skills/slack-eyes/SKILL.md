@@ -1,6 +1,6 @@
 ---
 name: slack-eyes
-description: "Handle a Slack message that Liam marked with :eyes: from start to finish, with no one to ask: read the thread, diagnose, fix and merge the code when the fix is small and safe (else open the PR and hold it), then reply in the thread as Liam, in his voice. Started by the slack-eyes watcher (~/.claude/bin/slack-eyes.mjs) in a background session. Also use when Liam types /slack-eyes <slack link>."
+description: "Handle a Slack message that Liam marked with :eyes: from start to finish, with no one to ask: read the thread, diagnose, fix and merge the code when the fix is small and safe (else open the PR and hold it), then reply in the thread as Liam, in his voice. Started headless by the slack-eyes watcher (~/.claude/bin/slack-eyes.mjs); only a run that needs Liam goes to Session Board. Also use when Liam types /slack-eyes <slack link>."
 ---
 
 # Handle an :eyes: message
@@ -9,9 +9,20 @@ Liam put :eyes: on a Slack message. The watcher already replied in its thread as
 a look") and started this session. Your job: find out what the message needs, do it, and reply
 in the thread as Liam. Finish the whole job without asking.
 
-This session is a row in Session Board. It starts as `eyes: <first words of the message>`, and the
-session-namer mod soon renames it to `#channel sender · topic`. Liam sees it there, and the board notifies him when the session ends its turn on a question ("Needs you").
-That is how you reach him: never through Slack.
+**How Liam sees this session.** The watcher runs it headless (`claude -p`): nobody sees it
+while it works. When it ends, it returns a result (step 7). A `done` result stays out of sight.
+A `needs_liam` result makes the watcher resume this same session in the background, so it
+appears in Session Board named by your `name`, and asks Liam your question there. Never reach
+Liam through Slack.
+
+If this session was started some other way (Liam typed `/slack-eyes`, or it is already a
+Session Board row), Liam is watching: end your turn on the question instead of returning.
+
+**Name it `<brand>: <issue>`**, lowercase: the customer company's short name as Liam would
+say it, then the issue in 2-5 words. For example `livfresh: payouts show $0` or
+`orbit pets: invite email missing`. Find the brand from the Slack Connect channel, the
+sender's company, or the account you looked up. Without a brand (a teammate's own question),
+use the teammate's first name: `drew: campaign card stats`.
 
 ## What the :eyes: approves, and what it does not
 
@@ -22,7 +33,7 @@ Approved, for this message only:
 - Change test accounts and test data.
 - Post replies in **this thread only**, as Liam, with `~/.claude/bin/slack-as-liam`.
 
-Not approved. Do the work up to that step, then hold it and tell Liam (see step 6):
+Not approved. Do the work up to that step, then hold it for Liam (see step 6):
 
 - A write to a real customer's data (a repair, a refund, a status change).
 - Anything that moves real money.
@@ -105,32 +116,42 @@ What the reply says depends on the outcome:
 - **Needs their input:** one specific question.
 - **Customer action:** what they must do.
 
-Every fact in the reply must match your evidence. Send it:
+Every fact in the reply must match your evidence.
+
+Start the reply by tagging the person who raised the issue: the author of the message Liam put
+:eyes: on, as `<@USERID>` (its `user` field). The watcher's first reply tagged them too. Do not
+tag Liam (in his self-DM there is nobody to tag) or a bot. Send it:
 
 ```sh
-~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<reply>"
+~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"
 ```
 
 Check that the output has `"ok":true`. Post one reply, not a running commentary.
 
-## 6. Tell Liam when something is held
+## 6. When something needs Liam
 
-When step 4 held a merge or a repair, or you could not prove the cause, end your turn on the
-one question Liam must answer. Session Board then shows the session under "Needs you" and
-notifies him. Put above the question, in a few lines: the message link, what you found, the PR
-link or the repair command, and the reply you already posted. Stay in the session: Liam answers
-in its tile, and you carry on from his answer (merge, run the repair, post a follow-up in the
-thread).
+Liam is needed when step 4 held a merge or a repair, when you could not prove the cause, or
+when the only safe next step is his. Do everything up to that point first: post the thread
+reply (step 5), and have the PR ready or the repair dry-run done. Then return `needs_liam`
+(step 7) with the one question he must answer. Do not wait or poll for him.
 
-For a held UI change, show Liam the change before you ask: follow the UI-approval step in
-`~/.claude/CLAUDE.md` (a clickable copy of the changed page, opened in the board pane with
-`board-browser.mjs`).
+When Liam opens the session, he sees it in Session Board, where the watcher asks you to brief
+him. Then give him, in a few lines, the message link, what you found, the PR link or the repair
+command, and the reply you posted. End your turn on the question, and carry on from his answer:
+merge, run the repair, or post a follow-up in the thread.
 
-When everything merged and the reply went out, end with the short report in step 7 and no
-question.
+For a held UI change, prepare the approval page that `~/.claude/CLAUDE.md` describes (a clickable
+copy of the changed page) before you return. Open it in the board pane with `board-browser.mjs`
+once Liam is in the session.
 
 ## 7. Finish
 
 Clean up what you started (dev servers, tabs, test records), as `~/.claude/CLAUDE.md` says.
-End the session with a short report: the cause, the PR and whether it merged, and the reply
-you posted.
+Then return the result the watcher asks for:
+
+- `status`: `done` when the job is finished (the reply went out, any fix merged and deployed,
+  or nothing was needed). `needs_liam` when step 6 applies.
+- `name`: `<brand>: <issue>`, as defined at the top.
+- `summary`: two or three sentences: the cause, the PR and whether it merged, and the reply
+  you posted.
+- `question`: for `needs_liam`, the one thing Liam must answer.

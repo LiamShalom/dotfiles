@@ -85,8 +85,11 @@ async function chooseName($: Engine, prompt: string, panes: Pane[]) {
 export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     // A /clear counts as a user turn, so "no assistant reply yet" marks the first prompt.
+    // A headless run (claude -p, the SDK) has no board row to name, and there the /rename takes
+    // the prompt's place: the model never runs and the result is "Session renamed to: …".
+    const headless = ((await $.env.get('CLAUDE_CODE_ENTRYPOINT')) ?? '').startsWith('sdk-')
     const isFirst =
-      !e.text.trimStart().startsWith('/') && !(await $.session.messages()).some(m => m.role === 'assistant')
+      !headless && !e.text.trimStart().startsWith('/') && !(await $.session.messages()).some(m => m.role === 'assistant')
     if (isFirst) {
       const text = e.text
       $.clock.after(0, async () => {

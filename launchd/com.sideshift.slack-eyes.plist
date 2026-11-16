@@ -21,6 +21,9 @@
 	</dict>
 	<key>StartInterval</key>
 	<integer>30</integer>
+	<!-- Each :eyes: job runs in a detached process for up to 4 hours; launchd must not kill it when the check exits. -->
+	<key>AbandonProcessGroup</key>
+	<true/>
 	<key>ProcessType</key>
 	<string>Background</string>
 	<key>LowPriorityIO</key>
