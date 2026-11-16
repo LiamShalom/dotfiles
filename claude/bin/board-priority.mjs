@@ -61,6 +61,19 @@ export function isHeavy(row) {
   return /^(qemu-system-[\w-]+|emulator|gradle)$/.test(row.name)
 }
 
+// Xcode's asset catalog compiler and its simulator helper. In the background band on a busy Mac
+// they never finish (11-16: FrostedUI's 5,670-icon catalog ran past 30 minutes and hung every iOS
+// build; at normal priority it took 3 minutes). They inherit background from xcodebuild, so they
+// are moved back to normal priority. Each runs for a few minutes per build.
+export function isAssetCompiler(row) {
+  return /^(actool|ibtool|ibtoold|AssetCatalogSimulatorAgent)$/.test(row.name)
+}
+
+// Which processes to move back to normal priority.
+export function toPromote(rows) {
+  return rows.filter(isAssetCompiler)
+}
+
 // Which processes to move to the background: rows of { pid, ppid, name, args }.
 export function toDemote(rows) {
   const byPid = new Map(rows.map((row) => [row.pid, row]))
@@ -74,7 +87,7 @@ export function toDemote(rows) {
     return chain
   }
   return rows.filter((row) => {
-    if (isSession(row)) return false
+    if (isSession(row) || isAssetCompiler(row)) return false
     const chain = ancestors(row)
     if (isAgentService(row) || chain.some((up) => isSession(up) || isAgentService(up))) return true
     // Detached: every process above it is another heavy tool (the emulator above its qemu). Rows
@@ -124,21 +137,28 @@ async function pass() {
   const live = new Set(rows.map((row) => row.pid))
   for (const pid of moved.keys()) if (!live.has(pid)) moved.delete(pid)
   const changed = []
-  for (const row of toDemote(rows)) {
+  const promoted = []
+  const plan = [
+    ...toDemote(rows).map((row) => [row, '-b', changed]),
+    ...toPromote(rows).map((row) => [row, '-B', promoted]),
+  ]
+  for (const [row, flag, list] of plan) {
     if (row.ageS < MIN_AGE_S) continue
     if (moved.get(row.pid) === row.args) continue
     // A process that ended in between fails here; that is fine.
-    const ok = await run('/usr/sbin/taskpolicy', ['-b', '-p', String(row.pid)], { timeout: CALL_TIMEOUT_MS }).then(() => true, () => false)
+    const ok = await run('/usr/sbin/taskpolicy', [flag, '-p', String(row.pid)], { timeout: CALL_TIMEOUT_MS }).then(() => true, () => false)
     if (!ok) continue
     moved.set(row.pid, row.args)
-    changed.push(row.name)
+    list.push(row.name)
   }
-  if (changed.length) {
+  const summary = (names) => {
     const counts = new Map()
-    for (const name of changed) counts.set(name, (counts.get(name) ?? 0) + 1)
-    log(`background ${changed.length}: ${[...counts].map(([name, n]) => `${name}×${n}`).join(' ')}`)
+    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1)
+    return `${names.length}: ${[...counts].map(([name, n]) => `${name}×${n}`).join(' ')}`
   }
-  return changed
+  if (changed.length) log(`background ${summary(changed)}`)
+  if (promoted.length) log(`normal ${summary(promoted)}`)
+  return [...changed, ...promoted.map((name) => `${name} (normal)`)]
 }
 
 if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
