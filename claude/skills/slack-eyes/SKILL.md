@@ -31,7 +31,8 @@ Approved, for this message only:
 
 - Read anything: Slack, production data (read replica, Firestore, logs), code, PRs.
 - Fix code, open a PR, verify it, and merge it when the merge rule below says so.
-- Change test accounts and test data.
+- Change test accounts and test data, billing included: waive or discount an invoice, change
+  a plan or subscription on a test brand (`isTest: true`). Charging nothing is not "real money".
 - Post replies in **this thread only**, as Liam, with `~/.claude/bin/slack-as-liam`.
 
 Not approved. Do the work up to that step, then hold it for Liam (see step 6):
