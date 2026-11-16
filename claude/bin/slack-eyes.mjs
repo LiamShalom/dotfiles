@@ -123,7 +123,7 @@ const SIDESHIFT_TEAM = 'T0697U57YTY'
 // automation's own (Liam's CLI app) or an app's.
 export function peopleAfter(messages, after, reporter) {
   return messages
-    .filter((m) => Number(m.ts) > Number(after) && !m.bot_id && !m.subtype && /^[UW][A-Z0-9]+$/.test(m.user ?? '') && m.user !== 'USLACKBOT')
+    .filter((m) => Number(m.ts) > Number(after) && !m.bot_id && (!m.subtype || m.subtype === 'thread_broadcast') && /^[UW][A-Z0-9]+$/.test(m.user ?? '') && m.user !== 'USLACKBOT')
     .filter((m) => m.user === LIAM || m.user === reporter || (m.user_team ?? m.team) === SIDESHIFT_TEAM)
     .map((m) => ({ user: m.user, ts: m.ts, text: m.text ?? '' }))
 }
@@ -309,26 +309,40 @@ async function listSet(file, { status, note }) {
   }
 }
 
-// Every ack the watcher can post, so a thread's ack is not taken for an answer.
+// Every ack the watcher can post, so a thread's ack is not taken for an answer. Jobs from now on
+// also keep the ack's ts; the text match covers older ones.
 const knownAcks = () => {
   let acks = DEFAULT_ACKS
   try { acks = [...acksFromVoice(readFileSync(VOICE, 'utf8')), ...DEFAULT_ACKS] } catch {}
-  return new Set(acks.map((a) => a.trim().toLowerCase()))
+  return new Set(acks.map(plainText))
 }
+const plainText = (text) => String(text ?? '').replace(/<[^>]*>/g, ' ').replace(/[^\w\s']/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+const isPerson = (m) => !m.bot_id && /^[UW][A-Z0-9]+$/.test(m.user ?? '') && m.user !== 'USLACKBOT'
+// A question in a post (links stripped first: a URL can hold a "?").
+const asksSomething = (text) => String(text ?? '').replace(/<[^>]*>/g, ' ').includes('?')
 
-// Whether the thread has its answer: Liam (by hand, or the automation posting as him) replied after
-// the :eyes: message with something other than the ack, and no other person posted after that reply.
-// The row follows this, not the session: a board chat often never reports back.
-export function isAnswered(thread, hitTs, acks) {
-  const after = thread.filter((m) => Number(m.ts) > Number(hitTs) && !m.subtype)
-  const replies = after.filter((m) => m.user === LIAM && !acks.has(String(m.text ?? '').trim().toLowerCase()))
+// Whether the thread has its answer: after the :eyes: message, Liam (by hand, or the automation
+// posting as him) posted something that is neither the ack nor a question, and every person's post
+// since then is a plain closing thanks. In his own DM, his hand-typed posts are context, not answers.
+// A job waiting on someone's answer is never answered. The row follows this, not the session: a
+// board chat often never reports back.
+export function isAnswered(thread, job, acks) {
+  if (['waiting_reporter', 'board_waiting'].includes(job.status)) return false
+  const ackTs = new Set([job.hit.ackTs, ...(job.ackTs ?? [])].filter(Boolean))
+  const after = thread.filter((m) => Number(m.ts) > Number(job.hit.ts) && (!m.subtype || m.subtype === 'thread_broadcast'))
+  const replies = after.filter((m) => m.user === LIAM && !ackTs.has(m.ts) && !acks.has(plainText(m.text)) && (!job.hit.own || m.bot_id))
   if (!replies.length) return false
-  const last = latestTs(replies)
-  const later = after.filter((m) => Number(m.ts) > Number(last) && m.user !== LIAM && !m.bot_id && /^[UW][A-Z0-9]+$/.test(m.user ?? '') && m.user !== 'USLACKBOT')
-  // A closing "thanks" / "got it" with no question does not reopen it.
-  return !later.length || isThanks(later.at(-1).text)
+  const last = replies.reduce((a, b) => (Number(b.ts) > Number(a.ts) ? b : a))
+  if (asksSomething(last.text)) return false
+  const later = after.filter((m) => Number(m.ts) > Number(last.ts) && isPerson(m) && (m.user !== LIAM || job.hit.own))
+  return later.every((m) => isThanks(m.text))
 }
-export const isThanks = (text) => !String(text ?? '').includes('?') && /\b(thanks?|thank you|thx|ty|tysm|appreciate[sd]?|got it|makes sense|perfect|all good|works now|sounds good)\b/i.test(String(text ?? ''))
+// A closing message: thanks or "got it", short, no question, nothing still wrong.
+export const isThanks = (text) => {
+  const t = String(text ?? '')
+  return t.length <= 200 && !asksSomething(t) && !/\b(but|still|not|again|broken|wrong|error|issue)\b|n't/i.test(t) &&
+    /\b(thanks?|thank you|thx|ty|tysm|appreciate[sd]?|got it|makes sense|perfect|all good|works now|sounds good)\b/i.test(t)
+}
 
 // The row status for a job that is still unanswered.
 const rowStatusOf = (job) => ({ on_board: 'needs_you', handing_off: 'needs_you', board_waiting: 'waiting', waiting_reporter: 'waiting' })[job.status] ?? 'triaging'
@@ -337,7 +351,7 @@ const rowStatusOf = (job) => ({ on_board: 'needs_you', handing_off: 'needs_you',
 // An unanswered one has a row with its current status.
 async function syncRow(file, thread) {
   const job = readJob(file)
-  if (isAnswered(thread, job.hit.ts, knownAcks())) {
+  if (isAnswered(thread, job, knownAcks())) {
     if (job.rowId) {
       await listRemove(file)
       log('row_answered', { key: job.hit.key, name: job.name })
@@ -687,12 +701,12 @@ async function pollOpen() {
       }
       if (how === 'wait') {
         updateJob(file, { undelivered: messages })
-        if (isAnswered(thread, job.hit.ts, knownAcks())) await syncRow(file, thread)
+        if (isAnswered(thread, job, knownAcks())) await syncRow(file, thread)
         else if (fresh.length) await listSet(file, { status: 'needs_you', note: 'new message in the thread; it goes to the chat once the chat is idle' })
         continue
       }
       updateJob(file, { status: 'on_board', undelivered: null, deliveryFailures: 0 })
-      if (isAnswered(thread, job.hit.ts, knownAcks())) await syncRow(file, thread)
+      if (isAnswered(thread, job, knownAcks())) await syncRow(file, thread)
       else await listSet(file, { status: 'triaging', note: 'new message in the thread' })
       log('board_follow_up', { key: job.hit.key, how, messages: messages.length })
     } catch (error) {
@@ -784,7 +798,7 @@ async function main() {
     writeState(state)
     try {
       // No tag here: only the real answer tags the person who raised the issue (the skill's step 5).
-      await slack('chat.postMessage', { channel: hit.channel, thread_ts: hit.threadTs, text: ack })
+      hit.ackTs = (await slack('chat.postMessage', { channel: hit.channel, thread_ts: hit.threadTs, text: ack })).ts
       log('acked', { key: hit.key, ack })
     } catch (error) {
       log('ack_failed', { key: hit.key, error: String(error.message ?? error) })
@@ -792,6 +806,8 @@ async function main() {
     // An :eyes: in a thread that already has a job continues that job's session, with its context.
     // An archived or closed job's thread starts a new job.
     const same = findJob((job) => job.hit?.channel === hit.channel && job.hit?.threadTs === hit.threadTs && job.sessionId && !['archived', 'closed'].includes(job.status))
+    // A later :eyes: in the thread posts its own ack; the job keeps every ack's ts.
+    if (same && hit.ackTs) updateJob(same, { ackTs: [...(readJob(same).ackTs ?? []), hit.ackTs] })
     const sameJob = same ? readJob(same) : null
     const sameStatus = sameJob?.status ?? null
     if (['queued', 'running'].includes(sameStatus)) {

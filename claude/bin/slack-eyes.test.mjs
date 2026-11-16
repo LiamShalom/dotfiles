@@ -1,0 +1,73 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { isAnswered, isThanks } from './slack-eyes.mjs'
+
+const LIAM = 'U0B78R52DFT'
+const REPORTER = 'U0REPORTER1'
+const acks = new Set(['taking a look', 'lemme check'])
+const job = (over = {}) => ({ status: 'done', ...over, hit: { ts: '100.0', own: false, ...over.hit } })
+const agent = (ts, text) => ({ ts, user: LIAM, bot_id: 'B1', text })
+const liam = (ts, text) => ({ ts, user: LIAM, text })
+const person = (ts, text, user = REPORTER) => ({ ts, user, text })
+const eyes = person('100.0', 'the page is broken')
+
+test('the ack alone is not an answer', () => {
+  assert.equal(isAnswered([eyes, agent('101.0', 'taking a look')], job(), acks), false)
+})
+
+test('an ack not in the voice file is caught by its saved ts', () => {
+  assert.equal(isAnswered([eyes, agent('101.0', 'on it boss')], job({ hit: { ackTs: '101.0' } }), acks), false)
+})
+
+test('an ack with a mention and punctuation still matches the ack text', () => {
+  assert.equal(isAnswered([eyes, agent('101.0', `<@${REPORTER}> Lemme check!`)], job(), acks), false)
+})
+
+test('a reply after the ack is the answer', () => {
+  assert.equal(isAnswered([eyes, agent('101.0', 'taking a look'), agent('102.0', `<@${REPORTER}> fixed, refresh it`)], job(), acks), true)
+})
+
+test('a question to the reporter is not the answer', () => {
+  assert.equal(isAnswered([eyes, agent('101.0', 'taking a look'), agent('102.0', 'can u send a screenshot of it?')], job(), acks), false)
+})
+
+test('a link with a ? in it does not make an answer a question', () => {
+  assert.equal(isAnswered([eyes, agent('102.0', 'its here <https://app.sideshift.app/x?tab=pay|settings>')], job(), acks), true)
+})
+
+test('a job waiting on someone is never answered', () => {
+  const thread = [eyes, agent('102.0', 'fixed it')]
+  assert.equal(isAnswered(thread, job({ status: 'waiting_reporter' }), acks), false)
+  assert.equal(isAnswered(thread, job({ status: 'board_waiting' }), acks), false)
+})
+
+test('a closing thanks keeps it answered; a new problem reopens it', () => {
+  const answered = [eyes, agent('102.0', 'fixed it')]
+  assert.equal(isAnswered([...answered, person('103.0', 'ty both for help!')], job(), acks), true)
+  assert.equal(isAnswered([...answered, person('103.0', 'thanks, but it is still broken for me')], job(), acks), false)
+  assert.equal(isAnswered([...answered, person('103.0', 'still broken'), person('104.0', 'ty', 'U0TEAMMATE1')], job(), acks), false)
+})
+
+test('a reply sent to the channel too (thread_broadcast) counts', () => {
+  const answered = [eyes, agent('102.0', 'fixed it')]
+  assert.equal(isAnswered([...answered, { ...person('103.0', 'how do i do it for the other brand?'), subtype: 'thread_broadcast' }], job(), acks), false)
+  assert.equal(isAnswered([eyes, { ...agent('102.0', 'fixed it'), subtype: 'thread_broadcast' }], job(), acks), true)
+})
+
+test("in Liam's own DM his hand-typed posts are context, not answers", () => {
+  const own = job({ hit: { own: true } })
+  const mine = person('100.0', 'brand x cannot pay', LIAM)
+  assert.equal(isAnswered([mine, agent('101.0', 'taking a look'), liam('102.0', 'also it started today')], own, acks), false)
+  assert.equal(isAnswered([mine, agent('103.0', 'found it, fixed')], own, acks), true)
+  assert.equal(isAnswered([mine, agent('103.0', 'found it, fixed'), liam('104.0', 'it is happening for brand y too')], own, acks), false)
+})
+
+test('a reply before the :eyes: message does not count (mid-thread :eyes:)', () => {
+  const thread = [person('90.0', 'first issue'), agent('95.0', 'fixed the first one'), eyes]
+  assert.equal(isAnswered(thread, job(), acks), false)
+})
+
+test('isThanks', () => {
+  for (const t of ['ty both for help!', 'makes sense - thx', 'Got it. Thank you.']) assert.equal(isThanks(t), true, t)
+  for (const t of ['not perfect yet', 'thanks! does it work for X too?', "thanks, didn't work", 'I was manually skipping everything', 'got it to fail again']) assert.equal(isThanks(t), false, t)
+})
