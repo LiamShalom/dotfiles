@@ -313,3 +313,4 @@ buttons around it.
 
 - 11-16 Jobs-moved popup: a three-row explainer was "too much text"; the fix was title + one sentence + the real job card (SideShift's listing) on its own. A card nested inside a drawn mini page "looks formatted awkwardly": show the real component bare.
 - 11-16 Campaign page: replacing Pay structure, Campaign rules and Contracts with a trimmed "Campaign details" card "removed a whole important section". Keep those three live-page cards; they belong on both the Overview and the Brief tab.
+  Later 11-16: "I think the component can be redesign though". Of one sheet / stat tiles / three slim cards, picked A, one "Campaign terms" sheet: the lead rate as the headline, then posts per platform, then contracts with their two buttons. Keep the content of a section the operator restored, but redesign it so nothing repeats (platforms and posts per cycle had appeared twice; dates are already in the page header).
