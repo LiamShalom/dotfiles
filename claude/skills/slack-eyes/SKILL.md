@@ -210,4 +210,7 @@ yourself, with the job key from your first prompt:
 
 - the job is finished: `~/.claude/bin/slack-eyes.mjs --set <job key> done`
 - you asked the reporter something: `~/.claude/bin/slack-eyes.mjs --set <job key> waiting "<question>"`.
-  The watcher then marks the row "Needs you" when they reply, and you carry on when Liam tells you.
+
+The job stays open until Liam archives its chat on Session Board, even after you set it done.
+When someone posts in the thread later (more context, a follow-up question), the watcher sends
+you their messages as your next prompt. Answer them in the thread as before.
