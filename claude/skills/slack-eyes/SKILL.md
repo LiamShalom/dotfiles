@@ -161,6 +161,11 @@ command, and the reply you posted. End that turn on the question: the board show
 under "Needs you" and notifies him. Carry on from his answer: merge, run the repair, or post a
 follow-up in the thread.
 
+His pick of a direction approves building it end to end. If it grows while you build (a
+migration PR first, an iOS/Android change, a backfill), build those too. Do not bring the
+bigger scope back to him as a new question. Stop only at a step the list at the top keeps for
+him (a customer data write, money, a held merge). Then tell him what grew when you report.
+
 For a held UI change, prepare the approval page that `~/.claude/CLAUDE.md` describes (a clickable
 copy of the changed page) before you return. Open it in the board pane with `board-browser.mjs`
 in that last turn, before the question.
