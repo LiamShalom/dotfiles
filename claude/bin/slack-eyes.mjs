@@ -335,12 +335,15 @@ export function isAnswered(thread, job, acks) {
   const last = replies.reduce((a, b) => (Number(b.ts) > Number(a.ts) ? b : a))
   if (asksSomething(last.text)) return false
   const later = after.filter((m) => Number(m.ts) > Number(last.ts) && isPerson(m) && (m.user !== LIAM || job.hit.own))
-  return later.every((m) => isThanks(m.text))
+  // Each person who posted since: their latest post must close it ("thanks" / "got it").
+  const lastByPerson = new Map(later.map((m) => [m.user, m]))
+  return [...lastByPerson.values()].every((m) => isThanks(m.text))
 }
 // A closing message: thanks or "got it", short, no question, nothing still wrong.
 export const isThanks = (text) => {
   const t = String(text ?? '')
-  return t.length <= 200 && !asksSomething(t) && !/\b(but|still|not|again|broken|wrong|error|issue)\b|n't/i.test(t) &&
+  return t.length <= 400 && !asksSomething(t) &&
+    !/\b(still|broken|again|yet)\b|\b(not|doesn['’]?t|didn['’]?t|isn['’]?t|won['’]?t) (work|working|fixed|showing|load|loading)\b/i.test(t) &&
     /\b(thanks?|thank you|thx|ty|tysm|appreciate[sd]?|got it|makes sense|perfect|all good|works now|sounds good)\b/i.test(t)
 }
 

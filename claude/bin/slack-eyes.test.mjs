@@ -68,6 +68,19 @@ test('a reply before the :eyes: message does not count (mid-thread :eyes:)', () 
 })
 
 test('isThanks', () => {
-  for (const t of ['ty both for help!', 'makes sense - thx', 'Got it. Thank you.']) assert.equal(isThanks(t), true, t)
-  for (const t of ['not perfect yet', 'thanks! does it work for X too?', "thanks, didn't work", 'I was manually skipping everything', 'got it to fail again']) assert.equal(isThanks(t), false, t)
+  for (const t of [
+    'ty both for help!', 'makes sense - thx', 'Got it. Thank you.',
+    "Ok perfect! thank you! For some reason it wasn't showing us but it is now!",
+    "okay i appreciate you checking on that with specifics! makes total sense- i hadn't realized",
+    "Got it. So yeah it's up to them not us. Thank you. Assume some more people will give us issues",
+  ]) assert.equal(isThanks(t), true, t)
+  for (const t of [
+    'not perfect yet', 'thanks! does it work for X too?', "thanks, didn't work", 'thanks but its still broken',
+    'I was manually skipping everything', 'got it to fail again', "thanks, the page isn't loading for me",
+  ]) assert.equal(isThanks(t), false, t)
+})
+
+test("each person's latest post decides: a question then the same person's thanks closes it", () => {
+  const answered = [eyes, agent('102.0', 'fixed it')]
+  assert.equal(isAnswered([...answered, person('103.0', 'want to confirm, both settings are on?'), person('104.0', 'ty both for help!')], job(), acks), true)
 })
