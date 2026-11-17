@@ -34,6 +34,16 @@ a money and risk call: prepare the facts, then `needs_liam` with `only_liam_can`
 - A failed withdrawal that Whop denies is not guaranteed to leave a ledger row: on 11-17 a brand flagged for a
   Bitcoin withdrawal attempt had only one completed `whop_wallet_withdraw` and no failed one.
 
+- **Freezing a suspicious brand's money** (petaluma health, 11-17, after Liam said yes): a manual fraud block,
+  not a suspension (a suspension emails the brand and locks sign-in). `POST https://sideshifters.vercel.app/api/fraud-block/<company id>`
+  with `{"action":"block","note":"..."}` (Bearer = minted liam@ token, memory `internal-dashboard-url`) writes
+  `fraudPaymentBlocks/<id>` with `active: true`, all four capabilities, `reasonCategory: 'manual'`. `payout` covers
+  wallet withdrawals: `lib/api/whop/wallet/withdraw.usecase.ts` calls `checkFraudPayoutBlock` (`getCapabilityBlock(..., 'payout')`).
+  A manual block is never waived by brand verification (`lib/fraud-controls/block.ts`). `{"action":"clear"}` undoes it.
+- **A pending Whop top-up**: read it with `GET https://api.whop.com/api/v1/payments/<pay id>` (`WHOP_API_KEY` from
+  `.env.local`, read in a script). `failure_message` gives Whop's reason (11-17: "The transaction was blocked due to a
+  high-risk fraud evaluation.", `substatus: blocked`, `voidable: false`): such a payment never lands, so there is nothing to void.
+
 ## Symptom -> cause -> proof
 
 | Report | Cause | Proof |
