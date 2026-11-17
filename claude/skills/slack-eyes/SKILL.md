@@ -95,10 +95,12 @@ Follow steps 3 to 5 of `investigate-slack-issue`. Prove the cause with evidence.
 problem is the customer's own action or working as designed, the reply says what they must do.
 
 ## 4. Fix
-For a status alert or outage, start with `#database-alerts` (C0B96GSUHDZ) and `#prod-alerts` in the
-same window, and for any database symptom find the hot query (pg_stat_statements on the read replica,
-Query Insights with gcloud). A symptom (a traffic spike, an error code) is not the cause. Once the
-cause is found, fixing it is the job: an outage fix merges under the merge rule above, not as a question.
+For a status alert or outage, start from `~/.claude/bin/incident-snapshot.mjs --at <alert time>` (the
+watcher attaches it to alert jobs): the alert channels, primary CPU and connections, the top queries with
+their text, statements run by hand, and merges, in 10-minute buckets. A symptom (a traffic spike, an
+error code) is not the cause; the top query or the alert usually is. Count errors in time buckets, never
+from one log line. Once the cause is found, fixing it is the job: for a hot query, an index through
+`/ship-migration` (agents merge and apply migrations), then re-run the snapshot to see it work.
 
 
 **Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread

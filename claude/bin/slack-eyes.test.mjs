@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt, wantsProof } from './slack-eyes.mjs'
+import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt, wantsProof, isIncident } from './slack-eyes.mjs'
 
 const LIAM = 'U0B78R52DFT'
 const REPORTER = 'U0REPORTER1'
@@ -206,4 +206,12 @@ test('an Opus cause_unproven goes back once for the incident checks; a real hold
   assert.equal(wantsProof('sonnet', outage), false)
   assert.equal(wantsProof('opus', { status: 'needs_liam', hold_reason: 'large_merge_held' }), false)
   assert.equal(wantsProof('opus', { status: 'done' }), false)
+})
+
+test('a status or database alert is an incident and gets the snapshot; a customer message is not', () => {
+  // The 11-16 alert this was built from.
+  assert.equal(isIncident({ channel: 'C0CEJUY1YDD', text: ':red_circle: SideShift Connect: Connect API: unavailable. Timed out after 8000 ms' }), true)
+  assert.equal(isIncident({ channel: 'C0B96GSUHDZ', text: 'Cloud SQL pooler - clients wait over 0.5 s for a connection' }), true)
+  assert.equal(isIncident({ channel: 'C0OTHER0001', text: 'getting query_wait_timeout on the analytics page' }), true)
+  assert.equal(isIncident({ channel: 'C0OTHER0001', text: 'the payouts page shows $0 for my creator' }), false)
 })
