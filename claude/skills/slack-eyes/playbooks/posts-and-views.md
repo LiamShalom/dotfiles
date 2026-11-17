@@ -58,12 +58,16 @@ decision (openart: the reply promised an API path and had to be edited).
 | Paid post shows "not counted", no reason (mise: posts show not counted) | A late post paid alone wrote `cycle-fill` placeholders mid-history. Fixed by PR #10547, merged 2026-11-16 | Check 7. Reason codes: `lib/creator/creator-cycle-posts.ts` (`not_counted_unknown` = no reason on record) |
 | Deleted videos still paid (la viral studio) | The campaign setting is off, or the post is not yet flagged (needs 2 checks, 24 hours apart) | Check 8. Reply with the setting's place: campaign settings step, "Drop deleted posts from payouts" |
 | API misses agency views (openart) | An API key sees its own company. `?scope=agency` works only for a parent agency key, else 403 (`lib/api/agency-scope.ts`). The missing views were in another agency's account | Compare `post_daily_stats` by `company_id` / `agency_id` |
+| "Stopped tracking her Instagram", handle still connected (olive: instagram stopped tracking) | The handle has scrape error `PROFILE_AGE_RESTRICTED` (contractsv2 `socialProfiles[].scrapeErrorCode`), so its reels come only from owner captures in `creator_video_insight_snapshots` (`addOauthReels`). The `instagram-insights` job crashed (signal 11) 11-13 to 11-16; #10512 fixed it, full capture again 11-17 ~19:00Z. New reels land at the next scrape after the capture | Captures per day for the creator's `oauth_account_id` (gap = the cause) and globally (`count(distinct oauth_account_id)` by `capture_date`, platform). Match snapshots to posts by `post_page ilike '%/'||shortcode||'/%'`: `posts.platform_post_id` is not `provider_video_id` or `shortcode` |
 | Posts tab filter drops campaigns on a share link (brand501) | Already fixed by PR #10629 | `gh pr list` and `git log` on `app/(public)/(share)/share_posts/page.tsx` before you fix anything; test on the live share link |
 
 ### Checks (read replica: `mcp__cloud-sql-postgres-read-replica__execute_sql`)
 
-Load the tool with ToolSearch `select:mcp__cloud-sql-postgres-read-replica__execute_sql`. In one headless run
-(hive scales) it was not found. Then use `postgres_query` (internal-dashboard); it refuses `information_schema` ("System
+Load the tool with ToolSearch `select:mcp__cloud-sql-postgres-read-replica__execute_sql`. In headless runs
+(hive scales, olive) it was not found. The shared bridge still answers: POST JSON-RPC (`initialize`, then
+`tools/call` `execute_sql`) to `http://127.0.0.1:47801/mcp` with `Authorization: Bearer` + the first line of
+`~/.config/mcp-shared/token`, and the `Mcp-Session-Id` header from the initialize reply. It reads OAuth and
+insight tables that the dashboard refuses. Spawning `mcp-shared-cloudsql.sh` over stdio hung in olive. Then use `postgres_query` (internal-dashboard); it refuses `information_schema` ("System
 catalogs are available only through schema tools"): use `postgres_describe_table`, or `postgres_search_schema`
 with a `search` argument. Find the creator with `find_account` (the contract's `contractor_id`).
 
