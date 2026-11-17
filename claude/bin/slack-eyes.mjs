@@ -955,10 +955,14 @@ export function loomNote(text, read = (id) => execFileSync(join(homedir(), '.cla
 
 function headlessTurn(job, messages, text, draft = '') {
   if (raiseAsked(job)) return { out: null, failure: null, raised: true, ran: false }
+  // The first headless turn after Liam moved the job off the board says so.
+  const lowered = job.lowered ? `${loweredPrompt(job.lowered)}\n\n` : ''
   const input = text
-    ? ['-p', text, '--resume', job.sessionId]
+    ? ['-p', lowered + text, '--resume', job.sessionId]
     : messages
-    ? ['-p', followUpPrompt(messages, job.permalink, draft) + otherThreadsNote(job) + loomNote(messages.map((m) => m.text).join('\n')), '--resume', job.sessionId]
+    ? ['-p', lowered + followUpPrompt(messages, job.permalink, draft) + otherThreadsNote(job) + loomNote(messages.map((m) => m.text).join('\n')), '--resume', job.sessionId]
+    : job.lowered
+    ? ['-p', lowered.trim(), '--resume', job.sessionId]
     : ['-p', prompt(job.hit, job.permalink, true, otherJobsNote(allJobs().map(({ job: j }) => j), job.hit.key)) + incidentNote(job.hit) + loomNote(job.hit.text) + readLearning(), '--session-id', job.sessionId]
   const model = modelOf(job)
   const run = claude([...input, '--dangerously-skip-permissions', '--output-format', 'json', '--json-schema', resultSchema(model)], RUN_TIMEOUT_MS, model)
@@ -1029,6 +1033,7 @@ async function runJob(file) {
     job = updateJob(file, { turns: (job.turns ?? 0) + 1, pending: null, turnFromTs: before })
     log('run_started', { key: job.hit.key, sessionId: job.sessionId, turn: job.turns, followUps: messages?.length ?? 0 })
     turn = headlessTurn(job, messages, null, draft)
+    if (job.lowered) job = updateJob(file, { lowered: null })
     // Raised before this turn started: its thread messages go to the board chat instead.
     if (turn.raised && !turn.ran) unsent = messages
     // Checks on the result, re-run after every extra turn they cause; each extra prompt at most once.
@@ -1734,6 +1739,85 @@ function raiseIdle(file) {
   return now.status === 'on_board' ? `"${name}" is on Session Board (claude attach ${now.boardId})` : `"${name}" did not reach Session Board (${now.status}); see ${LOG}`
 }
 
+// The note on the first headless turn after Liam moved a job off the board (`--headless`).
+export const loweredPrompt = ({ stopped }) => `Liam moved this job off his Session Board: it runs headless again. Nobody reads this chat now, so ask Liam nothing here: anything only he can do goes in your result as needs_liam. Return your result in the JSON format this run asks for.${stopped ? ' Your last turn was stopped partway when it moved: carry on from where it stopped and finish the job.' : ''}`
+
+// What `--headless` does to a job, given its board chat (`claude agents` entry, or null when the
+// chat is gone). The same conversation goes on headless; Liam's move resets the turn budget. A
+// chat stopped mid-turn carries on headless at once; an idle one waits for the thread's next
+// message, like any finished headless job.
+export function lowerPlan(job, agent) {
+  const name = job.name || sessionName(job.hit.text)
+  if (!job.boardId) return { name, message: `"${name}" is already headless` }
+  if (['archived', 'closed'].includes(job.status)) return { name, message: `"${name}" is ${job.status}` }
+  if (job.status === 'handing_off') return { name, message: `"${name}" is moving to Session Board: try again in a minute` }
+  const sessionId = agent?.sessionId ?? job.sessionId
+  const busy = Boolean(agent?.pid) && agent.status !== 'idle'
+  return {
+    name,
+    busy,
+    stop: agent?.pid ? agent.id : null,
+    remove: agent?.id ?? null,
+    fields: {
+      sessionId,
+      boardId: null,
+      formerSessions: [...new Set([...(job.formerSessions ?? []), job.sessionId])].filter((s) => s && s !== sessionId),
+      formerBoardIds: [...new Set([...(job.formerBoardIds ?? []), job.boardId])].filter(Boolean),
+      status: 'done',
+      turns: 0,
+      lowered: { stopped: busy },
+    },
+  }
+}
+
+// Moves a job's board chat back to headless: the chat is stopped and removed from the board, and
+// its conversation goes on as the job's headless session. Returns what happened, in words.
+export async function lowerJob(file) {
+  const lock = takeLock(file)
+  if (!lock) return `"${readJob(file).name ?? readJob(file).hit?.key}" is moving to or from Session Board: try again in a minute`
+  let plan
+  let removed = ''
+  try {
+    const job = readJob(file)
+    let agent = null
+    if (job.boardId) {
+      agentsCache = null
+      agent = boardAgentOf(job, backgroundAgents()) ?? null
+    }
+    plan = lowerPlan(job, agent)
+    if (!plan.fields) return plan.message
+    if (plan.stop) {
+      const run = spawnSync(CLAUDE, ['stop', plan.stop], { encoding: 'utf8', timeout: 30_000, env: { ...process.env, PATH: CHILD_PATH } })
+      if (run.status !== 0) throw new Error(`claude stop ${plan.stop} exited ${run.status ?? run.signal}: ${(run.stderr || run.stdout || '').trim().slice(0, 200)}`)
+    }
+    if (plan.remove) {
+      // `claude rm` refuses a chat whose worktree has unpushed or uncommitted work: then the
+      // stopped chat stays on the board for Liam to delete, and the job goes headless all the same.
+      const run = spawnSync(CLAUDE, ['rm', plan.remove], { encoding: 'utf8', timeout: 60_000, env: { ...process.env, PATH: CHILD_PATH } })
+      if (run.status !== 0) removed = ` Its stopped chat stays on the board: claude rm said "${(run.stderr || run.stdout || '').trim().split('\n')[0].slice(0, 160)}"`
+    }
+    // Messages held for the board chat go to the headless session instead.
+    const messages = job.undelivered?.length ? job.undelivered : null
+    updateJob(file, { ...plan.fields, ...(plan.busy && { undelivered: null }) })
+    log('lowered', { key: job.hit.key, name: plan.name, from: job.boardId, busy: plan.busy, removed: !removed })
+    if (plan.busy) await resumeJob(file, messages)
+  } finally {
+    try { unlinkSync(lock) } catch {}
+  }
+  return `"${plan.name}" is headless again${plan.busy ? ': its stopped turn carries on headless' : ''}.${removed}`
+}
+
+async function headlessFromCli(query) {
+  const matches = matchJob(allJobs(), query).filter(({ job }) => job.boardId && !['archived', 'closed'].includes(job.status))
+  if (matches.length !== 1) {
+    console.log(matches.length ? `slack-eyes: "${query}" matches ${matches.length} board jobs:` : `slack-eyes: no job on Session Board matches "${query}"`)
+    listJobs(matches.length ? matches : allJobs().filter(({ job }) => job.boardId && !['archived', 'closed'].includes(job.status)))
+    process.exitCode = 1
+    return
+  }
+  console.log(`slack-eyes: ${await lowerJob(matches[0].file)}`)
+}
+
 // `--open <job>`: raise one job. With no job, or several matches, it lists them.
 async function openFromCli(query) {
   const matches = matchJob(allJobs(), query)
@@ -1755,7 +1839,7 @@ function listJobs(only = null) {
     const where = job.boardId ? `board ${job.boardId}` : ['queued', 'running'].includes(job.status) ? 'headless, running' : 'headless'
     console.log(`${String(job.status ?? '?').padEnd(16)} ${where.padEnd(18)} ${(job.name || titleOf(job.hit.text ?? '')).slice(0, 60).padEnd(60)} ${String(job.sessionId ?? '').slice(0, 8)}`)
   }
-  console.log('\nslack-eyes.mjs --open <name part | session id | Slack link> moves one to Session Board')
+  console.log('\nslack-eyes.mjs --open <name part | session id | Slack link> moves one to Session Board; --headless <same> moves one back')
 }
 
 // Every page of reactions.list, so a baseline marks all of Liam's existing :eyes:, not only the newest 50.
@@ -1895,13 +1979,14 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
     : args.has('--lesson') ? lessonFromSession(...argv.slice(argv.indexOf('--lesson') + 1, argv.indexOf('--lesson') + 5))
     : args.has('--set') ? setFromSession(argv[argv.indexOf('--set') + 1], argv[argv.indexOf('--set') + 2], argv[argv.indexOf('--set') + 3])
     : args.has('--open') ? openFromCli(argv.slice(argv.indexOf('--open') + 1).join(' '))
+    : args.has('--headless') ? headlessFromCli(argv.slice(argv.indexOf('--headless') + 1).join(' '))
     : args.has('--thread') ? threadFromCli(argv[argv.indexOf('--thread') + 1], argv[argv.indexOf('--thread') + 2])
     : args.has('--posted') ? postedFromCli(...argv.slice(argv.indexOf('--posted') + 1, argv.indexOf('--posted') + 4))
     : args.has('--list') ? Promise.resolve(listJobs())
     : main()
   work.catch((error) => {
-    log(args.has('--run') ? 'job_failed' : args.has('--set') ? 'set_failed' : args.has('--open') ? 'open_failed' : args.has('--thread') || args.has('--posted') ? 'thread_add_failed' : 'run_failed', { job, error: String(error.message ?? error) })
-    if (['--set', '--open', '--list', '--thread'].some((flag) => args.has(flag))) console.error(`slack-eyes: ${error.message ?? error}`)
+    log(args.has('--run') ? 'job_failed' : args.has('--set') ? 'set_failed' : args.has('--open') ? 'open_failed' : args.has('--headless') ? 'headless_failed' : args.has('--thread') || args.has('--posted') ? 'thread_add_failed' : 'run_failed', { job, error: String(error.message ?? error) })
+    if (['--set', '--open', '--headless', '--list', '--thread'].some((flag) => args.has(flag))) console.error(`slack-eyes: ${error.message ?? error}`)
     process.exitCode = 1
   })
 }

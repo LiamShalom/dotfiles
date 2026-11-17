@@ -742,3 +742,43 @@ test('a post with no team is outside SideShift (fails closed), Liam never is', (
   const found = peopleInThread([{ ts: '5.000002', user: 'U0X1', text: 'hi' }, { ts: '5.000003', user: 'U0B78R52DFT', text: 'me' }], '5.000001')
   assert.deepEqual(found.map((m) => Boolean(m.outside)), [true, false])
 })
+
+import { lowerPlan, loweredPrompt } from './slack-eyes.mjs'
+
+const boardJob = (over = {}) => ({ status: 'on_board', name: 'acme: broken page', sessionId: 's-old', boardId: 'b1', hit: { key: 'C1:1.0', text: 'x' }, ...over })
+
+test('--headless: an idle board chat is removed and its conversation waits headless for the thread', () => {
+  const plan = lowerPlan(boardJob({ formerSessions: ['s-older'], turns: 7 }), { id: 'b1', pid: 42, status: 'idle', sessionId: 's-new' })
+  assert.equal(plan.busy, false)
+  assert.equal(plan.stop, 'b1')
+  assert.equal(plan.remove, 'b1')
+  assert.deepEqual(plan.fields, { sessionId: 's-new', boardId: null, formerSessions: ['s-older', 's-old'], formerBoardIds: ['b1'], status: 'done', turns: 0, lowered: { stopped: false } })
+})
+
+test('--headless: a chat mid-turn is stopped and carries on headless', () => {
+  const plan = lowerPlan(boardJob(), { id: 'b1', pid: 42, status: 'busy', sessionId: 's-old' })
+  assert.equal(plan.busy, true)
+  assert.deepEqual(plan.fields.formerSessions, [])
+  assert.deepEqual(plan.fields.lowered, { stopped: true })
+  assert.match(loweredPrompt(plan.fields.lowered), /carry on from where it stopped/)
+  assert.doesNotMatch(loweredPrompt({ stopped: false }), /carry on/)
+})
+
+test('--headless: an asleep chat is only removed; a deleted chat leaves nothing to stop', () => {
+  const asleep = lowerPlan(boardJob(), { id: 'b1', pid: null, status: 'idle', sessionId: 's-old' })
+  assert.equal(asleep.stop, null)
+  assert.equal(asleep.remove, 'b1')
+  assert.equal(asleep.busy, false)
+  const gone = lowerPlan(boardJob(), null)
+  assert.equal(gone.stop, null)
+  assert.equal(gone.remove, null)
+  assert.equal(gone.fields.sessionId, 's-old')
+})
+
+test('--headless refuses a headless, archived, closed or moving job', () => {
+  assert.match(lowerPlan(boardJob({ boardId: null, status: 'done' }), null).message, /already headless/)
+  assert.match(lowerPlan(boardJob({ status: 'archived' }), null).message, /archived/)
+  assert.match(lowerPlan(boardJob({ status: 'closed' }), null).message, /closed/)
+  assert.match(lowerPlan(boardJob({ status: 'handing_off' }), null).message, /try again/)
+  assert.equal(lowerPlan(boardJob({ status: 'archived' }), null).fields, undefined)
+})
