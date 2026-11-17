@@ -127,6 +127,12 @@ branch off `origin/main`. Its size check and Phase 9 are the merge rule:
   `blast-radius` on it first, and for a messaging shape the `messaging-compat` check. A schema
   migration ships through `/ship-migration`.
 
+When the message links a Figma frame, load the repo's `figma-to-code` skill before you write
+UI. Build the frame's layout, not the closest shipped screen with new text in it. Before you
+show the result, put a screenshot of the preview next to the frame's screenshot and list each
+difference. (2026-11-17: a trial-checkout Figma card shipped as the old full-screen split, and
+Liam said "this looks like the old one".)
+
 A data repair on a real customer account: do the dry run and manifest
 (`investigate-slack-issue` `references/repair.md`), check the manifest, then run it.
 
