@@ -743,7 +743,7 @@ test('a post with no team is outside SideShift (fails closed), Liam never is', (
   assert.deepEqual(found.map((m) => Boolean(m.outside)), [true, false])
 })
 
-import { lowerPlan, loweredPrompt } from './slack-eyes.mjs'
+import { lowerPlan, loweredPrompt, isArchived } from './slack-eyes.mjs'
 
 const boardJob = (over = {}) => ({ status: 'on_board', name: 'acme: broken page', sessionId: 's-old', boardId: 'b1', hit: { key: 'C1:1.0', text: 'x' }, ...over })
 
@@ -752,7 +752,7 @@ test('--headless: an idle board chat is removed and its conversation waits headl
   assert.equal(plan.busy, false)
   assert.equal(plan.stop, 'b1')
   assert.equal(plan.remove, 'b1')
-  assert.deepEqual(plan.fields, { sessionId: 's-new', boardId: null, formerSessions: ['s-older', 's-old'], formerBoardIds: ['b1'], status: 'done', turns: 0, lowered: { stopped: false } })
+  assert.deepEqual(plan.fields, { sessionId: 's-new', boardId: null, formerSessions: ['s-older', 's-old'], formerBoardIds: ['b1'], loweredBoardIds: ['b1'], status: 'done', turns: 0, model: 'opus', lowered: { stopped: false } })
 })
 
 test('--headless: a chat mid-turn is stopped and carries on headless', () => {
@@ -781,4 +781,22 @@ test('--headless refuses a headless, archived, closed or moving job', () => {
   assert.match(lowerPlan(boardJob({ status: 'closed' }), null).message, /closed/)
   assert.match(lowerPlan(boardJob({ status: 'handing_off' }), null).message, /try again/)
   assert.equal(lowerPlan(boardJob({ status: 'archived' }), null).fields, undefined)
+})
+
+test('--headless: a board chat that stayed on the board can be archived without closing the job', () => {
+  const lowered = { ...boardJob({ model: 'sonnet' }), ...lowerPlan(boardJob({ model: 'sonnet' }), { id: 'b1', pid: 42, status: 'idle', sessionId: 's-new' }).fields }
+  assert.equal(lowered.model, 'opus')
+  const archive = { sessions: new Set(['s-new']), ids: new Set(['b1']), bySession: new Map([['s-new', 'b1']]) }
+  assert.equal(isArchived(lowered, archive), false)
+  // A later board chat of the same job, raised again and archived, still closes it.
+  const raisedAgain = { ...lowered, boardId: 'b2', formerBoardIds: ['b1'] }
+  assert.equal(isArchived(raisedAgain, { sessions: new Set(['s-new']), ids: new Set(['b2']), bySession: new Map([['s-new', 'b2']]) }), true)
+  // Jobs never moved back keep the old rule.
+  assert.equal(isArchived(boardJob(), { sessions: new Set(), ids: new Set(['b1']), bySession: new Map() }), true)
+})
+
+test('--headless: a waiting :saluting_face: note starts a headless turn now, not on the next message', () => {
+  const plan = lowerPlan(boardJob({ requestNote: { ts: '5.0', text: 'build it' } }), { id: 'b1', pid: 42, status: 'idle', sessionId: 's-new' })
+  assert.equal(plan.busy, true)
+  assert.deepEqual(plan.fields.lowered, { stopped: false })
 })

@@ -956,7 +956,7 @@ export function loomNote(text, read = (id) => execFileSync(join(homedir(), '.cla
 function headlessTurn(job, messages, text, draft = '') {
   if (raiseAsked(job)) return { out: null, failure: null, raised: true, ran: false }
   // The first headless turn after Liam moved the job off the board says so.
-  const lowered = job.lowered ? `${loweredPrompt(job.lowered)}\n\n` : ''
+  const lowered = job.lowered ? `${loweredPrompt(job.lowered)}${job.requestNote ? `\n\n${requestNotePrompt(job)}` : ''}\n\n` : ''
   const input = text
     ? ['-p', lowered + text, '--resume', job.sessionId]
     : messages
@@ -1033,7 +1033,7 @@ async function runJob(file) {
     job = updateJob(file, { turns: (job.turns ?? 0) + 1, pending: null, turnFromTs: before })
     log('run_started', { key: job.hit.key, sessionId: job.sessionId, turn: job.turns, followUps: messages?.length ?? 0 })
     turn = headlessTurn(job, messages, null, draft)
-    if (job.lowered) job = updateJob(file, { lowered: null })
+    if (job.lowered) job = updateJob(file, (current) => ({ lowered: null, requestNote: noteAfterSend(current.requestNote, job.requestNote) }))
     // Raised before this turn started: its thread messages go to the board chat instead.
     if (turn.raised && !turn.ran) unsent = messages
     // Checks on the result, re-run after every extra turn they cause; each extra prompt at most once.
@@ -1214,15 +1214,19 @@ async function recoverJobs() {
 const readArchive = () => {
   try {
     const raw = JSON.parse(readFileSync(ARCHIVE, 'utf8'))
-    return { sessions: new Set(Object.keys(raw)), ids: new Set(Object.values(raw).map((entry) => entry?.id)) }
+    return { sessions: new Set(Object.keys(raw)), ids: new Set(Object.values(raw).map((entry) => entry?.id)), bySession: new Map(Object.entries(raw).map(([session, entry]) => [session, entry?.id])) }
   } catch {
     return { sessions: new Set(), ids: new Set() }
   }
 }
 // A resumed board chat runs under a new id; the ones it had before still count.
-export const isArchived = (job, archive) =>
-  [job.sessionId, ...(job.formerSessions ?? [])].some((id) => archive.sessions.has(id)) ||
-  [job.boardId, ...(job.formerBoardIds ?? [])].some((id) => id && archive.ids.has(id))
+// A chat Liam moved back to headless (`--headless`) that stayed on the board does not count: archiving
+// it is how he clears it, and the job goes on headless.
+export const isArchived = (job, archive) => {
+  const left = new Set(job.loweredBoardIds ?? [])
+  return [job.sessionId, ...(job.formerSessions ?? [])].some((id) => archive.sessions.has(id) && !(archive.bySession && left.has(archive.bySession.get(id)))) ||
+    [job.boardId, ...(job.formerBoardIds ?? [])].some((id) => id && !left.has(id) && archive.ids.has(id))
+}
 
 // The background sessions `claude agents` lists, read once per check and only when needed.
 let agentsCache = null
@@ -1752,7 +1756,9 @@ export function lowerPlan(job, agent) {
   if (['archived', 'closed'].includes(job.status)) return { name, message: `"${name}" is ${job.status}` }
   if (job.status === 'handing_off') return { name, message: `"${name}" is moving to Session Board: try again in a minute` }
   const sessionId = agent?.sessionId ?? job.sessionId
-  const busy = Boolean(agent?.pid) && agent.status !== 'idle'
+  const stopped = Boolean(agent?.pid) && agent.status !== 'idle'
+  // A :saluting_face: note waiting for the chat is work to start now, as a stopped turn is.
+  const busy = stopped || Boolean(job.requestNote)
   return {
     name,
     busy,
@@ -1763,9 +1769,12 @@ export function lowerPlan(job, agent) {
       boardId: null,
       formerSessions: [...new Set([...(job.formerSessions ?? []), job.sessionId])].filter((s) => s && s !== sessionId),
       formerBoardIds: [...new Set([...(job.formerBoardIds ?? []), job.boardId])].filter(Boolean),
+      loweredBoardIds: [...new Set([...(job.loweredBoardIds ?? []), job.boardId, agent?.id])].filter(Boolean),
       status: 'done',
       turns: 0,
-      lowered: { stopped: busy },
+      // The board conversation ran on Opus; switching model mid-conversation loses its cache too.
+      model: 'opus',
+      lowered: { stopped },
     },
   }
 }
@@ -1794,7 +1803,7 @@ export async function lowerJob(file) {
       // `claude rm` refuses a chat whose worktree has unpushed or uncommitted work: then the
       // stopped chat stays on the board for Liam to delete, and the job goes headless all the same.
       const run = spawnSync(CLAUDE, ['rm', plan.remove], { encoding: 'utf8', timeout: 60_000, env: { ...process.env, PATH: CHILD_PATH } })
-      if (run.status !== 0) removed = ` Its stopped chat stays on the board: claude rm said "${(run.stderr || run.stdout || '').trim().split('\n')[0].slice(0, 160)}"`
+      if (run.status !== 0) removed = ` Its stopped chat stays on the board (claude rm said "${(run.stderr || run.stdout || '').trim().split('\n')[0].slice(0, 160)}"): archiving it leaves the job running headless.`
     }
     // Messages held for the board chat go to the headless session instead.
     const messages = job.undelivered?.length ? job.undelivered : null
@@ -1804,7 +1813,7 @@ export async function lowerJob(file) {
   } finally {
     try { unlinkSync(lock) } catch {}
   }
-  return `"${plan.name}" is headless again${plan.busy ? ': its stopped turn carries on headless' : ''}.${removed}`
+  return `"${plan.name}" is headless again${plan.fields?.lowered.stopped ? ': its stopped turn carries on headless' : plan.busy ? ': its build request starts headless now' : ''}.${removed}`
 }
 
 async function headlessFromCli(query) {
