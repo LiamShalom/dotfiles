@@ -162,6 +162,10 @@ Never fill the gap with a guess in the reply.
   screen, signed in to the account that manages it. Ask for their Page only when the requested ID is
   on none of their contracts. (courtney: facebook page mismatch, 2026-11-17: asking first cost a second reply.) The 403 on
   `POST /api/public/audience-connect` does not log which Page Meta returned.
+- `requested_account_mismatch` when the creator ticked the right Page: the request `handle` can be the Page's Graph
+  (internal) Page ID, not its public ID. Crawlzo on the handle then returns the same Page name with a different
+  `profile_id`. Before #10710 (merged 2026-11-17) the link matched only the public ID or vanity name, so it refused
+  the right Page. Since then it also accepts the Graph Page ID (storytale openart: facebook page mismatch).
 - The contract tracks a profile and the creator made a new Page: the brand's old request link names the
   profile and refuses the Page, and a brand cannot request a handle that is not on its contract
   (`creator-audience-request.usecase.ts`). The creator adds Facebook on the campaign herself, signed in,
