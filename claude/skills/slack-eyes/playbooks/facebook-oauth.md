@@ -92,6 +92,14 @@ Never fill the gap with a guess in the reply.
    `[creator-social-oauth] {json}` with `event`, `stage`, `reason`, `creatorId` and an `attemptId`
    that ties the start, callback and completion of one try together. A `facebook_page_required` with
    a successful `oauth_token_exchange` proves the sign-in worked and Meta sent no postable Page.
+   Pass `since`/`until` (not `from`/`to`, which are ignored and give the last 15 minutes). Each hit shows only
+   one line per request, so the refusal reason is hidden: search the `attemptId` to get the try's steps, then
+   search the reason code as `text` in a 10-minute window; a hit on the same request proves it. An `oauth_start`
+   with no `oauth_callback` for its `attemptId` means the creator never got past Meta's own login.
+   Instagram links work the same way: `instagram.entry.ts` refuses any signed-in username other than the
+   link's `handle` with `requested_account_mismatch`, and the page then asks for a new sign-in (it looks
+   like a loop). Gloria (2026-11-17) was signed in to a different Instagram account than the link's.
+   Read a screen recording with ffmpeg: frames at `fps=1/2`, tiled `5x2` into one image.
 
 ### What to reply
 
