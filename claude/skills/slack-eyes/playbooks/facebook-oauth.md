@@ -155,5 +155,12 @@ Never fill the gap with a guess in the reply.
   screen, signed in to the account that manages it. Ask for their Page only when the requested ID is
   on none of their contracts. (courtney: facebook page mismatch, 2026-11-17: asking first cost a second reply.) The 403 on
   `POST /api/public/audience-connect` does not log which Page Meta returned.
+- The contract tracks a profile and the creator made a new Page: the brand's old request link names the
+  profile and refuses the Page, and a brand cannot request a handle that is not on its contract
+  (`creator-audience-request.usecase.ts`). The creator adds Facebook on the campaign herself, signed in,
+  ticking the Page: a signed-in add on a contract the brand chose is approved with no brand review
+  (`createHandleRequest` in `lib/handle-request-utils.ts`, status `added` in `my-gigs/handles.usecase.ts`).
+  Facebook is not a per-brand share provider (`BRAND_SHARE_PROVIDERS` in `lib/platforms.ts`), so no new
+  brand request is needed. Say "add", not "change": an edit retires the old profile row. (melaxin: fb profile needs a page.)
 - A brand asks to skip Facebook for one creator: Customize on the held contract and remove the platform
   that is missing (prove which one from step 4 first).
