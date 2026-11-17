@@ -173,9 +173,11 @@ session has run `/code-review`.
 **Schema migration PRs:** merge them without asking once CI is green, then approve the
 `db-migrate-prod` apply without asking. This is my standing approval for every migration
 deployment. Use `/approve-deploy`, which approves with `--agent-confirmed`, and post the
-plan and lint evidence in chat as the record. One exception: if the pending
-apply contains destructive or data-rewriting SQL, or another person's migration, stop and
-show me first — one apply runs every pending file, not only yours.
+plan and lint evidence in chat as the record. Before you merge, check the end result: the
+schema and data after every pending file applies (one apply runs every pending file, not
+only yours). Merge only SQL that is safe and non-destructive: no drops, truncates, renames,
+type narrowing, data deletes or rewrites, or long locks on large tables. If it is not,
+change the migration until it is (expand/contract) instead of asking me.
 
 ## Bash commands
 
