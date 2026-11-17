@@ -12,7 +12,8 @@ longer matches, fix this file (step 7 of the skill).
 
 Earlier runs lost time on: hedging which account Whop flagged (one grep answers it, see below), giving
 times in the wrong time zone (check the screenshot clock; one reporter was UTC+2), and promising "checking with
-Whop" in the thread. This run cannot contact Whop: promise no vendor contact. A freeze, a void or a refund is
+Whop" in the thread. This run cannot contact Whop: promise no vendor contact, and do not propose asking Whop
+(petaluma health 11-17, Liam: "no need to contact whop"; `slack-as-liam` now refuses such a post). A freeze, a void or a refund is
 a money and risk call: prepare the facts, then `needs_liam` with `only_liam_can`.
 
 ## How it works

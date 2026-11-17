@@ -13,6 +13,16 @@ case "${1:-}" in
   *) echo "slack-as-liam: method '${1:-}' is not allowed" >&2; exit 2 ;;
 esac
 
+# An agent post must not promise vendor contact that Liam has not asked for (coldtrace 11-17,
+# petaluma health 11-17: "no need to contact whop"). VENDOR_CONTACT_OK=1 when he asked for it.
+if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ "${VENDOR_CONTACT_OK:-}" != 1 ] && { [ "$1" = chat.postMessage ] || [ "$1" = chat.update ]; }; then
+  text=$(printf '%s\n' "$@" | sed -n 's/^text=//p')
+  if printf '%s' "$text" | grep -Eiq "(check(ing)?|ask(ing)?|reach(ing)? out|ping(ing)?|follow(ing)? up|loop(ing)? in|escalat(e|ing)|contact(ing)?|email(ing)?)( back)? (with |to |in )?(whop|stripe|meta|facebook|tiktok|apify|crawlzo|revenuecat|vercel|google|apple|shopify)\b"; then
+    echo "slack-as-liam: this text promises contact with a vendor. Liam did not ask for that; drop the promise (set VENDOR_CONTACT_OK=1 only when he asked for the contact)." >&2
+    exit 2
+  fi
+fi
+
 if ! token=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null); then
   echo "slack-as-liam: no token in Keychain (service claude-slack-user-token). See ~/dotfiles/claude/slack/README.md" >&2
   exit 1
