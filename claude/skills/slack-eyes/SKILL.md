@@ -117,6 +117,8 @@ state behind it, and read the other jobs your first prompt lists: one may alread
 same incident. "Paused for a short maintenance step" (`pg2_write_fenced`) is also what users see
 when the database does not answer; a planned switch shows only as `PG2_<CHUNK>_WRITE_FENCE`
 enabled in `rollout_flags`. List every claim in your reply that nothing proves in `unproven_claims`.
+In a headless run the watcher does not post a reply that lists one: it sends it back once to prove or
+drop, so the thread never reads a guess that a correction takes back.
 
 
 **Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread
@@ -149,7 +151,10 @@ A data repair on a real customer account: do the dry run and manifest
 ## 5. Reply as Liam
 
 Before you write, read the thread again. If Liam or someone else already answered after the
-:eyes:, do not repeat them: add only what is new, or post nothing.
+:eyes:, do not repeat them: add only what is new, or post nothing. When a SideShift teammate is
+handling the reporter's follow-up (it is addressed to them, or they answered it), do not step in
+or speak for them: post nothing, unless someone asks Liam directly. Never promise what someone
+else will do.
 
 Write the reply in Liam's voice:
 
@@ -161,7 +166,7 @@ Write the reply in Liam's voice:
    closing period, no exclamation marks, and no emoji.
 3. Use the "Reply" content rules in step 7 of `investigate-slack-issue`: check every claim,
    never admit fault to a customer or creator, and give a cause only when they asked why.
-   Ignore its draft step: here you post the reply yourself.
+   Ignore its draft step: the :eyes: approves the reply (sent as below).
 
 What the reply says depends on the outcome:
 
@@ -184,8 +189,15 @@ issue (the author of the message Liam put :eyes: on; the watcher's prompt names 
 "Reporter to tag" line). A status reply tags nobody: "found it, fixing" (step 4), "fix held for
 review", "held for Liam's decision", "still looking", and the watcher's "taking a look" and
 interim updates. Never tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a
-message with a `bot_id` or the subtype `bot_message` came from an app, so tag nobody. Send it
-(drop the `<@USERID> ` for a status reply):
+message with a `bot_id` or the subtype `bot_message` came from an app, so tag nobody.
+
+**In a headless run, do not post the reply yourself.** Return it in `reply` (step 7), with the tag
+first when it needs one. The watcher checks `unproven_claims` and posts it as Liam after you return;
+new thread messages that arrive first come back to you with the unposted reply to revise. This
+covers your answer, a question to the reporter (step 5b) and the facts before a hold (step 6). You
+still post step 4's "found it, fixing" update, reactions, and messages in other threads yourself.
+
+In a Session Board session, send it (drop the `<@USERID> ` for a status reply):
 
 ```sh
 ~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"
@@ -221,8 +233,10 @@ Follow its sections 1 to 3, with these changes:
   the reply without images.
 - **Phone-only steps:** no screenshots; write the steps.
 
-Skip its section 4 (approval): the :eyes: approves the reply and its images. Post the reply (step 5),
-then each image in click order, and check each for `"ok":true`:
+Skip its section 4 (approval): the :eyes: approves the reply and its images. In a headless run, list
+the PNG paths in `reply_images` in click order; the watcher uploads them right after the reply. In a
+Session Board session, post the reply (step 5), then each image in click order, and check each for
+`"ok":true`:
 
 ```sh
 ~/.claude/bin/slack-as-liam upload <channel> <png> "" <thread ts>
@@ -235,15 +249,15 @@ Refer to the images in the reply by their order ("1st one", "2nd and 3rd"), as t
 When you need a fact only the reporter has, first try to find it yourself: look the account up
 by name, email, handle, company, or a screenshot detail. If you still cannot, ask in the thread,
 as Liam, in his voice, tagging the reporter: one short message with the one or two things you
-need (for example "whats her email or handle on sideshift"). Then return `needs_reporter` with
-that question (step 7). Do not wait or poll. The watcher reads the thread and resumes you with
+need (for example "whats her email or handle on sideshift"). In a headless run that message is
+your `reply`. Then return `needs_reporter` with that question (step 7). Do not wait or poll. The watcher reads the thread and resumes you with
 their reply. Ask again only for something new; never repeat a question already in the thread.
 
 ## 6. When something needs Liam
 
 Liam is needed when step 4 held a merge or a repair, when you could not prove the cause, or
-when the only safe next step is his. Do everything up to that point first: post the thread
-reply (step 5), and have the PR ready or the repair dry-run done. Then return `needs_liam`
+when the only safe next step is his. Do everything up to that point first: write the thread
+reply (step 5; in a headless run it goes in `reply`), and have the PR ready or the repair dry-run done. Then return `needs_liam`
 (step 7) with the one question he must answer. Do not wait or poll for him.
 
 After you return, the watcher moves this session onto the board and sends you one more turn.
@@ -298,8 +312,10 @@ Then return the result the watcher asks for:
   guess; put what you found in `summary` and what is left in `question`. The watcher resumes
   this session on Opus to finish it.
 - `name`: `<brand>: <issue>`, as defined at the top.
-- `summary`: two or three sentences: the cause, the PR and whether it merged, and the reply
-  you posted.
+- `summary`: two or three sentences: the cause, the PR and whether it merged, and the reply.
+- `reply`: the message the watcher posts as Liam in the job's thread (step 5), or empty when
+  nothing should be posted. Every return carries the full reply still to post, also after a
+  check sends you back. `reply_images`: the PNG paths from step 5a, in order.
 - `question`: for `needs_liam`, the one thing Liam must answer; for `needs_reporter`, the
   question you posted; for `needs_opus`, what is left to do.
 - `hold_reason`: for `needs_liam`, which held step it is (`large_merge_held`, `only_liam_can`,

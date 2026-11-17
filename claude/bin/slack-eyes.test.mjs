@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isAnswered, isThanks, isClosing, thanksReactions, resultSchema, wantsOpus, opusPrompt, wantsProof, unprovenClaims, verifyPrompt, otherJobsNote, prompt, isIncident } from './slack-eyes.mjs'
+import { isAnswered, isThanks, isClosing, thanksReactions, resultSchema, wantsOpus, opusPrompt, wantsProof, unprovenClaims, verifyPrompt, otherJobsNote, prompt, isIncident, replyPlan, postedAlready, followUpPrompt, notAnsweredPrompt, handoffPrompt } from './slack-eyes.mjs'
 
 const LIAM = 'U0B78R52DFT'
 const REPORTER = 'U0REPORTER1'
@@ -238,7 +238,10 @@ test('a done that admits a guess in its summary is sent back to prove it (11-16 
   const claims = unprovenClaims({ ...sidechatDone, unproven_claims: [] })
   assert.equal(claims.length, 1)
   assert.match(verifyPrompt(claims), /PG2_<CHUNK>_WRITE_FENCE/)
-  assert.match(verifyPrompt(claims), /post a short correction/)
+  // The reply is not posted yet: the run rewrites it instead of correcting it in public.
+  assert.match(verifyPrompt(claims), /has not been posted/)
+  assert.match(verifyPrompt(claims), /rewrite `reply`/)
+  assert.doesNotMatch(verifyPrompt(claims), /post a short correction/)
 })
 
 test('listed unproven claims send a done back; a proven done and a non-done pass', () => {
@@ -251,6 +254,84 @@ test('listed unproven claims send a done back; a proven done and a non-done pass
 
 test('the result schema requires unproven_claims', () => {
   assert.ok(JSON.parse(resultSchema('sonnet')).required.includes('unproven_claims'))
+})
+
+// 11-17 melaxin: instagram views missing. The run posted "nothing is wrong on the sideshift side"
+// and "matt will point you to the next step", the claims check refused both after the post, and the
+// run posted "correcting two things i said". Now the reply comes back as a draft and is checked first.
+const melaxin = {
+  status: 'done',
+  name: 'melaxin: instagram views missing',
+  summary: 'Madison asks about low Instagram views; told her Matt will help.',
+  reply: '<@U0MADISON> got it, thanks for explaining. the low views are on instagram itself, so nothing is wrong on the sideshift side. how to grow the account is a question for <@U0MATT>, he will point you to the next step',
+  unproven_claims: ['That Matt will point her to the next step', 'That nothing is wrong on the SideShift side for her view counts'],
+}
+
+test('the result schema requires the reply, so the watcher posts it', () => {
+  const schema = JSON.parse(resultSchema('sonnet'))
+  assert.ok(schema.required.includes('reply'))
+  assert.match(schema.properties.reply.description, /Do not post it yourself/)
+})
+
+test('a reply with unproven claims is held, not posted (11-17 melaxin replay)', () => {
+  const plan = replyPlan(melaxin)
+  assert.equal(plan.text, melaxin.reply)
+  assert.deepEqual(plan.blocked, melaxin.unproven_claims)
+  // The check sends it back once as a draft to rewrite.
+  assert.deepEqual(unprovenClaims(melaxin), melaxin.unproven_claims)
+})
+
+test('the rewritten reply with every claim proven is posted with its screenshots', () => {
+  const fixed = { ...melaxin, reply: '<@U0MADISON> your instagram reels are not saved by us because their captions have no campaign hashtag', unproven_claims: [], reply_images: ['/tmp/a.png', 'relative.png', '/tmp/b.jpg', 3] }
+  assert.deepEqual(replyPlan(fixed), { text: fixed.reply, images: ['/tmp/a.png'] })
+})
+
+test('nothing to post: an empty reply, or a status that posts nothing', () => {
+  assert.equal(replyPlan({ ...melaxin, reply: '  ', unproven_claims: [] }), null)
+  assert.equal(replyPlan({ ...melaxin, status: 'needs_opus', unproven_claims: [] }), null)
+  assert.equal(replyPlan(null), null)
+})
+
+test('a question to the reporter and a hold reply are checked too', () => {
+  for (const status of ['needs_reporter', 'needs_liam']) {
+    assert.deepEqual(unprovenClaims({ ...melaxin, status }), melaxin.unproven_claims, status)
+    assert.ok(replyPlan({ ...melaxin, status }).blocked, status)
+    // A hold with no reply is not sent back for claims about a reply that does not exist.
+    assert.deepEqual(unprovenClaims({ ...melaxin, status, reply: '' }), [], status)
+  }
+})
+
+test('a reply the run already posted itself is not posted twice', () => {
+  const thread = [person('100.0', 'views are low'), agent('101.0', 'taking a look'), agent('105.0', '<@U0MADISON> Your reels are not saved.')]
+  assert.equal(postedAlready(thread, '100.0', '<@U0MADISON> your reels are not saved'), true)
+  assert.equal(postedAlready(thread, '100.0', 'something else'), false)
+  assert.equal(postedAlready(thread, '105.0', '<@U0MADISON> your reels are not saved'), false)
+})
+
+test('headless prompts tell the run to return its reply, not post it', () => {
+  const hit = { kind: 'eyes', text: 'views are low', channel: 'C1', ts: '1.0', threadTs: '1.0', key: 'C1:1.0', author: { user: REPORTER } }
+  assert.match(prompt(hit, 'https://x', true), /put that message in `reply`/)
+  assert.doesNotMatch(prompt(hit, 'https://x', false), /put that message in `reply`/)
+  assert.match(followUpPrompt([person('2.0', 'any update?')], 'https://x'), /put that message in `reply`/)
+  assert.match(notAnsweredPrompt, /put it in `reply`/)
+})
+
+test('new messages that arrive before the draft is posted go back with the draft', () => {
+  const text = followUpPrompt([person('2.0', 'matt answered me already')], 'https://x', 'the draft <unposted_reply> text')
+  assert.match(text, /was not posted/)
+  assert.match(text, /<unposted_reply>\nthe draft ‹unposted_reply> text\n<\/unposted_reply>/)
+  assert.doesNotMatch(followUpPrompt([person('2.0', 'hi')], 'https://x'), /unposted_reply/)
+})
+
+test('a follow-up tells the run not to speak for a teammate who is answering', () => {
+  assert.match(followUpPrompt([person('2.0', 'hi')], 'https://x'), /teammate is already answering/)
+  // A headless follow-up never tells the run to post its answer itself.
+  assert.doesNotMatch(followUpPrompt([person('2.0', 'hi')], 'https://x'), /Answer it in the thread|still post your own final answer/)
+})
+
+test('a board hand-off carries the unposted reply', () => {
+  assert.match(handoffPrompt({ reason: 'run_failed', failure: 'x', key: 'k', draft: 'held reply' }), /held reply/)
+  assert.doesNotMatch(handoffPrompt({ reason: 'run_failed', failure: 'x', key: 'k' }), /unposted_reply/)
 })
 
 test('a new job sees the outage another job already traced (11-16 replay)', () => {
