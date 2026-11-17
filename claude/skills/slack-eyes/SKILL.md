@@ -95,6 +95,11 @@ Follow steps 3 to 5 of `investigate-slack-issue`. Prove the cause with evidence.
 problem is the customer's own action or working as designed, the reply says what they must do.
 
 ## 4. Fix
+For a status alert or outage, start with `#database-alerts` (C0B96GSUHDZ) and `#prod-alerts` in the
+same window, and for any database symptom find the hot query (pg_stat_statements on the read replica,
+Query Insights with gcloud). A symptom (a traffic spike, an error code) is not the cause. Once the
+cause is found, fixing it is the job: an outage fix merges under the merge rule above, not as a question.
+
 
 **Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread
 sees that work. Before you write code, read the thread again and post one short update as Liam

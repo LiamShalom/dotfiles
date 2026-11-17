@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt } from './slack-eyes.mjs'
+import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt, wantsProof } from './slack-eyes.mjs'
 
 const LIAM = 'U0B78R52DFT'
 const REPORTER = 'U0REPORTER1'
@@ -197,4 +197,13 @@ test(':tv: picks the running job in its thread over an older closed one, and nev
   assert.equal(threadJob([j('old', '1794000000.000001', 'closed'), j('older', '1793000000.000001', 'closed')], hit).job.sessionId, 'old')
   assert.deepEqual(threadJob([j('a', '1794000000.000001', 'done'), j('b', '1794000100.000001', 'waiting_reporter')], hit).several, ['a', 'b'])
   assert.equal(threadJob([j('gone', '1794000000.000001', 'archived')], hit), null)
+})
+
+test('an Opus cause_unproven goes back once for the incident checks; a real hold does not', () => {
+  // The 11-16 Connect/DB outage result, as returned.
+  const outage = { status: 'needs_liam', hold_reason: 'cause_unproven', name: 'connect: postgres pool saturated' }
+  assert.equal(wantsProof('opus', outage), true)
+  assert.equal(wantsProof('sonnet', outage), false)
+  assert.equal(wantsProof('opus', { status: 'needs_liam', hold_reason: 'large_merge_held' }), false)
+  assert.equal(wantsProof('opus', { status: 'done' }), false)
 })
