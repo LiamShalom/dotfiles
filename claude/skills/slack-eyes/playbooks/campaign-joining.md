@@ -51,6 +51,14 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
 - **Handle removal.** Approval retires the handle (`retired_at` on `contract_social_profiles`); an
   edit retires the old one (`applyHandleRequestToProfiles`, `lib/handle-requests/approve-core.ts`).
   Before #10602 (2026-11-17) an approved removal changed nothing. Check 4 shows what is still live.
+- **Wrong account on a contract.** Live contract: the brand's Edit handles changes the handle or
+  platform in place; its delete shows only when the creator has more than one handle
+  (`components/campaign-details/handle-editor.tsx:273`). Pending (held) contract: the brand cannot
+  edit. A creator `remove` request (`POST /api/internal/creator/my-gigs/handles`) has no contract
+  status gate, never auto-approves (`creator-proven-approval.ts` skips `remove`), and its approval
+  retires the handle at any status (`approveRemovalCore`, `approve-core.ts`). Only iOS has a remove
+  screen (`ManageHandlesCoordinator.swift` mode `.remove`); the web creator modal only adds or
+  replaces (`manage-handles-modal.tsx`). Fastest fix: retire the handle for them as a repair.
 - **Ended and archived campaigns.** An email invite is refused one day after the end date
   (`send-campaign-invite.usecase.ts`). Creating an invite link checks no end date
   (`createCampaignInvite`); redeeming it fails if the link is expired or used up
