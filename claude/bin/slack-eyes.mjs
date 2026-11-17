@@ -94,7 +94,7 @@ Check what the first pass already did (the thread, any branch or PR), then carry
 
 // Used when the voice file has no "Acknowledgements" list. Liam's style: lowercase, no end punctuation.
 const DEFAULT_ACKS = ['taking a look', 'looking into it', 'on it, checking now', 'checking this now', 'digging in', 'looking now']
-const DEFAULT_REQUEST_ACKS = ['on it', 'getting this done', 'on it, will get this built', 'will get this done', 'working on this', 'on it, building this now']
+const DEFAULT_REQUEST_ACKS = ['on it', 'getting this done', 'will get this done', 'working on this', 'on it rn', 'yep will get this done']
 
 const args = new Set(process.argv.slice(2))
 const dryRun = args.has('--dry-run')
