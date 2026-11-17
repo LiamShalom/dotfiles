@@ -58,7 +58,12 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   status gate, never auto-approves (`creator-proven-approval.ts` skips `remove`), and its approval
   retires the handle at any status (`approveRemovalCore`, `approve-core.ts`). Only iOS has a remove
   screen (`ManageHandlesCoordinator.swift` mode `.remove`); the web creator modal only adds or
-  replaces (`manage-handles-modal.tsx`). Fastest fix: retire the handle for them as a repair.
+  replaces (`manage-handles-modal.tsx`). Fastest fix: retire the handle for them as a repair. Worked on
+  2026-11-17 (`plutus: remove wrong creator account`): a script calls `createHandleRequest({actionType:
+  'remove', notifyBrand: false})`, then `approveHandleRequestCore` with the same request fields, with the
+  primary PG flags from `repair.md`. Loading the imports took about 10 minutes, so run it in the
+  background. The dashboard `postgres_query` refuses `contract_social_profiles`, so check
+  `contractsv2/<id>.socialProfiles[].retiredAt` in Firestore instead.
 - **Ended and archived campaigns.** An email invite is refused one day after the end date
   (`send-campaign-invite.usecase.ts`). Creating an invite link checks no end date
   (`createCampaignInvite`); redeeming it fails if the link is expired or used up
