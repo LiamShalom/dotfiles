@@ -192,9 +192,43 @@ message with a `bot_id` or the subtype `bot_message` came from an app, so tag no
 ```
 
 Check that the output has `"ok":true`. Post one final reply, not a running commentary: the only
-other post is step 4's "found it, fixing" update. While your turn runs, the watcher answers new
+other post is step 4's "found it, fixing" update. When step 5a applies, its screenshots go in the
+same thread right after the reply; they are part of that reply, not another post. While your turn runs, the watcher answers new
 questions in the thread for you with a status reply from your notes, so the thread may hold
 replies you did not write: read them and do not repeat them.
+
+## 5a. Show it with marked screenshots
+
+When the reply tells someone where to click, says a fix is live ("fixed and deployed"), or explains
+a label, number or status on a screen, attach screenshots with each step boxed in red and numbered,
+and private data blurred. Use the monorepo's `app-how-to` skill for this. Your session starts in
+the main checkout, which may not have it yet, so read it from `origin/main`:
+
+```sh
+git -C ~/sideshift-monorepo show origin/main:.claude/skills/app-how-to/SKILL.md
+git -C ~/sideshift-monorepo show origin/main:.claude/skills/app-how-to/annotate.js
+```
+
+Follow its sections 1 to 3, with these changes:
+
+- **Account:** always a test account, never the reader's: `~/.claude/bin/agent-signin.mjs [--as creator] <url>`
+  opens the page signed in. Then no other company's data is on the screen, and the blur is a second check.
+- **Helper:** pass annotate.js's text as `function` to `evaluate_script`. The browser tool cannot read it
+  from a path, because the file is not in the folder your session started in.
+- **Fix proof:** take it in production after the deploy is READY, on the screen the reporter showed.
+- **Look at every image** before you send it (open the PNG). A badge on the wrong control, or a readable
+  name, handle, email, photo or amount, means you take it again. If you cannot get a clean image, send
+  the reply without images.
+- **Phone-only steps:** no screenshots; write the steps.
+
+Skip its section 4 (approval): the :eyes: approves the reply and its images. Post the reply (step 5),
+then each image in click order, and check each for `"ok":true`:
+
+```sh
+~/.claude/bin/slack-as-liam upload <channel> <png> "" <thread ts>
+```
+
+Refer to the images in the reply by their order ("1st one", "2nd and 3rd"), as the skill says.
 
 ## 5b. Ask the reporter for more
 
