@@ -148,3 +148,13 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
 - Creator will not give an SSN: the brand can still pay. The money waits in their SideShift wallet. They verify only
   to withdraw, and US creators must give an SSN.
 - A follow-up that only says thanks needs no reply.
+
+## Dispute screen shows "No payment cycles are available to dispute yet"
+
+- The cycles list (`lib/disputes/disputable-cycles.ts` getDisputableCycles) reads posts only from the
+  Firestore subcollection `contractsv2/{id}/posts`. If the brand removed the creator with "Delete campaign
+  data", those posts are gone and the list is empty, even when posts were never paid. Check:
+  `select removed_reason, count(*) from contract_posts where contract_id='<id>' group by 1` (`contract_wipe`)
+  and `firestore_count_collection contractsv2/<id>/posts` (0). Proven on `wheelz: dispute continue greyed`.
+- The "Other" dispute type needs no cycle, and the create route (create.usecase.ts) has no contract-status
+  check, so a cancelled contract can still file one.
