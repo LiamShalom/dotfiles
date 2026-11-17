@@ -44,14 +44,18 @@ fewer. Run the ones for the error, then post one reply. Never say what kind of a
 | "Choose the Facebook Page requested in your connection link. Meta sent us a different Page." | `requested_account_mismatch` | Meta returned at least one postable Page, but none is the one the brand's request names. |
 | "Personal profiles cannot be connected" on the request page | none | Fixed help text on the request page (`components/creator-social-oauth/audience-connect-page.tsx`, `provider-copy.ts`), not an error. |
 | "Facebook hides this Page from people who are not logged in, so we can't track it…" | `facebook_page_hidden` | The Page has an age or country limit. Retrying does not help; the creator removes the limit. |
-| "We could not confirm this Facebook Page. Please try connecting again." | `page_handle_resolution_unavailable` | The public-ID lookup missed (it misses about 1 call in 5). Transient: try again. |
-| "Reconnect Facebook and allow access to your Pages." | `insufficient_scope` | The creator turned off a Page permission on the Facebook screen. |
-| "Facebook token app mismatch" | `app_id_mismatch` | Config or code defect: engineering. |
+| "Reconnect Facebook and allow access to your Pages." | `required_permissions_missing` (error code `insufficient_scope`) | The creator turned off a Page permission on the Facebook screen. |
+| "Facebook could not be connected. Please try again." (signed in) or "The account could not be connected. Please try again." (request link) | look in the logs | The generic text. Behind it is often `page_handle_resolution_unavailable` (the public-ID lookup missed, about 1 call in 5: transient, try again) or `app_id_mismatch` (config or code defect: engineering). Find which in the log line's `reason`, `details` or `error` (check 5). |
 
 ### Checks (read replica: `mcp__cloud-sql-postgres-read-replica__execute_sql`)
 
 Load the read-replica tool first with ToolSearch `select:mcp__cloud-sql-postgres-read-replica__execute_sql`.
-The internal-dashboard `postgres_query` tool refuses the OAuth tables, so do not start there.
+Two runs on 11-17 found that the internal-dashboard `postgres_query` refused the OAuth tables. If
+ToolSearch finds no read-replica tool (it happens in headless runs), search again once with
+`cloud-sql-postgres-read-replica`; if it is still missing, use the dashboard `postgres_query` for the
+other tables (`contract_social_profiles`, `handle_requests`, `creator_connection_requests`), the
+Firestore MCP for `contractsv2`, and say in `unproven_claims` which OAuth-table check you could not run.
+Never fill the gap with a guess in the reply.
 
 1. The creator: `find_account` (internal-dashboard) with their email gives the creator id.
 2. Their Facebook grants and connections:
@@ -77,12 +81,14 @@ The internal-dashboard `postgres_query` tool refuses the OAuth tables, so do not
    where p.platform ilike 'facebook%'
      and p.contract_id in (select contract_id from handle_requests where person_id = '<creator id>');
    ```
-   For `requested_account_mismatch`, compare the request's `handle` with these handles and with
-   `social_accounts` (`platform='facebook'`, `creator_id`): the Page she has is not the ID requested.
+   For `requested_account_mismatch`, compare the request's `handle` with these handles and with the
+   `username` of any `facebook` row in `creator_social_oauth_connections`. (`social_accounts` holds
+   TikTok only: it has no Facebook rows.)
 5. The attempt in the logs: `logs_search_webapp` (internal-dashboard) with the reason code as `text`
    (for example `facebook_page_required`), a window of 10 minutes or less around the time of the
-   screenshot. Wider windows time out. The connect routes are under
-   `/api/internal/creator/social-oauth/` (`connect/complete`, `client-report`). Each line is
+   screenshot. Wider windows time out. A signed-in connect finishes under
+   `/api/internal/creator/social-oauth/` (`connect/complete`, `client-report`); a brand's request link
+   finishes at `POST /api/public/audience-connect`. Each line is
    `[creator-social-oauth] {json}` with `event`, `stage`, `reason`, `creatorId` and an `attemptId`
    that ties the start, callback and completion of one try together. A `facebook_page_required` with
    a successful `oauth_token_exchange` proves the sign-in worked and Meta sent no postable Page.

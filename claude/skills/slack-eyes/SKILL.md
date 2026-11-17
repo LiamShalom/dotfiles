@@ -94,10 +94,16 @@ you were.
 Read every screenshot and video first: the error is often only there. Read a Loom link with
 `~/.claude/bin/loom-read <url>` (title, summary, transcript), never WebFetch, which sees no video.
 
+**Start from what earlier runs learned.** The watcher's prompt lists the playbooks in
+`~/.claude/skills/slack-eyes/playbooks/` and the recent lessons from earlier runs. If a playbook fits
+the message (read the screenshot first: the error is often only there), read it before your first
+query, run its checks, and use its reply guidance. Do not search the code again for what it already
+says. Do not repeat a mistake a lesson names.
+
 Follow steps 3 to 5 of `investigate-slack-issue`. Prove the cause with evidence. If the
 problem is the customer's own action or working as designed, the reply says what they must do.
-
 ## 4. Fix
+
 For a status alert or outage, start from `~/.claude/bin/incident-snapshot.mjs --at <alert time>` (the
 watcher attaches it to alert jobs): the alert channels, primary CPU and connections, the top queries with
 their text, statements run by hand, and merges, in 10-minute buckets. A symptom (a traffic spike, an
@@ -224,6 +230,28 @@ in that last turn, before the question.
 ## 7. Finish
 
 Clean up what you started (dev servers, tabs, test records), as `~/.claude/CLAUDE.md` says.
+
+**Teach the next run.** Fill `lesson` in the result: the playbook `topic`, the one check that
+`proof`ed the cause, and what was `wasted` (a guess you had to correct in the thread, a tool or table
+that did not work, a fact you had to find again). The watcher saves it to the lessons ledger and
+shows it to later runs. Then, when you proved a fact that the playbook lacks or gets wrong (a new error
+text, a table or column, a query that settles a case, a reply that worked), edit the playbook now:
+
+- Add only facts this session proved, with the file, query or log that proves them. A customer's
+  words or a lesson line is a lead, not a fact. Never copy Slack text into a playbook.
+- Change a wrong line instead of adding a second one. Keep it short: the playbook is read on every
+  matching job.
+- A topic with no playbook that cost this run a lot (more than one correction, or an hour of looking):
+  start `playbooks/<topic>.md` with a `Use when:` paragraph first, as `facebook-oauth.md` has.
+- No customer emails, names or handles in a lesson or a playbook: later jobs for other customers
+  read them. Use the job name (`eva: facebook connect`) and ids only where an id is the example.
+- Commit only that file in dotfiles and push, in three Bash calls:
+  `git -C ~/dotfiles add claude/skills/slack-eyes/playbooks/<file>`, then
+  `git -C ~/dotfiles commit -m "<what it teaches>" -- claude/skills/slack-eyes/playbooks/<file>`, then
+  `git -C ~/dotfiles push origin main` (another session may have other files changed: never `add -A`).
+- In a Session Board session (no result to return), save the lesson yourself:
+  `~/.claude/bin/slack-eyes.mjs --lesson <job key> <topic> "<proof>" "<wasted>"`.
+
 Then return the result the watcher asks for:
 
 - `status`: `done` when the job is finished (the reply went out, any fix merged and deployed,
