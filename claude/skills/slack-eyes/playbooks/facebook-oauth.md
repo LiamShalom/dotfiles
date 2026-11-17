@@ -112,6 +112,23 @@ Never fill the gap with a guess in the reply.
    facebook page mismatch, the "tick that Page" reply was wrong and needed a correction.
    Count its tracked reels with `posts` where `company_id` = the brand and `creator` = the Facebook
    display name (`creator` holds a display name, not an id).
+   A 404 with `status.code` `PROFILE_RESTRICTED` means the account exists but Facebook hides it from
+   logged-out viewers (usually an age limit): we can neither connect nor scrape it, whatever the type.
+7. **"I connected 20 times and it says connected"** (paige: facebook connect loops, 2026-11-17): check
+   which Pages her grants actually hold before reading logs (Vercel log search refuses windows older
+   than about 3 days with `ExceedsBillingLimitError`):
+   ```sql
+   select g.created_at, a.username, a.display_name, a.status from creator_social_oauth_grants g
+   left join creator_social_oauth_accounts a on a.grant_id = g.id
+   where g.creator_id = '<creator id>' and g.provider = 'facebook';
+   select provider, created_at, consumed_at from creator_social_oauth_states
+   where creator_id = '<creator id>' order by created_at desc limit 30;  -- every connect try, by provider
+   ```
+   A signed-in connect drops a Page it cannot confirm (a hidden one) and still succeeds on the other
+   Pages (`confirmPages` in `facebook.entry.ts`), so the contract's Page stays unconnected with no error.
+   If the read-replica MCP tool is not loaded, call it over stdio: spawn `~/.claude/bin/mcp-shared-cloudsql.sh`,
+   send `initialize`, then `tools/call` `execute_sql` (kill the process after the reply; it does not exit
+   on stdin close).
 
 ### What to reply
 
