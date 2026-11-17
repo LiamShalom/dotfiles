@@ -21,6 +21,13 @@ fi
 cd "$HOME"
 api() { SLACK_USER_TOKEN="$token" env -u SLACK_BOT_TOKEN slack api --skip-update "$@"; }
 
+# A Slack :eyes: job's session that posts in another thread (an escalation to a vendor's channel)
+# keeps following it: the watcher reads that thread too and sends the replies to this session.
+follow() {
+  [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ -x "$HOME/.claude/bin/slack-eyes.mjs" ] || return 0
+  "$HOME/.claude/bin/slack-eyes.mjs" --posted "$@" >/dev/null || true
+}
+
 if [ "$1" = upload ]; then
   channel="${2:?usage: slack-as-liam upload <channel-id> <file> [comment] [thread_ts]}"
   file="${3:?usage: slack-as-liam upload <channel-id> <file> [comment] [thread_ts]}"
@@ -37,8 +44,21 @@ if [ "$1" = upload ]; then
   args=(files.completeUploadExternal "files=[{\"id\":\"$id\",\"title\":$(jq -Rn --arg t "$name" '$t')}]" channel_id="$channel")
   [ -n "$comment" ] && args+=(initial_comment="$comment")
   [ -n "$thread" ] && args+=(thread_ts="$thread")
-  api "${args[@]}"
-  exit
+  rc=0
+  done=$(api "${args[@]}") || rc=$?
+  printf '%s\n' "$done"
+  [ "$rc" = 0 ] || exit "$rc"
+  if [ -n "$thread" ] && [ "$(jq -r '.ok // false' <<<"$done" 2>/dev/null)" = true ]; then follow "$channel" "$thread" "$thread"; fi
+  exit 0
 fi
 
-SLACK_USER_TOKEN="$token" exec env -u SLACK_BOT_TOKEN slack api --skip-update "$@"
+if [ "$1" != chat.postMessage ]; then
+  SLACK_USER_TOKEN="$token" exec env -u SLACK_BOT_TOKEN slack api --skip-update "$@"
+fi
+rc=0
+out=$(api "$@") || rc=$?
+printf '%s\n' "$out"
+[ "$rc" = 0 ] || exit "$rc"
+if [ "$(jq -r '.ok // false' <<<"$out" 2>/dev/null)" = true ]; then
+  follow "$(jq -r '.channel // empty' <<<"$out")" "$(jq -r '.ts // empty' <<<"$out")" "$(jq -r '.message.thread_ts // empty' <<<"$out")"
+fi

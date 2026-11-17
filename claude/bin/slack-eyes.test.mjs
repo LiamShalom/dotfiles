@@ -580,3 +580,84 @@ test('a message listed once per reaction (:eyes: and :saluting_face:) is handled
   const items = eyesItems([both, { ...both }])
   assert.deepEqual(items.map((i) => i.key), ['C1:7.7:request'])
 })
+
+import { jobThreads, followsThread, threadOfLink, peopleInThread, threadsAfterPoll, jobOfSession, lastActivity, otherThreadsNote, channelLabel } from './slack-eyes.mjs'
+
+const multi = {
+  hit: { key: 'C0COLD:1794900000.000100', channel: 'C0COLD', ts: '1794900000.000100', threadTs: '1794900000.000100' },
+  permalink: 'https://sideshift-group.slack.com/archives/C0COLD/p1794900000000100',
+  channelName: '#coldtrace',
+  seenTs: '1794900100.000000',
+  sessionId: 'sess-now',
+  formerSessions: ['sess-old'],
+  boardId: 'abc12345',
+  status: 'on_board',
+  threads: [{ channel: 'C0WHOP', threadTs: '1794900500.000200', permalink: 'https://sideshift-group.slack.com/archives/C0WHOP/p1794900500000200', name: '#ext-whop', seenTs: '1794900600.000000' }],
+}
+
+test('a job follows its own thread and the threads it posted in', () => {
+  assert.deepEqual(jobThreads(multi).map((t) => [t.channel, t.main]), [['C0COLD', true], ['C0WHOP', false]])
+  assert.equal(followsThread(multi, { channel: 'C0WHOP', threadTs: '1794900500.000200' }), true)
+  assert.equal(followsThread(multi, { channel: 'C0WHOP', threadTs: '1794900999.000000' }), false)
+  assert.equal(followsThread({ hit: multi.hit }, { channel: 'C0COLD', threadTs: multi.hit.threadTs }), true)
+})
+
+test('threadOfLink reads the thread of a reply link, or the message of a root link', () => {
+  assert.deepEqual(threadOfLink('https://x.slack.com/archives/C0WHOP/p1794900600000300?thread_ts=1794900500.000200&cid=C0WHOP'), { channel: 'C0WHOP', threadTs: '1794900500.000200' })
+  assert.deepEqual(threadOfLink('https://x.slack.com/archives/C0WHOP/p1794900500000200'), { channel: 'C0WHOP', threadTs: '1794900500.000200' })
+  assert.equal(threadOfLink('https://example.com/nope'), null)
+})
+
+test('an added thread passes on any person, marks people outside SideShift, never bots or old posts', () => {
+  const found = peopleInThread([
+    { ts: '1794900500.000200', user: 'U0LIAM', text: 'escalating', bot_id: 'B1' },
+    { ts: '1794900700.000000', user: 'U0WHOP1', text: 'we fixed the payout', user_team: 'T0WHOPTEAM' },
+    { ts: '1794900800.000000', user: 'U0MATE', text: 'nice', user_team: 'T0697U57YTY' },
+    { ts: '1794900550.000000', user: 'U0WHOP1', text: 'old', user_team: 'T0WHOPTEAM' },
+    { ts: '1794900900.000000', user: 'U0BOT', text: 'joined', subtype: 'channel_join' },
+  ], '1794900600.000000')
+  assert.deepEqual(found, [
+    { user: 'U0WHOP1', ts: '1794900700.000000', text: 'we fixed the payout', outside: true },
+    { user: 'U0MATE', ts: '1794900800.000000', text: 'nice' },
+  ])
+})
+
+test('a poll keeps threads added meanwhile and drops ones that are gone', () => {
+  const a = { channel: 'C1', threadTs: '1.000001', seenTs: '1.000001' }
+  const b = { channel: 'C2', threadTs: '2.000001', seenTs: '2.000001' }
+  const c = { channel: 'C3', threadTs: '3.000001', seenTs: '3.000001' }
+  const read = [{ ...a, seenTs: '1.500000', found: [] }, { ...b, gone: true, found: [] }]
+  assert.deepEqual(threadsAfterPoll([a, b, c], read), [{ ...a, seenTs: '1.500000' }, c])
+})
+
+test('a post names its job by any of its session or board ids, never a closed job', () => {
+  const jobs = [{ file: 'a', job: { ...multi, status: 'closed', sessionId: 'sess-x' } }, { file: 'b', job: multi }]
+  assert.equal(jobOfSession(jobs, 'sess-old')?.file, 'b')
+  assert.equal(jobOfSession(jobs, 'abc12345')?.file, 'b')
+  assert.equal(jobOfSession(jobs, 'sess-x'), null)
+  assert.equal(jobOfSession(jobs, undefined), null)
+})
+
+test('a busy added thread keeps the job polled often', () => {
+  assert.equal(lastActivity(multi), 1794900600)
+  assert.equal(lastActivity({ hit: multi.hit }), 1794900000.0001)
+})
+
+test('a link to an added thread finds the job', () => {
+  const jobs = [{ file: '/j/C0COLD_1.json', job: multi }]
+  assert.equal(matchJob(jobs, 'https://sideshift-group.slack.com/archives/C0WHOP/p1794900700000000?thread_ts=1794900500.000200').length, 1)
+})
+
+test('prompts name the other threads, and only when there are some', () => {
+  assert.equal(otherThreadsNote({ hit: multi.hit }), '')
+  const note = otherThreadsNote(multi)
+  assert.match(note, /#ext-whop: channel C0WHOP, thread_ts 1794900500\.000200/)
+  assert.match(note, /outside SideShift/)
+  assert.equal(channelLabel({ name: 'ext-whop' }), '#ext-whop')
+  assert.equal(channelLabel({ is_im: true }), 'DM')
+})
+
+test('a post with no team is outside SideShift (fails closed), Liam never is', () => {
+  const found = peopleInThread([{ ts: '5.000002', user: 'U0X1', text: 'hi' }, { ts: '5.000003', user: 'U0B78R52DFT', text: 'me' }], '5.000001')
+  assert.deepEqual(found.map((m) => Boolean(m.outside)), [true, false])
+})
