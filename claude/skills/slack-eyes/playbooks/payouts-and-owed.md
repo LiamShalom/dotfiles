@@ -119,7 +119,11 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
    `NEW_TOPUP_FEE_CONFIG_BY_PLAN` (`lib/fee-utils-server.ts` `getCustomFee`). No active subscription = Starter
    (bank 3%, card 5%). Our modelled Whop ACH cost is 0.8% capped at $5 (`calculateProcessorFeeCents`).
    Connect integrators fund through `reason='escrow_deposit'` rows, sub-accounts show `embed_transfer`.
-   A cap or a rate change is pricing: hold for Liam.
+   A cap or a rate change is pricing: hold for Liam. Once he picks a rate, set it with the dashboard's
+   `POST https://sideshifters.vercel.app/api/employers/<id>/fees` (`{paymentMethodType, percentFee, fixedFeeCents,
+   notes}`, Bearer = minted liam@ token, see memory `internal-dashboard-url`). Prove it by running
+   `getCustomFee(<id>, 'us_bank_account')` with tsx `--conditions=react-server` for the integrator and one sub-account.
+   (clipstake: ACH fee, 11-17: a 1% rate was the answer, not a cap.)
 9. Archive: `lib/payouts/campaign-outstanding-payouts.ts` gives the owed total. Run a read-only dry run first.
    Escrow crypto: deposits are `wallet_ledger` rows with `reason='escrow_deposit'`. The Firestore
    `embed_escrow_deposits` is outside the dashboard tool: say what you could not read.
