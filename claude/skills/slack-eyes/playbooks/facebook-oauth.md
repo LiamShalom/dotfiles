@@ -27,6 +27,13 @@ fewer. Run the ones for the error, then post one reply. Never say what kind of a
   `handle` is the public ID of the Page the brand asked for. The request link accepts only that Page.
 - **Two Facebook ID namespaces.** `contract_social_profiles.handle` / `facebook_id` hold the public ID
   (what scrapers and links use). `oauth_provider_subject_id` holds the Graph Page ID. They differ.
+  A brand can still put the Graph Page ID in a request (it is the "Page ID" a Page shows). Crawlzo
+  `facebook-profile` on it returns a different `profile_id`: that is the sign. Before #10710
+  (merged 2026-11-17) such a link refused the right Page with `requested_account_mismatch`; it
+  now matches on the Graph ID too. A refused try's `account_discovery` line (same request id,
+  2-second window) shows `postablePageCount`; the 403 never names the Page Meta sent.
+- Meta's "Continue as <name>? continue with your previous settings" resends the Pages ticked last
+  time. A creator who must share another Page taps Edit settings, not Continue.
 - **Tracking does not need OAuth.** Reels of a public profile or Page are scraped publicly. The
   contract `cTKIgr0UPjx4jHZmIzTT` had 68 Facebook posts (534K views) with no Facebook grant at all, and
   they appear in the brand's posts search (`lib/analytics/pg/posts-search-query.ts`). A Page connection
