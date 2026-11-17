@@ -34,7 +34,9 @@ EXTENSIONS="$HOME/.cache/agent-chrome/extensions"
 up() { curl -fsS --max-time 1 "$URL/agent-chrome-proxy" >/dev/null 2>&1 || curl -fsS --max-time 2 "$URL/json/version" >/dev/null 2>&1; }
 chrome_up() { curl -fsS --max-time 2 "http://127.0.0.1:$CHROME_PORT/json/version" >/dev/null 2>&1; }
 
-if up; then
+# The proxy can outlive what it routes to (Session Board gone, then the headless Chrome gone too):
+# then it still answers its own check, but every page request hangs. Start Chrome in that case.
+if up && { chrome_up || curl -fsS --max-time 2 "$URL/json/version" >/dev/null 2>&1; }; then
 	echo "$URL"
 	exit 0
 fi
