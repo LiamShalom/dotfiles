@@ -70,6 +70,7 @@ LINKS=(
 	"claude/bin/chrome-reaper.sh:.claude/bin/chrome-reaper.sh"
 	"claude/bin/agent-reaper.mjs:.claude/bin/agent-reaper.mjs"
 	"claude/bin/slack-eyes.mjs:.claude/bin/slack-eyes.mjs"
+	"claude/bin/loom-read.mjs:.claude/bin/loom-read"
 	"claude/bin/board-priority.mjs:.claude/bin/board-priority.mjs"
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
 	"claude/bin/open-in-pane.sh:.claude/bin/open-in-pane.sh"

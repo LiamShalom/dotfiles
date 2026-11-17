@@ -91,6 +91,9 @@ you were.
 
 ## 3. Investigate
 
+Read every screenshot and video first: the error is often only there. Read a Loom link with
+`~/.claude/bin/loom-read <url>` (title, summary, transcript), never WebFetch, which sees no video.
+
 Follow steps 3 to 5 of `investigate-slack-issue`. Prove the cause with evidence. If the
 problem is the customer's own action or working as designed, the reply says what they must do.
 
