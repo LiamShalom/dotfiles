@@ -168,6 +168,9 @@ test('the interim prompt carries the thread, the job notes and the voice, and as
   assert.match(text, /lowercase, short/)
   assert.match(text, /You have no tools/)
   assert.doesNotMatch(text, /slack-as-liam/)
+  // A status update notifies nobody: the watcher posts it with no tag added.
+  assert.match(text, /No tag: a status update notifies nobody/)
+  assert.doesNotMatch(text, /the watcher adds it/)
 })
 
 test("the watcher's interim status reply is not the job's answer", () => {

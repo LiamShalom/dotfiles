@@ -112,8 +112,8 @@ enabled in `rollout_flags`. List every claim in your reply that nothing proves i
 
 **Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread
 sees that work. Before you write code, read the thread again and post one short update as Liam
-(step 5's voice and tag rules): what you found in plain words and that a fix is on the way, with
-no date. For example "<@U123> found it, that warning doesnt say which video it means. fixing it
+(step 5's voice rules), with no tag: what you found in plain words and that a fix is on the way,
+with no date. For example "found it, that warning doesnt say which video it means. fixing it
 so it names them". Skip it only if Liam already said the same thing in the thread.
 
 If the cause is in code, follow the `quick-fix` skill from its Phase 1, in a worktree on a
@@ -168,11 +168,15 @@ What the reply says depends on the outcome:
 
 Every fact in the reply must match your evidence.
 
-Start the reply by tagging the person who raised the issue: the author of the message Liam put
-:eyes: on, as `<@USERID>`. The watcher's prompt names them on its "Tag in your answer" line. Only this reply tags them: the watcher's
-"taking a look" does not. Do not
-tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a message with a `bot_id`
-or the subtype `bot_message` came from an app, so tag nobody. Send it:
+A tag notifies the person, so tag only when the reply needs them: it gives the fix ("fixed and
+deployed"), the answer, or asks them to do or tell you something ("needs their input",
+"customer action", step 5b). Then start the reply with `<@USERID>` for the person who raised the
+issue (the author of the message Liam put :eyes: on; the watcher's prompt names them on its
+"Reporter to tag" line). A status reply tags nobody: "found it, fixing" (step 4), "fix held for
+review", "held for Liam's decision", "still looking", and the watcher's "taking a look" and
+interim updates. Never tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a
+message with a `bot_id` or the subtype `bot_message` came from an app, so tag nobody. Send it
+(drop the `<@USERID> ` for a status reply):
 
 ```sh
 ~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"

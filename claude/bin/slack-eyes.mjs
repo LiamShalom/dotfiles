@@ -246,7 +246,7 @@ Message: ${permalink}
 Channel: ${hit.channel}
 Message ts: ${hit.ts}
 Thread ts (reply here): ${hit.threadTs}
-Tag in your answer: ${reporterOf(hit.author) ? `<@${reporterOf(hit.author)}> (the person who raised it)` : 'nobody (Liam, a bot, or no person)'}
+Reporter to tag (only in a reply that gives the fix or answer, or asks them for something): ${reporterOf(hit.author) ? `<@${reporterOf(hit.author)}> (the person who raised it)` : 'nobody (Liam, a bot, or no person)'}
 Job key: ${hit.key}${others}
 
 ${headless
@@ -881,9 +881,7 @@ Rules for the reply:
 - Liam's voice for this reader (customer or teammate): short, lowercase start, no closing period, no exclamation marks, no emoji.
 - Say only what the notes prove. Give the cause only if they asked why or what is wrong, in plain words, with no internal details (code, PRs, branches, other customers). Say "fixed" only if the notes say the fix is live in production.
 - Give no date or time and admit no fault. If the notes show the job is holding something for Liam's decision, do not promise or hint at a next step: say you are still looking. If the notes show nothing yet, say you are still on it.
-- No tag at the start: the watcher adds it.`
-
-const INTERIM_LEAD = (job) => (reporterOf(job.hit.author) ? `<@${reporterOf(job.hit.author)}> ` : '')
+- No tag: a status update notifies nobody. Only the job's fix, answer or question to the reporter tags them.`
 
 // `slack-eyes.mjs --interim <job file>`: the side session, detached from the check.
 async function runInterim(file) {
@@ -910,7 +908,7 @@ async function runInterim(file) {
       log('interim_done', { key: job.hit.key, ok: true, posted: false, cost_usd: cost, why: reply ? 'answered meanwhile' : 'no answer needed' })
       return
     }
-    const ts = (await slack('chat.postMessage', { channel: job.hit.channel, thread_ts: job.hit.threadTs, text: INTERIM_LEAD(job) + reply })).ts
+    const ts = (await slack('chat.postMessage', { channel: job.hit.channel, thread_ts: job.hit.threadTs, text: reply })).ts
     updateJob(file, { interimPostTs: [...(readJob(file).interimPostTs ?? []), ts] })
     log('interim_done', { key: job.hit.key, ok: true, posted: true, cost_usd: cost })
   } finally {
