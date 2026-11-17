@@ -241,8 +241,11 @@ text, a table or column, a query that settles a case, a reply that worked), edit
   words or a lesson line is a lead, not a fact. Never copy Slack text into a playbook.
 - Change a wrong line instead of adding a second one. Keep it short: the playbook is read on every
   matching job.
-- A topic with no playbook that cost this run a lot (more than one correction, or an hour of looking):
-  start `playbooks/<topic>.md` with a `Use when:` paragraph first, as `facebook-oauth.md` has.
+- This is for every kind of message, not one topic. Give the lesson a topic from the "Lesson topics in
+  use" list in your first prompt when one fits, so lessons on one problem collect under one name.
+- A topic with no playbook: when it comes back in a second job, the watcher sends you one more turn to
+  write `playbooks/<topic>.md`. Start one sooner when this run cost a lot (more than one correction, or
+  an hour of looking). Put a `Use when:` paragraph first, as `facebook-oauth.md` has.
 - No customer emails, names or handles in a lesson or a playbook: later jobs for other customers
   read them. Use the job name (`eva: facebook connect`) and ids only where an id is the example.
 - Commit only that file in dotfiles and push, in three Bash calls:
