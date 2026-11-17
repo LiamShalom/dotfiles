@@ -105,6 +105,13 @@ Never fill the gap with a guess in the reply.
    the try was 21:11Z the day before (inner clock "1:11" Pacific). A refused try leaves no
    `creator_social_oauth_grants` row, but Facebook still lists SideShift as connected in the creator's
    settings: that is what "it says connected on Facebook" means.
+6. **Page or profile, before any reply:** POST `https://scrape.crawlzo.com/v1/scrapers/facebook-profile`
+   (`X-API-Key` = `CRAWLZO_API_KEY` from `.env.local`, read inside a script) with
+   `{"username":"<id>","allow_no_reels":true}`. `data.bio.account_type` is `page` or `profile`. A
+   `requested_account_mismatch` on a `profile` ID can never pass: Meta returns only Pages. In chitara:
+   facebook page mismatch, the "tick that Page" reply was wrong and needed a correction.
+   Count its tracked reels with `posts` where `company_id` = the brand and `creator` = the Facebook
+   display name (`creator` holds a display name, not an id).
 
 ### What to reply
 
