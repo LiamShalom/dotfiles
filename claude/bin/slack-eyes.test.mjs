@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt, wantsProof, isIncident } from './slack-eyes.mjs'
+import { isAnswered, isThanks, resultSchema, wantsOpus, opusPrompt, wantsProof, isIncident, unprovenClaims, verifyPrompt, otherJobsNote, prompt } from './slack-eyes.mjs'
 
 const LIAM = 'U0B78R52DFT'
 const REPORTER = 'U0REPORTER1'
@@ -214,4 +214,48 @@ test('a status or database alert is an incident and gets the snapshot; a custome
   assert.equal(isIncident({ channel: 'C0B96GSUHDZ', text: 'Cloud SQL pooler - clients wait over 0.5 s for a connection' }), true)
   assert.equal(isIncident({ channel: 'C0OTHER0001', text: 'getting query_wait_timeout on the analytics page' }), true)
   assert.equal(isIncident({ channel: 'C0OTHER0001', text: 'the payouts page shows $0 for my creator' }), false)
+})
+
+// Replay of 11-16 "sideshift: campaign writes paused" (C0CESKD6CV6:1794876795.492009): Sonnet posted
+// "we're mid database switch for campaigns" and returned done with this summary. The fence was off.
+const sidechatDone = {
+  status: 'done',
+  name: 'sideshift: campaign writes paused',
+  summary: 'Matt\'s "maintenance step" banner is the deliberate campaigns write fence (pg2_write_fenced, 503) from the in-progress Campaigns Postgres switch. Prod logs show it fencing campaign writes right now, e.g. creator job apply and contract previews. I did not trace the SideChat save route in code or logs; I assumed it is a campaign write, so the SideChat part of the reply is unverified. Replied in the thread tagging Matt: same pause, nothing lost, back when the switch finishes. No code change made.',
+}
+
+test('a done that admits a guess in its summary is sent back to prove it (11-16 replay)', () => {
+  const claims = unprovenClaims({ ...sidechatDone, unproven_claims: [] })
+  assert.equal(claims.length, 1)
+  assert.match(verifyPrompt(claims), /PG2_<CHUNK>_WRITE_FENCE/)
+  assert.match(verifyPrompt(claims), /post a short correction/)
+})
+
+test('listed unproven claims send a done back; a proven done and a non-done pass', () => {
+  assert.deepEqual(unprovenClaims({ status: 'done', summary: 'fixed', unproven_claims: ['a switch is running'] }), ['a switch is running'])
+  assert.deepEqual(unprovenClaims({ status: 'done', summary: 'Fixed #10586, checked in prod.', unproven_claims: [] }), [])
+  assert.deepEqual(unprovenClaims({ status: 'needs_opus', summary: 'I assumed X', unproven_claims: ['X'] }), [])
+  // The later correction turn's summary names the old claim as not proven but makes no new guess.
+  assert.deepEqual(unprovenClaims({ status: 'done', unproven_claims: [], summary: 'Don said the cause was an overloaded database, now fixed. My earlier "planned database switch" claim was not proven, so I posted a correction.' }), [])
+})
+
+test('the result schema requires unproven_claims', () => {
+  assert.ok(JSON.parse(resultSchema('sonnet')).required.includes('unproven_claims'))
+})
+
+test('a new job sees the outage another job already traced (11-16 replay)', () => {
+  const connect = {
+    hit: { key: 'C0CEJUY1YDD:1794873760.140119', ts: '1794873760.140119', ackTs: '1794873846.0' },
+    name: 'connect: postgres pool saturated', status: 'on_board',
+    summary: 'The Connect alert is a symptom. Since about 23:55 UTC on 11-16, production Postgres connections through the pool have failed on nearly every route, not only Connect.',
+  }
+  const old = { hit: { key: 'C1:1.0', ts: '1794800000.0' }, name: 'old: thing', status: 'done', summary: 'x' }
+  const self = { hit: { key: 'C0CESKD6CV6:1794876795.492009', ts: '1794876795.492009', threadTs: '1794876795.492009', channel: 'C0CESKD6CV6', author: 'U0BN5T3DADA', text: 'sidechat also broken' }, status: 'running' }
+  const now = 1794876823_000
+  const note = otherJobsNote([connect, old, self], self.hit.key, now)
+  assert.match(note, /connect: postgres pool saturated \(on_board, started 00:04Z\): The Connect alert is a symptom/)
+  assert.doesNotMatch(note, /old: thing/)
+  assert.doesNotMatch(note, /campaign writes paused/)
+  assert.match(prompt(self.hit, 'https://x', true, note), /Job key: C0CESKD6CV6:1794876795\.492009\n\nOther :eyes: jobs/)
+  assert.equal(otherJobsNote([self], self.hit.key, now), '')
 })

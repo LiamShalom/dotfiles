@@ -102,6 +102,12 @@ error code) is not the cause; the top query or the alert usually is. Count error
 from one log line. Once the cause is found, fixing it is the job: for a hot query, an index through
 `/ship-migration` (agents merge and apply migrations), then re-run the snapshot to see it work.
 
+An error message says what the code reports, not why. Before you name a cause from one, check the
+state behind it, and read the other jobs your first prompt lists: one may already have traced the
+same incident. "Paused for a short maintenance step" (`pg2_write_fenced`) is also what users see
+when the database does not answer; a planned switch shows only as `PG2_<CHUNK>_WRITE_FENCE`
+enabled in `rollout_flags`. List every claim in your reply that nothing proves in `unproven_claims`.
+
 
 **Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread
 sees that work. Before you write code, read the thread again and post one short update as Liam
