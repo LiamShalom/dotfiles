@@ -289,3 +289,8 @@ test('only non-empty string claims count', () => {
   assert.deepEqual(unprovenClaims({ status: 'done', summary: 'ok', unproven_claims: 'abc' }), [])
   assert.deepEqual(unprovenClaims({ status: 'done', summary: 'ok', unproven_claims: ['', '  ', 3, 'x'] }), ['x'])
 })
+
+test('more first-person guesses are caught', () => {
+  for (const summary of ['I assume it is a campaign write.', "I'm assuming the fence is on.", 'I have not traced the save route.'])
+    assert.equal(unprovenClaims({ status: 'done', summary, unproven_claims: [] }).length, 1, summary)
+})
