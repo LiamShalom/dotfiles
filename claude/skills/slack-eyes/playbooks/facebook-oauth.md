@@ -130,6 +130,14 @@ Never fill the gap with a guess in the reply.
    send `initialize`, then `tools/call` `execute_sql` (kill the process after the reply; it does not exit
    on stdin close).
 
+7. **"Is FB tracking for X?"** Run Crawlzo on the contract's Facebook ID 2-3 times. A repeated
+   `PROFILE_RESTRICTED` is the `hidden` case in `lib/facebook/setup-status.ts`: we cannot track it
+   until the creator removes the age or country limit (and turns on professional mode for a profile).
+   No reconnect is needed for tracking. Some creators run one Page per brand: list every contract's
+   Facebook handle (`contract_social_profiles` join `contracts` on `contractor_id`) before you call a
+   connected Page "the wrong one". In melaxin: fb tracking for paige d (2026-11-17), the connected
+   Page belonged to her Klover contract, and the thread needed two corrections.
+
 ### What to reply
 
 - `facebook_page_required`, and they have a Page: sign in with the Facebook account that manages the
