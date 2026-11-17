@@ -27,7 +27,7 @@ fewer. Run the ones for the error, then post one reply. Never say what kind of a
   `handle` is the public ID of the Page the brand asked for. The request link accepts only that Page.
 - **Two Facebook ID namespaces.** `contract_social_profiles.handle` / `facebook_id` hold the public ID
   (what scrapers and links use). `oauth_provider_subject_id` holds the Graph Page ID. They differ.
-- **Tracking does not need OAuth.** Reels of a public profile or Page are scraped publicly. Sasha's
+- **Tracking does not need OAuth.** Reels of a public profile or Page are scraped publicly. The
   contract `cTKIgr0UPjx4jHZmIzTT` had 68 Facebook posts (534K views) with no Facebook grant at all, and
   they appear in the brand's posts search (`lib/analytics/pg/posts-search-query.ts`). A Page connection
   adds Reel insights (audience data) and handle proof; it is not needed for posts to count.
@@ -71,15 +71,14 @@ Never fill the gap with a guess in the reply.
    select platform, handle, company_id, requested_at, channel
    from creator_connection_requests where creator_id = '<creator id>' order by requested_at desc;
    ```
-4. What the contracts track. `contracts.creator_id` is empty on almost every contract (921 of 752K
-   in the last 60 days), so find the creator's contracts through `handle_requests.person_id`, or
-   through `creatorId` on the Firestore `contractsv2` doc:
+4. What the contracts track. The creator on a contract is `contracts.contractor_id` (set on every
+   contract). `contracts.creator_id` is empty on almost all of them: do not use it. A ghost contract
+   (a handle the brand tracks before the creator joins) has `contractor_id = 'ghost-<contract id>'`.
    ```sql
    select p.contract_id, p.platform, p.handle, p.facebook_id, p.connection_status,
           p.oauth_grant_id is not null as has_grant, p.oauth_verified_username, p.retired_at
-   from contract_social_profiles p
-   where p.platform ilike 'facebook%'
-     and p.contract_id in (select contract_id from handle_requests where person_id = '<creator id>');
+   from contract_social_profiles p join contracts c on c.id = p.contract_id
+   where p.platform ilike 'facebook%' and c.contractor_id = '<creator id>';
    ```
    For `requested_account_mismatch`, compare the request's `handle` with these handles and with the
    `username` of any `facebook` row in `creator_social_oauth_connections`. (`social_accounts` holds
@@ -100,6 +99,12 @@ Never fill the gap with a guess in the reply.
    link's `handle` with `requested_account_mismatch`, and the page then asks for a new sign-in (it looks
    like a loop). Gloria (2026-11-17) was signed in to a different Instagram account than the link's.
    Read a screen recording with ffmpeg: frames at `fps=1/2`, tiled `5x2` into one image.
+   **A screenshot can be hours old.** Its time may be a reshared one (a screenshot of a screenshot shows
+   an inner clock). When a 10-minute window around the Slack post finds nothing, search the requested
+   handle as `text` in the inner clock's hour in each US time zone. In chitara: facebook page mismatch,
+   the try was 21:11Z the day before (inner clock "1:11" Pacific). A refused try leaves no
+   `creator_social_oauth_grants` row, but Facebook still lists SideShift as connected in the creator's
+   settings: that is what "it says connected on Facebook" means.
 
 ### What to reply
 
@@ -116,7 +121,7 @@ Never fill the gap with a guess in the reply.
   If that Page is in the contract's `socialProfiles` (the creator added it), the request is right and
   the creator manages several Pages: tell them to tick that Page under "Edit access" on the Facebook
   screen, signed in to the account that manages it. Ask for their Page only when the requested ID is
-  on none of their contracts. (Courtney, 2026-11-17: asking first cost a second reply.) The 403 on
+  on none of their contracts. (courtney: facebook page mismatch, 2026-11-17: asking first cost a second reply.) The 403 on
   `POST /api/public/audience-connect` does not log which Page Meta returned.
 - A brand asks to skip Facebook for one creator: Customize on the held contract and remove the platform
   that is missing (prove which one from step 4 first).
