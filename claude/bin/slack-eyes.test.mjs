@@ -103,3 +103,56 @@ test('the Opus turn carries what the Sonnet pass found', () => {
   assert.match(text, /invite query skips archived seats/)
   assert.match(text, /fix the query and reply/)
 })
+
+// --- Raising a job to Session Board
+import { matchJob, raiseHits, raisedPrompt, RAISE_EMOJI } from './slack-eyes.mjs'
+
+const jobs = [
+  { file: '/j/C1_100.000001.json', job: { name: 'acme: invite link broken', sessionId: 'aaaa1111-2222', hit: { key: 'C1:100.000001', channel: 'C1', ts: '100.000001', threadTs: '100.000001' } } },
+  { file: '/j/C2_200.000002.json', job: { name: 'beta: payouts stuck', sessionId: 'bbbb3333-4444', boardId: 'cccc5555', hit: { key: 'C2:200.000002', channel: 'C2', ts: '1794000250.000005', threadTs: '1794000200.000002' } } },
+]
+const names = (list) => list.map((m) => m.job.name)
+
+test('a job is found by key, session prefix, board id, name part or Slack link', () => {
+  assert.deepEqual(names(matchJob(jobs, 'C1:100.000001')), ['acme: invite link broken'])
+  assert.deepEqual(names(matchJob(jobs, 'aaaa1111')), ['acme: invite link broken'])
+  assert.deepEqual(names(matchJob(jobs, 'cccc5555')), ['beta: payouts stuck'])
+  assert.deepEqual(names(matchJob(jobs, 'PAYOUTS')), ['beta: payouts stuck'])
+  assert.deepEqual(names(matchJob(jobs, 'https://x.slack.com/archives/C2/p1794000250000005')), ['beta: payouts stuck'])
+  assert.deepEqual(names(matchJob(jobs, 'https://x.slack.com/archives/C2/p1794000999000000?thread_ts=1794000200.000002&cid=C2')), ['beta: payouts stuck'])
+  assert.deepEqual(matchJob(jobs, ''), [])
+  assert.deepEqual(matchJob(jobs, 'nothing like it'), [])
+})
+
+test("only Liam's :tv: counts, on any message in the thread", () => {
+  const item = (reactions, threadTs) => ({ type: 'message', channel: 'C2', message: { ts: '260.000001', thread_ts: threadTs, reactions } })
+  assert.deepEqual(raiseHits([item([{ name: RAISE_EMOJI, users: ['U0B78R52DFT'] }], '200.000002')]), [{ key: 'C2:260.000001', channel: 'C2', threadTs: '200.000002' }])
+  assert.deepEqual(raiseHits([item([{ name: RAISE_EMOJI, users: ['U0SOMEONE'] }], '200.000002')]), [])
+  assert.deepEqual(raiseHits([item([{ name: 'eyes', users: ['U0B78R52DFT'] }])]), [])
+})
+
+test('a raised session is told whether its turn was stopped', () => {
+  const stopped = raisedPrompt({ stopped: true, permalink: 'https://x/p1', key: 'C1:1' })
+  assert.match(stopped, /stopped your headless turn/)
+  assert.match(stopped, /carry on with the job/)
+  assert.match(stopped, /Slack thread: https:\/\/x\/p1$/)
+  const finished = raisedPrompt({ status: 'done', key: 'C1:1' })
+  assert.match(finished, /it was finished/)
+  assert.match(finished, /end your turn/)
+})
+
+test('a raise before a queued turn hands its unsent thread messages to the board chat', () => {
+  const text = raisedPrompt({ messages: [{ user: 'U0REPORTER1', ts: '1.2', text: 'it is order 42' }], key: 'C1:1' })
+  assert.match(text, /order 42/)
+  assert.doesNotMatch(text, /stopped your headless turn/)
+})
+
+import { threadJob } from './slack-eyes.mjs'
+test(':tv: picks the running job in its thread over an older closed one, and never guesses between two', () => {
+  const j = (key, ts, status) => ({ file: `/j/${key}`, job: { sessionId: key, status, hit: { key, channel: 'C9', ts, threadTs: '1794000000.000001' } } })
+  const hit = { channel: 'C9', threadTs: '1794000000.000001' }
+  assert.equal(threadJob([j('old', '1794000000.000001', 'closed'), j('new', '1794000100.000001', 'running')], hit).job.sessionId, 'new')
+  assert.equal(threadJob([j('old', '1794000000.000001', 'closed'), j('older', '1793000000.000001', 'closed')], hit).job.sessionId, 'old')
+  assert.deepEqual(threadJob([j('a', '1794000000.000001', 'done'), j('b', '1794000100.000001', 'waiting_reporter')], hit).several, ['a', 'b'])
+  assert.equal(threadJob([j('gone', '1794000000.000001', 'archived')], hit), null)
+})
