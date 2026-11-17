@@ -177,7 +177,8 @@ plan and lint evidence in chat as the record. Before you merge, check the end re
 schema and data after every pending file applies (one apply runs every pending file, not
 only yours). Merge only SQL that is safe and non-destructive: no drops, truncates, renames,
 type narrowing, data deletes or rewrites, or long locks on large tables. If it is not,
-change the migration until it is (expand/contract) instead of asking me.
+change the migration until it is (add the new shape, leave the old one in place) instead
+of asking me.
 
 ## Bash commands
 
