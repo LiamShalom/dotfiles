@@ -75,6 +75,11 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   (`select.usecase.ts`, #10563, live 2026-11-16). A pick of an earlier-connected account with no
   fresh sign-in can still add it to every waiting campaign.
 
+**Which iOS code runs.** The App Store build is not always `main`: check
+`curl -s 'https://itunes.apple.com/lookup?bundleId=com.SideShift&country=us'` for the version, then find the
+branch whose `Version.xcconfig` has that `MARKETING_VERSION` (2.30 shipped from `creator-release-polish`, PR #359,
+while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: read with `git show origin/<branch>:<path>`.
+
 ## Symptom → cause → proof
 
 | What they report | Cause | Proof |
@@ -86,6 +91,7 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
 | Removed handle still tracked, "already on this campaign" | Approved removal not applied (before #10602), or a re-add | Check 4 |
 | One connect appears on 3 or 4 campaigns | `/connect/select` sent no campaign | Check 3 by handle: one row per contract, seconds apart, `reviewed_by` empty |
 | Cannot invite a creator to an ended campaign | Email invites stop after the end date | Check 6 |
+| iOS: contract link in a chat flashes a "Preparing your contract" skeleton and closes, held contract | iOS 2.30 (`creator-release-polish`, not `main`) closes the sign sheet and opens the campaign page on the Home tab without switching tabs (`showGetReady` → `.openCampaignFromActivity`); fixed in mobile #382 | Webapp logs per tap: `GET contracts/{id}` 200, then `GET jobs/{programId}` 404 from the hidden page. Workaround: creator taps the Home tab |
 
 ### Checks (read replica)
 
