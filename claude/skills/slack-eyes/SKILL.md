@@ -99,8 +99,9 @@ For a status alert or outage, start from `~/.claude/bin/incident-snapshot.mjs --
 watcher attaches it to alert jobs): the alert channels, primary CPU and connections, the top queries with
 their text, statements run by hand, and merges, in 10-minute buckets. A symptom (a traffic spike, an
 error code) is not the cause; the top query or the alert usually is. Count errors in time buckets, never
-from one log line. Once the cause is found, fixing it is the job: for a hot query, an index through
-`/ship-migration` (agents merge and apply migrations), then re-run the snapshot to see it work.
+from one log line. Once the cause is found, fixing it is the job: for a missing index, create it now with `scripts/db-hotfix-index.sh create` (the monorepo's emergency
+index job: CREATE INDEX CONCURRENTLY in minutes, runbook `services/db-hotfix-index/README.md`), re-run the
+snapshot to see it work, then ship the same index through `/ship-migration` and drop the hotfix copy.
 
 An error message says what the code reports, not why. Before you name a cause from one, check the
 state behind it, and read the other jobs your first prompt lists: one may already have traced the
