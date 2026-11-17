@@ -14,8 +14,8 @@
 //   slack-eyes.mjs --run <job>  run one job (the check starts this, detached)
 //   slack-eyes.mjs --list       the open jobs, headless or on the board
 //   slack-eyes.mjs --open <job> move a job to Session Board to watch or steer it (a running headless
-//                               turn is stopped and the same session resumes there). Liam's :tv: on
-//                               any message in a job's thread does the same.
+//                               turn is stopped and the same session resumes there). Session
+//                               Board's Slack group runs this when Liam opens a job there.
 // Pause: touch ~/.claude/state/slack-eyes.PAUSED   Log: ~/.claude/logs/slack-eyes.log
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -284,8 +284,8 @@ export const handoffPrompt = ({ reason, failure, question, permalink, key }) => 
   ? ''
   : `The headless run stopped before it finished (${failure || 'no result'}). First check what is already done (the thread, the PR, the job's worktree) and finish the job, without repeating a step: never post a second reply that says the same thing. `}For a held UI change, open its approval page now with board-browser.mjs, as the slack-eyes skill says. Then, in a few lines, tell Liam what you found, what you did and what you posted in the thread (with the message and PR links), and end your turn on the one thing he must answer${question ? `: ${question}` : ''}. Carry on from his answer. ${boardListNote(key)}${permalink ? `\n\nSlack thread: ${permalink}` : ''}`
 
-// The turn a session gets when Liam raises it to the board himself (`--open`, or his :tv: in the
-// thread) to watch or steer it. `stopped`: the watcher stopped a headless turn to move it.
+// The turn a session gets when Liam raises it to the board himself (`--open`, which Session
+// Board's Slack group runs) to watch or steer it. `stopped`: the watcher stopped a headless turn to move it.
 // `messages`: thread messages the job was about to be resumed with, which it has not seen yet.
 const carryOnHere = 'check what is already done (the thread, the PR, the worktree) and carry on with the job, working without asking as before. Never repeat a step or post a second reply that says the same thing. When the skill says to hold something for Liam, end your turn on the question.'
 export const raisedPrompt = ({ stopped, status, messages, permalink, key }) => `Liam moved this job to his Session Board to look at it${stopped
@@ -1078,8 +1078,7 @@ async function setFromSession(key, status, note) {
   console.log(`slack-eyes: ${key} is ${status}`)
 }
 
-// --- Raising a job to Session Board by hand: `--open <job>`, or Liam's :tv: in the job's thread.
-export const RAISE_EMOJI = 'tv'
+// --- Raising a job to Session Board by hand: `--open <job>` (Session Board's Slack group runs it).
 
 // A job by its key, file, session or board id (or a prefix of one), Slack link, or part of its name.
 export function matchJob(jobs, query) {
@@ -1115,7 +1114,7 @@ const childrenOf = (pid) => {
 // Puts a job's session on the board. A headless turn in progress is stopped (SIGTERM; the transcript
 // keeps everything up to there) and its runner hands the same session over. An idle job is resumed
 // on the board here. Returns what happened, in words.
-export async function raiseJob(file, { wait = true } = {}) {
+export async function raiseJob(file) {
   const job = readJob(file)
   const name = job.name || sessionName(job.hit.text)
   if (!job.sessionId) return `"${name}" has no session to show`
@@ -1135,7 +1134,6 @@ export async function raiseJob(file, { wait = true } = {}) {
       }
     }
     log('raise_asked', { key: job.hit.key, name, status: job.status })
-    if (!wait) return `stopping the headless run of "${name}"; it moves to Session Board`
     // The runner hands it over once its claude turn has exited.
     for (let i = 0; i < 60; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1_000))
@@ -1191,54 +1189,6 @@ function listJobs(only = null) {
   console.log('\nslack-eyes.mjs --open <name part | session id | Slack link> moves one to Session Board')
 }
 
-// Liam's :tv: on any message in a job's thread (one not handled yet) raises that job.
-export function raiseHits(items) {
-  return items
-    .filter((item) => item.type === 'message' && item.message?.ts)
-    .filter((item) => (item.message.reactions ?? []).some((r) => r.name === RAISE_EMOJI && r.users?.includes(LIAM)))
-    .map((item) => ({ key: `${item.channel}:${item.message.ts}`, channel: item.channel, threadTs: item.message.thread_ts ?? item.message.ts }))
-}
-
-// The job a :tv: in a thread means: the one running there, else the open one, else the newest
-// closed one (it reopens). Two candidates at the same level return { several } instead of a guess.
-export function threadJob(jobs, hit) {
-  const inThread = jobs.filter(({ job }) => job.hit?.channel === hit.channel && job.hit?.threadTs === hit.threadTs && job.sessionId && job.status !== 'archived')
-  for (const level of [['queued', 'running', 'handing_off'], null, ['closed']]) {
-    const found = inThread.filter(({ job }) => (level ? level.includes(job.status) : !['queued', 'running', 'handing_off', 'closed'].includes(job.status)))
-    if (found.length > 1 && level?.[0] !== 'closed') return { several: found.map(({ job }) => job.hit.key) }
-    if (found.length) return found.sort((a, b) => Number(b.job.hit.ts) - Number(a.job.hit.ts))[0]
-  }
-  return null
-}
-
-async function raiseFromSlack(state, items) {
-  const hits = raiseHits(items)
-  // First check with this: the :tv: already there are old.
-  if (!Array.isArray(state.raised)) {
-    state.raised = hits.map((h) => h.key)
-    return true
-  }
-  let changed = false
-  for (const hit of hits) {
-    if (state.raised.includes(hit.key)) continue
-    const match = threadJob(allJobs(), hit)
-    if (!match) continue
-    state.raised.push(hit.key)
-    changed = true
-    if (match.several) {
-      log('raise_ambiguous', { key: hit.key, jobs: match.several })
-      if (!dryRun) notify(`:tv: in a thread with ${match.several.length} open jobs: run slack-eyes.mjs --list, then --open the one you want`)
-      continue
-    }
-    if (dryRun) { log('would_raise', { key: match.job.hit.key }); continue }
-    const said = await raiseJob(match.file, { wait: false })
-    log('raised_from_slack', { key: match.job.hit.key, said })
-    notify(said)
-  }
-  if (state.raised.length > 500) state.raised = state.raised.slice(-500)
-  return changed
-}
-
 // Every page of reactions.list, so a baseline marks all of Liam's existing :eyes:, not only the newest 50.
 const allEyes = async () => {
   const items = []
@@ -1262,7 +1212,7 @@ async function main() {
   // First run (or --baseline): everything already reacted to is old. Only new :eyes: start work.
   if (!state || args.has('--baseline')) {
     const items = await allEyes()
-    state = { seen: [...new Set([...(state?.seen ?? []), ...items.map((i) => i.key)])], lastAck: state?.lastAck ?? null, ...(state?.raised && { raised: state.raised }) }
+    state = { seen: [...new Set([...(state?.seen ?? []), ...items.map((i) => i.key)])], lastAck: state?.lastAck ?? null }
     if (!dryRun) writeState(state)
     log('baseline', { marked: items.length })
     return
@@ -1273,9 +1223,7 @@ async function main() {
     await pollOpen()
     await pollRunning()
   }
-  const reacted = (await slack('reactions.list', { user: LIAM, limit: 50, full: 'true' })).items ?? []
-  if (await raiseFromSlack(state, reacted) && !dryRun) writeState(state)
-  const items = eyesItems(reacted)
+  const items = eyesItems((await slack('reactions.list', { user: LIAM, limit: 50, full: 'true' })).items ?? [])
   const seen = new Set(state.seen)
   const fresh = items.filter((i) => !seen.has(i.key)).reverse().slice(0, MAX_PER_RUN)
   for (const hit of fresh) {
