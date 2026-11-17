@@ -96,6 +96,12 @@ problem is the customer's own action or working as designed, the reply says what
 
 ## 4. Fix
 
+**Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread
+sees that work. Before you write code, read the thread again and post one short update as Liam
+(step 5's voice and tag rules): what you found in plain words and that a fix is on the way, with
+no date. For example "<@U123> found it, that warning doesnt say which video it means. fixing it
+so it names them". Skip it only if Liam already said the same thing in the thread.
+
 If the cause is in code, follow the `quick-fix` skill from its Phase 1, in a worktree on a
 branch off `origin/main`. Its size check and Phase 9 are the merge rule:
 
@@ -152,7 +158,10 @@ or the subtype `bot_message` came from an app, so tag nobody. Send it:
 ~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"
 ```
 
-Check that the output has `"ok":true`. Post one reply, not a running commentary.
+Check that the output has `"ok":true`. Post one final reply, not a running commentary: the only
+other post is step 4's "found it, fixing" update. While your turn runs, the watcher answers new
+questions in the thread for you with a status reply from your notes, so the thread may hold
+replies you did not write: read them and do not repeat them.
 
 ## 5b. Ask the reporter for more
 
