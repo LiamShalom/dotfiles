@@ -269,3 +269,23 @@ test('other jobs are a data block a planted tag or newline cannot leave', () => 
   assert.doesNotMatch(note, /<slack_message/)
   assert.equal(note.split('\n').filter((l) => l.startsWith('- ')).length, 1)
 })
+
+test('state words in a proven answer are not a guess; first-person guesses are', () => {
+  for (const summary of [
+    "Creator's Whop identity is unverified, so the withdrawal is blocked; checked the kyc row id 123.",
+    'Matt assumed the data was lost; it is not: row abc exists',
+    'Their Instagram account is not verified as a business account, so the connect failed. Checked the grant.',
+    'Unverified email blocked sign-in; confirmed in the auth logs.',
+    'Don\'s latest message is a joke, so I posted nothing. I did not test a SideChat save myself.',
+  ]) assert.deepEqual(unprovenClaims({ status: 'done', summary, unproven_claims: [] }), [], summary)
+  for (const summary of [
+    'I assumed the save is a campaign write.',
+    "I didn't check the route.",
+    'Replied. The SideChat part of the reply is unverified.',
+  ]) assert.equal(unprovenClaims({ status: 'done', summary, unproven_claims: [] }).length, 1, summary)
+})
+
+test('only non-empty string claims count', () => {
+  assert.deepEqual(unprovenClaims({ status: 'done', summary: 'ok', unproven_claims: 'abc' }), [])
+  assert.deepEqual(unprovenClaims({ status: 'done', summary: 'ok', unproven_claims: ['', '  ', 3, 'x'] }), ['x'])
+})

@@ -527,7 +527,7 @@ function handOff(file, { reason, failure, question, summary, raised }) {
       }
       // An earlier board chat of this job (one that was deleted, or a raise of a finished job) still counts for archiving.
       const formerBoardIds = [...new Set([...(job.formerBoardIds ?? []), job.boardId])].filter((b) => b && b !== id)
-      updateJob(file, { status: 'on_board', reason, boardId: id, formerBoardIds, boardTries: tries, raise: null, raised: null, ...(summary && { summary }) })
+      updateJob(file, { status: 'on_board', reason, boardId: id, formerBoardIds, boardTries: tries, raise: null, raised: null })
       log('to_board', { key: job.hit.key, name, reason, failure, id, summary })
     } catch (error) {
       const final = tries >= MAX_BOARD_TRIES
@@ -556,9 +556,10 @@ export const unprovenPrompt = `You returned needs_liam with cause_unproven. Befo
 // read "maintenance step" (pg2_write_fenced) as a planned campaigns switch, posted that as Liam, and
 // said in its own summary that the SideChat part was assumed. The fence flag was off; the database
 // was overloaded and the fence fails closed when its state read times out.
-const ADMITS_GUESS = /\b(assum(e|ed|es|ing|ption)|unverified|not verified)\b/i
+// First person only: "her identity is unverified" is a state, not a guess.
+const ADMITS_GUESS = /\bI (assumed|guessed|did not (check|trace|verify|confirm|prove)|didn'?t (check|trace|verify|confirm|prove)|have not (checked|verified|confirmed|proven))\b|\b(reply|part|claim|cause)\b[^.]{0,40}\b(is|stays) (unverified|not verified|unproven|not proven)\b/i
 export const unprovenClaims = (out) => out?.status !== 'done' ? []
-  : [...(out.unproven_claims ?? []), ...(ADMITS_GUESS.test(out.summary ?? '') ? [`from your summary: ${out.summary}`] : [])]
+  : [...(Array.isArray(out.unproven_claims) ? out.unproven_claims : []).filter((c) => typeof c === 'string' && c.trim()), ...(ADMITS_GUESS.test(out.summary ?? '') ? [`from your summary: ${out.summary}`] : [])]
 export const verifyPrompt = (claims) => `You returned done, but your thread reply rests on claims nothing in this session proves:
 ${claims.map((c) => `- ${c}`).join('\n')}
 
@@ -683,7 +684,7 @@ async function runJob(file) {
   const key = job.hit.key
   // Raised during the turn, or after it ended and before its result is written here.
   if (turn.raised || raiseAsked(job)) {
-    updateJob(file, { status: 'handing_off' })
+    updateJob(file, { status: 'handing_off', ...(out?.summary && { summary: out.summary }) })
     const raised = turn.ran ? { stopped: true } : unsent?.length ? { messages: unsent } : { status: turn.raised ? 'running' : out?.status }
     handOff(file, { reason: 'raised', raised })
     log('raised', { key, name: job.name, from: 'running' })
@@ -705,7 +706,7 @@ async function runJob(file) {
   // Needs Liam, the run failed, or it used up its turns: put the same session in front of him.
   const reason = out?.status === 'needs_liam' ? 'needs_liam' : 'run_failed'
   const why = reason === 'needs_liam' ? null : failure ?? `it used all ${MAX_TURNS} turns`
-  updateJob(file, { status: 'handing_off' })
+  updateJob(file, { status: 'handing_off', ...(out?.summary && { summary: out.summary }) })
   handOff(file, { reason, failure: why, question: out?.question, summary: out?.summary })
   await listSet(file, { status: 'needs_you', note: out?.question ?? why ?? '' })
 }
