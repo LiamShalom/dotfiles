@@ -101,13 +101,43 @@ unqueued() {
 }
 mkdir -p "$DIR" 2>/dev/null && [ -w "$DIR" ] || unqueued "$@"
 
+# A job may hold a slot for at most MAX_SECS, then it is stopped with everything
+# it started. On 11-17 hung iOS runs held both iOS slots for 4 and 6 hours, and
+# their sessions sat in Working with nothing to act on.
+case "$POOL" in
+	xcode) MAX_SECS="${HEAVY_XCODE_MAX_SECS:-3600}" ;;
+	*) MAX_SECS="${HEAVY_MAX_SECS:-2700}" ;;
+esac
+# Runs inside the slot: the job in its own process group (set -m), a watchdog
+# that stops that group at the limit, and a trap that passes a cancel on to it.
+# shellcheck disable=SC2016
+RUN_JOB=': > "$1"; rm -f "$2"; max=$3; shift 3
+set -m
+"$@" &
+job=$!
+# The watchdog writes its notice to the job stderr (fd 3) but keeps no other
+# handle on it, so it never holds the caller output open.
+( sleep "$max"
+  if kill -0 "$job" 2>/dev/null; then
+    echo "heavy: stopped after $((max / 60)) min holding a slot; the job ran too long or hung" >&3
+    kill -TERM -- "-$job" 2>/dev/null; sleep 10; kill -KILL -- "-$job" 2>/dev/null
+  fi ) </dev/null >/dev/null 3>&2 2>/dev/null &
+dog=$!
+set +m
+trap "kill -TERM -- -$job 2>/dev/null" TERM INT HUP
+wait "$job"; rc=$?
+# wait returns early when a trapped signal arrives: wait again for the real exit.
+while kill -0 "$job" 2>/dev/null; do wait "$job"; rc=$?; done
+kill -- "-$dog" 2>/dev/null
+exit "$rc"'
+
 notified=0
 while :; do
 	for i in $(seq 1 "$SLOTS"); do
 		rm -f "$started"
 		# lockf exits 75 when the slot is busy; the marker file tells that apart
 		# from the job itself exiting 75.
-		lockf -s -t 0 "$DIR/$POOL.$i" /bin/sh -c ': > "$1"; rm -f "$2"; shift 2; exec "$@"' sh "$started" "$queued" "$@"
+		lockf -s -t 0 "$DIR/$POOL.$i" /bin/sh -c "$RUN_JOB" sh "$started" "$queued" "$MAX_SECS" "$@"
 		rc=$?
 		if [ -e "$started" ]; then
 			rm -f "$started"

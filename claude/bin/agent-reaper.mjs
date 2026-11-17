@@ -27,6 +27,8 @@
 //                whose app is gone, once seen orphaned for ORPHAN_MIN (30)
 //                minutes. Nothing can read their output any more. One with a
 //                dev server or a connected client inside is left alone.
+//   xcodebuild   Stop an xcodebuild whose process tree gained under 5 CPU s in
+//                XCODE_HUNG_MIN (60): it is hung and holds an iOS queue slot.
 //   containers   Stop (never remove) a container in the default Colima VM that
 //                has had no real network traffic for CONTAINER_IDLE_HOURS (24).
 //                The VM has a fixed 6 GB, and agents' leftover databases fill
@@ -66,6 +68,7 @@ const EMU_IDLE_MS = env("EMU_IDLE_MIN", 10) * 60e3;
 // at least every 2 h; it reached 7 GB after 18 h (2026-11-13).
 const KOTLIN_MAX_KB = env("KOTLIN_MAX_GB", 5) * 1024 * 1024;
 const ORPHAN_MS = env("ORPHAN_MIN", 30) * 60e3;
+const XCODE_HUNG_MS = env("XCODE_HUNG_MIN", 60) * 60e3;
 const CONTAINER_IDLE_MS = env("CONTAINER_IDLE_HOURS", 24) * 3600e3;
 const CONTAINER_ACTIVE_BYTES = 16 * 1024;
 const KEEP_CONTAINERS = new Set(["sideshift-pg-local", ...(process.env.KEEP_CONTAINERS ?? "").split(",").filter(Boolean)]);
@@ -602,7 +605,7 @@ async function main() {
 	try {
 		state = JSON.parse(readFileSync(STATE, "utf8"));
 	} catch {}
-	const next = { sims: {}, dev: {}, tabs: {}, orphans: {}, containers: {}, kotlin: {} };
+	const next = { sims: {}, dev: {}, tabs: {}, orphans: {}, containers: {}, kotlin: {}, xcode: {} };
 	const lines = [];
 	const pending = [];
 	const say = (line) => lines.push(line);
@@ -682,6 +685,39 @@ async function main() {
 			act(`STOP ${label}: over the ${gb(KOTLIN_MAX_KB)} limit and no compile for ${ago(now - since)}; the next build starts a new one`, () =>
 				process.kill(p.pid, "SIGTERM"));
 		else if (dry) say(`keep ${label}: ${kb <= KOTLIN_MAX_KB ? "under the limit" : quiet ? `quiet ${ago(now - since)}` : "compiling"}`);
+	}
+
+	// A hung xcodebuild holds an iOS slot of the heavy queue for hours (11-17: two ran 4 and 6
+	// hours on ~3 CPU minutes). Hung = its whole process tree gained under 5 s of CPU for an hour.
+	const xcode = procs.filter((p) => /\/usr\/bin\/xcodebuild(\s|$)/.test(p.cmd));
+	if (xcode.length) {
+		const kids = new Map();
+		for (const p of procs) kids.set(p.ppid, [...(kids.get(p.ppid) ?? []), p.pid]);
+		const treeOf = (pid) => {
+			const out = [];
+			for (const stack = [pid]; stack.length; ) {
+				const q = stack.pop();
+				out.push(q);
+				stack.push(...(kids.get(q) ?? []));
+			}
+			return out;
+		};
+		const trees = new Map(xcode.map((p) => [p.pid, treeOf(p.pid)]));
+		const cpu = cpuSeconds([...trees.values()].flat());
+		for (const p of xcode) {
+			const tree = trees.get(p.pid);
+			const total = tree.reduce((s, q) => s + (cpu[q] ?? 0), 0);
+			const prev = state.xcode?.[p.pid];
+			const same = prev && prev.cmd === p.cmd;
+			const quiet = same && total - prev.cpu < 5;
+			const since = quiet ? prev.quietSince : now;
+			// Keep the CPU mark from when it went quiet, so slow drips still count as quiet.
+			next.xcode[p.pid] = { cmd: p.cmd, cpu: quiet ? prev.cpu : total, quietSince: since };
+			const label = `xcodebuild (pid ${p.pid}, up ${ago(p.ageSec * 1000)}, ${Math.round(total)} CPU s)`;
+			if (quiet && now - since >= XCODE_HUNG_MS)
+				act(`STOP ${label}: hung, under 5 CPU s in ${ago(now - since)}`, () => killTree(tree));
+			else if (dry) say(`keep ${label}: ${quiet ? `quiet ${ago(now - since)}` : "working"}`);
+		}
 	}
 
 	for (const s of endedSessionSims(live)) {
