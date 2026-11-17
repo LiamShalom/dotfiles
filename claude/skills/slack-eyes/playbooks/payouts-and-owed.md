@@ -107,11 +107,19 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
 7. Logs: `logs_search_webapp` (internal-dashboard). Window 60 min at most, set `since` and `until` (not
    `from`/`to`). Use `route` (for example `/api/payouts`) with `statusCode` `5xx`, or `text`. Each hit shows one
    line per request. Take the screenshot time, convert to UTC, search 10 minutes around it.
-8. Pending ACH top-ups: `select l.id, w.company_name, l.status, l.payin_status, l.whop_status, l.voidable,
+8. Pending ACH top-ups: `select l.id, w.company_name, l.status, l.whop_status, l.whop_substatus, l.voidable,
    l.source_amount_cents, l.created_at from wallet_ledger l left join wallets w on w.company_id=l.wallet_id where l.reason='wallet_topup'
-   and l.status='pending' and l.payment_method_type='us_bank_account' order by l.created_at desc`. The
+   and l.status='pending' order by l.created_at desc`. On 11-17 the dashboard `postgres_query` had no
+   `payment_method_type` or `payin_status` column on `wallet_ledger` (`postgres_describe_table wallet_ledger`). The
    amount is `source_amount_cents` (`amount_cents` is null on a pending row). Several brands can have one at
    once: ask which brand before you pick.
+10. Top-up fees (ACH, card) and caps. `FeeConfig` is only `percentFee` + `fixedFeeCents`: no fee has a cap
+   (`lib/pricing-config.ts` `calculateFeeCents`). The rate is `users/<id>/customFees/<method>` if set (a Connect
+   sub-account also reads its integrator's, `embedIntegratorId`), else the plan rate in
+   `NEW_TOPUP_FEE_CONFIG_BY_PLAN` (`lib/fee-utils-server.ts` `getCustomFee`). No active subscription = Starter
+   (bank 3%, card 5%). Our modelled Whop ACH cost is 0.8% capped at $5 (`calculateProcessorFeeCents`).
+   Connect integrators fund through `reason='escrow_deposit'` rows, sub-accounts show `embed_transfer`.
+   A cap or a rate change is pricing: hold for Liam.
 9. Archive: `lib/payouts/campaign-outstanding-payouts.ts` gives the owed total. Run a read-only dry run first.
    Escrow crypto: deposits are `wallet_ledger` rows with `reason='escrow_deposit'`. The Firestore
    `embed_escrow_deposits` is outside the dashboard tool: say what you could not read.
