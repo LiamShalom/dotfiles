@@ -69,15 +69,18 @@ export function isAssetCompiler(row) {
   return /^(actool|ibtool|ibtoold|AssetCatalogSimulatorAgent)$/.test(row.name)
 }
 
-// Which processes to move back to normal priority.
-export function toPromote(rows) {
-  return rows.filter(isAssetCompiler)
+// A job that holds a heavy-queue slot (~/.claude/bin/heavy runs it under `lockf <slot file>`).
+// At most five run at once (2 general, 1 build, 2 iOS), and every other queued job waits on
+// them. In the background band the disk throttle stretched them 30-100x (11-17: a 1-minute
+// package build took 88 minutes), so 25 jobs waited up to 6 hours behind two slots. They run at
+// normal priority instead, with everything they start.
+export function isSlotHolder(row) {
+  return row.name === 'lockf' && /\/agent-heavy-\d+\/\w+\.\d+ /.test(row.args)
 }
 
-// Which processes to move to the background: rows of { pid, ppid, name, args }.
-export function toDemote(rows) {
+function ancestorsIn(rows) {
   const byPid = new Map(rows.map((row) => [row.pid, row]))
-  const ancestors = (row) => {
+  return (row) => {
     const chain = []
     const seen = new Set([row.pid])
     for (let up = byPid.get(row.ppid); up && !seen.has(up.pid); up = byPid.get(up.ppid)) {
@@ -86,9 +89,25 @@ export function toDemote(rows) {
     }
     return chain
   }
+}
+
+function inSlot(row, chain) {
+  return isSlotHolder(row) || chain.some(isSlotHolder)
+}
+
+// Which processes to move back to normal priority.
+export function toPromote(rows) {
+  const ancestors = ancestorsIn(rows)
+  return rows.filter((row) => isAssetCompiler(row) || inSlot(row, ancestors(row)))
+}
+
+// Which processes to move to the background: rows of { pid, ppid, name, args }.
+export function toDemote(rows) {
+  const ancestors = ancestorsIn(rows)
   return rows.filter((row) => {
     if (isSession(row) || isAssetCompiler(row)) return false
     const chain = ancestors(row)
+    if (inSlot(row, chain)) return false
     if (isAgentService(row) || chain.some((up) => isSession(up) || isAgentService(up))) return true
     // Detached: every process above it is another heavy tool (the emulator above its qemu). Rows
     // of other users and launchd itself are not listed, so a chain ends there.
@@ -129,7 +148,7 @@ function log(line) {
   }
 }
 
-// Processes already moved, by pid, with their arguments to tell a reused pid apart.
+// Processes already moved, by pid: the flag used and their arguments (to tell a reused pid apart).
 const moved = new Map()
 
 async function pass() {
@@ -144,11 +163,12 @@ async function pass() {
   ]
   for (const [row, flag, list] of plan) {
     if (row.ageS < MIN_AGE_S) continue
-    if (moved.get(row.pid) === row.args) continue
+    // Keyed with the flag: a job demoted before it took a heavy slot must still be promoted.
+    if (moved.get(row.pid) === `${flag} ${row.args}`) continue
     // A process that ended in between fails here; that is fine.
     const ok = await run('/usr/sbin/taskpolicy', [flag, '-p', String(row.pid)], { timeout: CALL_TIMEOUT_MS }).then(() => true, () => false)
     if (!ok) continue
-    moved.set(row.pid, row.args)
+    moved.set(row.pid, `${flag} ${row.args}`)
     list.push(row.name)
   }
   const summary = (names) => {
