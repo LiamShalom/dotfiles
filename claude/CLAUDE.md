@@ -217,14 +217,16 @@ type narrowing, data deletes or rewrites, or long locks on large tables. If it i
 change the migration until it is (add the new shape, leave the old one in place) instead
 of asking me.
 
-**Production deploys (`cloud-run-prod` gate, Cloud Run services and jobs):** start and
-approve them without asking (standing approval, given 2026-11-18). Dry-run first with
-`scripts/approve-deploy.sh <run-id> --dry-run`, read the evidence and every commit the
-deploy ships (other people's merged work included), then approve with
-`scripts/approve-deploy.sh <run-id> --human-confirmed --confirmed-by=LiamShalom` and post
-the evidence and commit list in chat as the record. Deploy only what is merged to `main`
-and green. Still stop and ask when the deploy would spend real money or ships a change
-that is not merged.
+**Redeploys (`cloud-run-prod` gate, Cloud Run services and jobs, messaging images and
+their preview gates):** start and approve them yourself when you judge them safe; never
+wait on me for one. Dry-run first with `scripts/approve-deploy.sh <run-id> --dry-run`, read
+the evidence and every commit the deploy ships (other people's merged work included), check
+the criteria in the monorepo's `.claude/commands/approve-deploy.md`, then approve with
+`scripts/approve-deploy.sh <run-id> --agent-confirmed --agent=claude-code/<session>` and
+post the evidence and commit list in chat as the record. Never use `--human-confirmed` for
+an approval I did not give in this chat. Deploy only what is merged to `main` and green,
+then check the new revision serves. Stop and ask only when the deploy would spend real
+money, ships a change that is not merged, or the script refuses `--agent-confirmed`.
 
 ## Testing: no permission needed, except for real money
 
