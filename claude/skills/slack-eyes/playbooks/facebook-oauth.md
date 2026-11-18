@@ -56,11 +56,16 @@ fewer. Run the ones for the error, then post one reply. Never say what kind of a
 | "Personal profiles cannot be connected" on the request page | none | Fixed help text on the request page (`components/creator-social-oauth/audience-connect-page.tsx`, `provider-copy.ts`), not an error. |
 | "Facebook hides this Page from people who are not logged in, so we can't track it…" | `facebook_page_hidden` | The Page has an age or country limit. Retrying does not help; the creator removes the limit. |
 | "Reconnect Facebook and allow access to your Pages." | `required_permissions_missing` (error code `insufficient_scope`) | The creator turned off a Page permission on the Facebook screen. |
+| iOS "Add a Facebook account" step spins, then shows Connect again, no error | `facebook_account_selection_required` | Meta shared 2+ Pages and the server asked the app to pick one. iOS 2.30 (651) and older draw the Page list only once a Page is selected, so the step loops (tapcook: facebook connect spins, mobile PR #394). Proof: `creator_social_oauth_states` rows consumed (Meta returned), grant `updated_at` moves on every try, and the reason code as `text` in a 1-minute window on `connect/complete` hits her request. Ticking only one Page on Meta's screen marks the grant's other Pages `unavailable` (data.ts persist), so do not suggest it when other contracts use those Pages. |
 | "Facebook could not be connected. Please try again." (signed in) or "The account could not be connected. Please try again." (request link) | look in the logs | The generic text. Behind it is often `page_handle_resolution_unavailable` (the public-ID lookup missed, about 1 call in 5: transient, try again) or `app_id_mismatch` (config or code defect: engineering). Find which in the log line's `reason`, `details` or `error` (check 5). |
 
 ### Checks (read replica: `mcp__cloud-sql-postgres-read-replica__execute_sql`)
 
 Load the read-replica tool first with ToolSearch `select:mcp__cloud-sql-postgres-read-replica__execute_sql`.
+When it is missing, POST JSON-RPC to the shared bridge `http://127.0.0.1:47801/mcp` (initialize, then
+`tools/call` `execute_sql`) with `Authorization: Bearer <~/.config/mcp-shared/token>`; it answered in
+seconds on 2026-11-18 when spawning `mcp-shared-cloudsql.sh` over stdio hung. A creator's name is not in
+`find_account`: query Firestore `users` where `name ==` the full name.
 Two runs on 11-17 found that the internal-dashboard `postgres_query` refused the OAuth tables. If
 ToolSearch finds no read-replica tool (it happens in headless runs), search again once with
 `cloud-sql-postgres-read-replica`; if it is still missing, use the dashboard `postgres_query` for the
