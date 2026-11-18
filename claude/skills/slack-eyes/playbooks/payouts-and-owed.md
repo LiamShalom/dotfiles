@@ -114,8 +114,10 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
    `payment_method_type` or `payin_status` column on `wallet_ledger` (`postgres_describe_table wallet_ledger`). The
    amount is `source_amount_cents` (`amount_cents` is null on a pending row). Several brands can have one at
    once: ask which brand before you pick.
-10. Top-up fees (ACH, card) and caps. `FeeConfig` is only `percentFee` + `fixedFeeCents`: no fee has a cap
-   (`lib/pricing-config.ts` `calculateFeeCents`). The rate is `users/<id>/customFees/<method>` if set (a Connect
+10. Top-up fees (ACH, card) and caps. `FeeConfig` is `percentFee` + `fixedFeeCents` + optional `maxFeeCents`
+   (a per-top-up cap, #10765, 11-17). The cap lives only on a `customFees` doc, must be a number, and is never applied
+   to wires. The dashboard fee API cannot set it yet: write it with firebase-admin (`ref.update({maxFeeCents})`). Prove
+   it live on a test brand: a temporary capped doc, then `GET /api/whop/fees` returns `maxFeeCents`. The rate is `users/<id>/customFees/<method>` if set (a Connect
    sub-account also reads its integrator's, `embedIntegratorId`), else the plan rate in
    `NEW_TOPUP_FEE_CONFIG_BY_PLAN` (`lib/fee-utils-server.ts` `getCustomFee`). No active subscription = Starter
    (bank 3%, card 5%). Our modelled Whop ACH cost is 0.8% capped at $5 (`calculateProcessorFeeCents`).
@@ -124,7 +126,7 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
    `POST https://sideshifters.vercel.app/api/employers/<id>/fees` (`{paymentMethodType, percentFee, fixedFeeCents,
    notes}`, Bearer = minted liam@ token, see memory `internal-dashboard-url`). Prove it by running
    `getCustomFee(<id>, 'us_bank_account')` with tsx `--conditions=react-server` for the integrator and one sub-account.
-   (clipstake: ACH fee, 11-17: a 1% rate was the answer, not a cap.)
+   (clipstake: ACH fee, 11-17: 1% with a $10 cap. "1% so no cap needed" was wrong for big top-ups: $1k on $100k.)
 9. Archive: `lib/payouts/campaign-outstanding-payouts.ts` gives the owed total. Run a read-only dry run first.
    Escrow crypto: deposits are `wallet_ledger` rows with `reason='escrow_deposit'`. The Firestore
    `embed_escrow_deposits` is outside the dashboard tool: say what you could not read.
