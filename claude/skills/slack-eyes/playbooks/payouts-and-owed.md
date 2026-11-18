@@ -72,6 +72,7 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
 | Videos pending, no payment | Brand has not reviewed, or automatic pay is off | Check 5. |
 | Creator refuses SSN | Not needed to be paid, needed to withdraw | Check 6. Never advise to remove the creator. |
 | Whop top-up wanted cancelled | ACH row `pending_bank`, Whop shows it voidable | Check 8. Void is a write: hold for Liam. |
+| ACH top-up "Deposit failed" right after "Bank transfer started" (tapcook 11-18) | Whop rejects it before the bank: payment `open`/`failed` within ~2 s of `paid_at`, `failure_message` "The payment failed.", no `decline_code`, `amount_after_fees` 0. Nothing in our ledger says why (`failureMessage` "failed") | GET `api.whop.com/api/v1/payments/<id>` with `.env.local` `WHOP_API_KEY` + `Api-Version-Date: 2026-08-21` (GET only). Same method succeeding before rules out our side. Only Whop knows the reason: ask Brendan in #sideshift-x-whop (C09NST1C9JN) with the `payt_` and `pay_` ids. A real bank NSF shows `generic_decline` and fails a day later. |
 | Archive all campaigns and fix what they owe | Guard blocks while owed | Check 9. Needs Liam's yes. |
 
 ## Checks (read replica: `mcp__cloud-sql-postgres-read-replica__execute_sql`)
