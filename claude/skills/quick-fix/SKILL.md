@@ -342,8 +342,8 @@ surface goes through the cone's repo boundary (enforced by CI).
 
 ## Phase 8 — Prove it end to end
 
-Tests passing is not proof. On the PR's Vercel preview
-(`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app`), or the running app for
+Tests passing is not proof. On the PR's Vercel preview (a push builds none: run
+`npm run vercel:preview` on the branch, no permission needed, and use the address it prints), or the running app for
 code with no preview, drive the real user flow to its outcome in the shared agent Chrome:
 the reported symptom is gone, and the neighbouring flows still work. For UI, check desktop
 and phone widths. For data jobs, run on a small real sample and read the result. Use the

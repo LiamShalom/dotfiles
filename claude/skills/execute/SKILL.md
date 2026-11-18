@@ -79,8 +79,9 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
 7. **Open one PR** (not draft) with the final behavior, rollout order and links. Follow
    `docs/agents/vercel-deployments.md` for title markers.
 
-8. **Test the whole feature end to end on the preview.** Use the `proof` skill against
-   `https://sideshift-web-git-<branch-slug>-side-shift.vercel.app`, as a real user of each
+8. **Test the whole feature end to end on the preview.** A push builds no preview: run
+   `npm run vercel:preview` (no permission needed; again after each commit you must check).
+   Use the `proof` skill against the address it prints, as a real user of each
    party, driven to the outcome (not to the button), at desktop and phone widths for UI.
    Cover all of it, not a sample:
    - **Every promise.** Each spec requirement and party-matrix row gets a journey.

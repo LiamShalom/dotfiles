@@ -102,8 +102,9 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    3 creator sections"; 11-08 Brief tab: "theres no need to have brief and examples when we
    have the large UI above".)
 
-7. **Show the operator.** Give the localhost URL and, once pushed, the Vercel preview URL
-   (`https://sideshift-web-git-<branch-slug>-side-shift.vercel.app/dev-<slug>-preview`).
+7. **Show the operator.** Give the localhost URL and the Vercel preview URL: a push builds no
+   preview, so commit, run `npm run vercel:preview` (no permission needed), and add
+   `/dev-<slug>-preview` to the address it prints.
    Show the directions from step 4 side by side and say which you would pick and why.
    **Put that comparison on the feature's canvas** (see `visual-companion`, "UI design: the
    canvas first"): screenshot each direction from the preview route at 1280 and 390 wide, and
