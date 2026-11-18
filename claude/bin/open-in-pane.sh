@@ -14,6 +14,12 @@ if [ "${1:-}" = "--note" ]; then
 	shift 2
 fi
 board="$HOME/session-board/scripts/board-browser.mjs"
+# A Claude desktop app session's operator looks at the app's own browser pane, which only the session's
+# own browser tools can open: neither the board nor Arc is where they are looking.
+if [ "${CLAUDE_CODE_ENTRYPOINT:-}" = "claude-desktop" ]; then
+	echo "open-in-pane: this is a Claude desktop session; open $* in the app's browser pane with mcp__Claude_Browser__preview_start" >&2
+	exit 1
+fi
 status=0
 for target in "$@"; do
 	if [ -f "$board" ] && node "$board" "$target" "$note"; then

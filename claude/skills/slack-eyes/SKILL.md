@@ -43,7 +43,7 @@ Approved, for this message:
   credit a customer. Use a card or login from 1Password (`agent-login`). Keep the amount to
   what the message asks for.
 - Change test accounts and test data, billing included.
-- Post as Liam (`~/.claude/bin/slack-as-liam`) in this thread, and send other messages or
+- Post and react as Liam (`~/.claude/bin/slack-as-liam`) in this thread (reactions: step 5c), and send other messages or
   emails that the fix needs (for example, a vendor's support form, or a teammate who must act).
 
 Still held for Liam (do the work up to that step, then see step 6):
@@ -85,7 +85,8 @@ you were.
   in the code and the data, prove it, and go to step 5.
 - **A problem** (something is broken, wrong, missing, stuck): investigate it. Go to step 3.
 - **A change request** (copy, a small tweak): go to step 4.
-- **Nothing for Liam** (already answered, an FYI, a joke): post nothing more. Go to step 7.
+- **Nothing for Liam** (already answered, an FYI, a joke): post nothing more. A reaction may fit
+  instead (step 5c). Go to step 7.
 - **Not enough to go on** (no account named, no screenshot of the error, an unclear ask), and
   your own lookups cannot fill the gap: ask the reporter (step 5b).
 
@@ -102,7 +103,6 @@ says. Do not repeat a mistake a lesson names.
 
 Follow steps 3 to 5 of `investigate-slack-issue`. Prove the cause with evidence. If the
 problem is the customer's own action or working as designed, the reply says what they must do.
-## 4. Fix
 
 For a status alert or outage, start from `~/.claude/bin/incident-snapshot.mjs --at <alert time>` (the
 watcher attaches it to alert jobs): the alert channels, primary CPU and connections, the top queries with
@@ -120,6 +120,7 @@ enabled in `rollout_flags`. List every claim in your reply that nothing proves i
 In a headless run the watcher does not post a reply that lists one: it sends it back once to prove or
 drop, so the thread never reads a guess that a correction takes back.
 
+## 4. Fix
 
 **Tell them first.** A fix, its PR and the deploy take an hour or more, and nobody in the thread
 sees that work. Before you write code, read the thread again and post one short update as Liam
@@ -163,7 +164,7 @@ Write the reply in Liam's voice:
 2. Check its numbers against his newest trained profile from the support system:
    `select style_stats from slack_support_profiles where slack_user_id='U0B78R52DFT' order by version desc limit 1`
    (read replica). Keep the reply near his usual length, starting lowercase, with no
-   closing period, no exclamation marks, and no emoji.
+   closing period and no exclamation marks. Emoji go in reactions (step 5c), not in the text.
 3. Use the "Reply" content rules in step 7 of `investigate-slack-issue`: check every claim,
    never admit fault to a customer or creator, and give a cause only when they asked why.
    Ignore its draft step: the :eyes: approves the reply (sent as below).
@@ -252,6 +253,36 @@ as Liam, in his voice, tagging the reporter: one short message with the one or t
 need (for example "whats her email or handle on sideshift"). In a headless run that message is
 your `reply`. Then return `needs_reporter` with that question (step 7). Do not wait or poll. The watcher reads the thread and resumes you with
 their reply. Ask again only for something new; never repeat a question already in the thread.
+
+## 5c. React like Liam
+
+Liam reacts much more than he types emoji: of his last 342 reactions, most are :+1:,
+:raised_hands:, :white_check_mark: and :heart:, and his trained profile has 0 emoji in message
+text. Do the same. Add a reaction with:
+
+```sh
+~/.claude/bin/slack-as-liam reactions.add channel=<channel> timestamp=<message ts> name=<emoji name>
+```
+
+Use a reaction when it says the whole thing, in place of a message:
+
+- A closing "thanks", "works now" or "perfect": :raised_hands:. "got it" or "sounds good": :+1:.
+  The watcher already does this for short closing lines while a job runs and after it is done,
+  so check the message's reactions first and never add a second one from Liam.
+- An FYI or a teammate's update that needs no answer: :+1:.
+- Good news from a teammate (a deal closed, a ship): :raised_hands:, :fireball:, :sideshift_love:
+  or :partyparrot:.
+- Bad news that needs no answer from Liam: :sadblob:.
+
+Once the fix is deployed and checked in production, add :white_check_mark: to the message Liam
+put :eyes: on, in addition to the reply (not in his self-DM, where that message is his own). That is the only reaction that goes with a reply.
+
+Keep it rare. At most one reaction from Liam on a message, and only one or two per job. Never react
+to a complaint, an open bug, money or account trouble, or a customer who is upset: a reaction
+there reads as dismissive. Never react on Liam's own messages or a bot's. Never add :eyes:: from Liam's account it
+starts a new job. Use only emoji he uses
+(the ones above, plus :heart: and :joy: with teammates), never an emoji in the reply text, and no
+reaction in place of an answer that someone is waiting for.
 
 ## 6. When something needs Liam
 

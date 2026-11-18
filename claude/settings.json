@@ -12,13 +12,17 @@
     "API_TIMEOUT_MS": "600000",
     "CLAUDE_CODE_SUBAGENT_MODEL": "inherit",
     "CLAUDE_CODE_ENABLE_TASKS": "0",
-    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/ready-banner"
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/ready-banner:~/.claude/mods/session-chrome"
   },
   "permissions": {
     "allow": [],
     "defaultMode": "bypassPermissions"
   },
-  "disabledMcpjsonServers": ["chrome-devtools", "sideshift-firestore", "cloud-sql-postgres-read-replica"],
+  "disabledMcpjsonServers": [
+    "chrome-devtools",
+    "sideshift-firestore",
+    "cloud-sql-postgres-read-replica"
+  ],
   "model": "cc/claude-opus-5-5[1m]",
   "skillOverrides": {
     "codebase-design": "off",
@@ -139,7 +143,7 @@
   "statusLine": {
     "type": "command",
     "command": "if [ -x \"$HOME/.claude/recompact/bin/recompact\" ]; then \"$HOME/.claude/recompact/bin/recompact\" statusline -- \"$HOME/.claude/statusline.sh\" || \"$HOME/.claude/statusline.sh\"; else \"$HOME/.claude/statusline.sh\"; fi",
-    "refreshInterval": 1
+    "refreshInterval": 10
   },
   "enabledPlugins": {
     "ecc@ecc": false,
@@ -177,6 +181,7 @@
   },
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-ansi",
+  "tui": "fullscreen",
   "preferredNotifChannel": "terminal_bell",
   "agentPushNotifEnabled": true,
   "hasCompletedOnboarding": true

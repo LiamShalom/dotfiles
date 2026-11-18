@@ -27,7 +27,7 @@ SERVERS=(
 	"vercel https://mcp.vercel.com"
 	"notion https://mcp.notion.com/mcp"
 	"intercom https://mcp.intercom.com/mcp"
-	"internal-dashboard https://sideshift-internal-dashboard-lnab.vercel.app/mcp"
+	"internal-dashboard https://sideshifters.vercel.app/mcp"
 	"context7 https://mcp.context7.com/mcp/oauth"
 )
 

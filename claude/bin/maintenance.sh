@@ -7,7 +7,8 @@
 #   sweep   every 15 min  worktrees of merged/closed PRs, in every repo; abandoned
 #                         headless agent Chromes (memory); a full janitor run if
 #                         free disk drops under TRIGGER_GB
-#   daily   04:00         stale .next caches, node_modules of worktrees idle
+#   daily   04:00         fast-forward local main to origin/main in every repo;
+#                         stale .next caches, node_modules of worktrees idle
 #                         IDLE_DAYS, old npx installs
 #   weekly  Sun 03:30     retire worktrees idle RETIRE_DAYS (branch kept, changes
 #                         archived); deep clean of every regenerable cache (all
@@ -46,6 +47,34 @@ janitor_all() {
 	done <"$REPOS_FILE"
 }
 
+# Fast-forward each repo's local main to origin/main. Only ever a fast-forward:
+# a main with its own commits, or uncommitted edits to a file upstream changed,
+# is left alone and logged.
+sync_main_all() {
+	local name repo wt out lock
+	while read -r name _; do
+		case "$name" in '' | '#'*) continue ;; esac
+		repo="$HOME/$name"
+		[ -d "$repo/.git" ] || continue
+		# The worktree that has main checked out, if any.
+		wt=$(git -C "$repo" worktree list --porcelain |
+			awk '/^worktree /{w=substr($0,10)} $0=="branch refs/heads/main"{print w; exit}')
+		if [ -n "$wt" ]; then
+			# A git killed mid-write leaves index.lock behind, and every later git write
+			# in that checkout fails (the 04:00 run failed on one 5 days of 7, 10-15..10-21).
+			lock="$(git -C "$wt" rev-parse --absolute-git-dir)/index.lock"
+			if [ -n "$(find "$lock" -mmin +60 2>/dev/null)" ] && ! lsof "$lock" >/dev/null 2>&1; then
+				rm -f "$lock" && log "removed stale $lock"
+			fi
+			out=$(git -C "$repo" fetch --quiet origin main 2>&1 &&
+				git -C "$wt" merge --ff-only --quiet origin/main 2>&1)
+		else
+			out=$(git -C "$repo" fetch --quiet origin main:main 2>&1)
+		fi
+		[ $? -eq 0 ] || log "main not updated in $name: $(printf '%s' "$out" | tr '\n' ' ')"
+	done <"$REPOS_FILE"
+}
+
 case "$MODE" in
 sweep)
 	janitor_all MODE=merged
@@ -56,6 +85,7 @@ sweep)
 	fi
 	;;
 daily)
+	sync_main_all
 	start=$(free_gb)
 	janitor_all MODE=full IDLE_DAYS="${IDLE_DAYS:-3}"
 	log "free ${start}GB -> $(free_gb)GB"

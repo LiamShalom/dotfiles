@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
-import { rule } from '../hooks/register'
+import { openCodexRequestsSql, rule, sentMessageId, summarizeBackground, waitingText } from '../hooks/register'
 
 const BAND = {
   component: 'AbovePrompt',
@@ -62,7 +63,7 @@ test('one orange line after a plain turn, green after a merge', async ($, on) =>
   }
 })
 
-test('hidden while a background agent runs, shown once it finishes', async ($, on) => {
+test('AGENT WORKING while a background agent runs, CLAUDE READY once it finishes', async ($, on) => {
   on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
   on('turn.complete', (_$, e) => ({ text: e.answer }))
   on('classic.Stop', () => ({}))
@@ -72,7 +73,9 @@ test('hidden while a background agent runs, shown once it finishes', async ($, o
   await $.classic.Stop(stop(['subagent']) as never)
   await $.turn.complete(TURN)
   let ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
-  expect(await ui.findAll({ type: 'Text' })).toHaveLength(0)
+  let drawn = JSON.stringify(await ui.drawn())
+  expect(drawn).toContain('#3B82F6')
+  expect(drawn).toContain(rule(120, ' AGENT WORKING '))
   await ui.unmount()
 
   // The agent's notification wakes the main loop, whose next Stop has nothing left.
@@ -82,12 +85,13 @@ test('hidden while a background agent runs, shown once it finishes', async ($, o
   expect(JSON.stringify(await ui.drawn())).toContain('#D97757')
   await ui.unmount()
 
-  // Stop arriving after turn.complete hides it too.
+  // Stop arriving after turn.complete counts too.
   await $.prompt.submit({ text: 'workflow' } as never)
   await $.turn.complete(TURN)
-  await $.classic.Stop(stop(['workflow']) as never)
+  await $.classic.Stop(stop(['workflow', 'subagent']) as never)
   ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
-  expect(await ui.findAll({ type: 'Text' })).toHaveLength(0)
+  drawn = JSON.stringify(await ui.drawn())
+  expect(drawn).toContain(rule(120, ' 2 AGENTS WORKING '))
   await ui.unmount()
 })
 
@@ -115,4 +119,87 @@ test('gh pr merge --auto does not count as a merge', async ($, on) => {
   await $.turn.complete(TURN)
   const ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
   expect(JSON.stringify(await ui.drawn())).toContain('#D97757')
+})
+
+const SENT = 'f2c5292c-4bb3-4db2-ad77-f6dc88a1ae30'
+
+const sendResult = (target: string) => ({
+  result: [{ type: 'text', text: JSON.stringify({ message: { id: SENT, target, sender: 'claude:me', status: 'queued' } }) }],
+})
+
+const codex = (open: () => boolean) => (on: Parameters<TestBody>[1]) => {
+  on('tool.call', (_$, e) => (e.tool === 'Bash' ? { result: bash } : sendResult((e as never as { target: string }).target)) as never)
+  on('process.run', (_$, e) =>
+    ({
+      value: { exitCode: 0, stdout: e.argv[0] === 'printenv' ? '/Users/x\n' : open() ? `${SENT}\n` : '', stderr: '' },
+    }) as never,
+  )
+  on('clock.every', () => ({ value: undefined }) as never)
+  on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  on('classic.Stop', () => ({}))
+  on('ui.render', () => ({ type: 'Box', props: {}, children: [] }) as never)
+}
+
+const SEND = 'mcp__agent_bridge__agent_bridge_send_message'
+
+test('reads the message id out of the send result', () => {
+  expect(sentMessageId(sendResult('codex:x').result)).toBe(SENT)
+  expect(openCodexRequestsSql([SENT])).toContain(`m.id IN ('${SENT}')`)
+})
+
+test('blue CODEX WORKING while a sent request is open, orange once Codex answers', async ($, on) => {
+  let open = true
+  codex(() => open)(on)
+
+  await $.prompt.submit({ text: 'hand to codex' } as never)
+  await $.tool.call({ tool: SEND, target: 'codex:abc', sender: 'claude:me', text: 'do it' } as never)
+  await $.classic.Stop(stop([]) as never)
+  await $.turn.complete(TURN)
+  let ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
+  let drawn = JSON.stringify(await ui.drawn())
+  expect(drawn).toContain('#3B82F6')
+  expect(drawn).toContain(rule(120, ' CODEX WORKING '))
+  await ui.unmount()
+
+  open = false
+  await $.classic.Stop(stop([]) as never)
+  ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
+  drawn = JSON.stringify(await ui.drawn())
+  expect(drawn).toContain('#D97757')
+  expect(drawn).toContain(rule(120))
+})
+
+test('a message to another Claude session does not count', async ($, on) => {
+  codex(() => true)(on)
+
+  await $.prompt.submit({ text: 'ping claude' } as never)
+  await $.tool.call({ tool: SEND, target: 'claude:other', sender: 'claude:me', text: 'hi' } as never)
+  await $.classic.Stop(stop([]) as never)
+  await $.turn.complete(TURN)
+  const ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
+  expect(JSON.stringify(await ui.drawn())).toContain('#D97757')
+})
+
+test('a running agent and an open Codex request show together', async ($, on) => {
+  codex(() => true)(on)
+
+  await $.prompt.submit({ text: 'both' } as never)
+  await $.tool.call({ tool: SEND, target: 'codex:abc', sender: 'claude:me', text: 'do it' } as never)
+  await $.classic.Stop(stop(['subagent']) as never)
+  await $.turn.complete(TURN)
+  const ui = await $.ui.mount({ plugin: 'ready-banner', surface: 'terminal', ...BAND })
+  expect(JSON.stringify(await ui.drawn())).toContain(rule(120, ' AGENT · CODEX WORKING '))
+})
+
+test('CI is a shell, monitor or one-shot wakeup watching checks; dev servers are not', () => {
+  const shell = (command: string) => ({ type: 'shell', description: command, command })
+  expect(summarizeBackground([shell('gh pr checks 6041 --watch')], [])).toEqual({ agents: 0, isCiRunning: true })
+  expect(summarizeBackground([shell('.claude/skills/pr-approve/scripts/gh-approve 6041 --merge')], []).isCiRunning).toBe(true)
+  expect(summarizeBackground([{ type: 'monitor', description: 'Watch CI on PR #6041' }], []).isCiRunning).toBe(true)
+  expect(summarizeBackground([shell('npm run dev -- -p 3001')], []).isCiRunning).toBe(false)
+  expect(summarizeBackground([], [{ prompt: 'check CI on #6041', recurring: false }]).isCiRunning).toBe(true)
+  expect(summarizeBackground([], [{ prompt: 'check CI on #6041', recurring: true }]).isCiRunning).toBe(false)
+  expect(waitingText(0, true, false)).toBe(' CI WORKING ')
+  expect(waitingText(3, true, true)).toBe(' 3 AGENTS · CI · CODEX WORKING ')
 })

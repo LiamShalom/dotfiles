@@ -1,6 +1,6 @@
 {
   "name": "ready-banner",
   "version": "0.1.0",
-  "description": "Full-width CLAUDE READY rule above the prompt once the turn and every background agent are done; green when the turn merged a PR",
+  "description": "Full-width rule above the prompt when the turn ends: orange CLAUDE READY, green after a PR merge, blue AGENTS · CI · CODEX WORKING while background agents, CI watches or Codex requests are still open",
   "types": "./types/index.d.ts"
 }

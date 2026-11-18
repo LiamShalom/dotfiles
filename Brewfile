@@ -62,6 +62,8 @@ brew "pinentry-mac"
 brew "procs"
 # Interpreted, interactive, object-oriented programming language
 brew "python@3.12"
+# Runs .codex/with-test-secrets and the Agent Bridge (bridge.py)
+brew "python@3.14"
 # Cross-shell prompt for astronauts
 brew "starship"
 # Very fast implementation of tldr in Rust

@@ -1,6 +1,6 @@
 ---
 name: agent-login
-description: "Sign in to a website as Liam from the agent browser with a login saved in 1Password: `node ~/.claude/bin/agent-login.mjs` types the username, password and two-step code into your tab with no prompt (a read-only 1Password service account), and types codes a site emailed to Liam's Gmail (--email-code), and never shows you the values. Use it before you hand a sign-in to Liam, whenever a page in your agent-Chrome tab asks for a username, email, password or authenticator code for one of Liam's accounts or a SideShift test account."
+description: "Sign in to websites with saved 1Password credentials without prompts. Use agent-login-codex.mjs in Codex's in-app browser, or agent-login.mjs in agent Chrome. Supports saved passwords, authenticator codes, emailed codes and texted codes without printing secrets. Use before handing a login to Liam."
 ---
 
 # Agent login
@@ -75,7 +75,47 @@ account's username with this item's password. If the adapter reports a filled
 password, it is available: report the observed sign-in failure, not a missing-password
 blocker. Keep the one-failed-sign-in handoff rule below.
 
-## Run it
+## Codex in-app browser
+
+For the staff dashboard at `https://sideshifters.vercel.app`, use the saved `SideShift Internal Dashboard` login and `emailCode: true`. The six boxes accept the full code in the first textbox; filling it submits automatically, so use `submit: false`. If its saved login is missing and the operator authorizes saving it, create an email-only Login in Agent Logins before a manual handoff.
+
+
+Use this path in Codex. Do not open agent Chrome. Reuse the relevant in-app tab, inspect
+its current form, then call the adapter from **cua_repl**. The adapter uses the tab's documented
+Playwright locators. It reads 1Password locally and passes values directly to those locators.
+No credential is returned, printed, written to disk or placed on the clipboard.
+
+```javascript
+let login = await import('/Users/liamshalom/.claude/bin/agent-login-codex.mjs');
+// tab is your existing cua tab. Use labels from its current state, not guessed selectors.
+nodeRepl.write(await login.loginInCodex(tab, {
+  item: 'SideShift Test Creator',
+  fields: { username: tab.playwright.getByRole('textbox', { name: 'Email Address', exact: true }) },
+  submit: true,
+}));
+await tab.getAXState();
+```
+
+Run it at each step. `fields` accepts `username`, `password` and `code` locators. For a
+split code, pass an array of the visible digit locators as `code`. Pass `emailCode: true`
+only when the page says it emailed a code, and `smsCode: true` only when it says it texted one. `item` can be a saved title or ID; `account`
+can select a saved username. Omit them when exactly one saved login matches the site.
+For SideShift testing, use `SideShift Test Creator`; use the admin item only for admin tasks.
+
+The result contains only `origin`, `filled`, `missing` and `submitted`. A missing field
+prevents submission. Read the next page to confirm sign-in; `submitted: true` only means
+Enter was pressed. Do not print or call the shared credential resolver directly. Do not
+read filled inputs back. A failed sign-in still requires stopping under the rule below.
+
+The adapter requires HTTPS, checks each field's origin before input and rejects cross-origin
+frames. Both browser paths use the same website matching, vault lookup and code helpers.
+A missing service token stops with no interactive 1Password fallback. A locked macOS
+Keychain or a site's CAPTCHA, passkey or device approval can still need Liam.
+
+Verified 2026-10-30: Codex in-app browser, signed-out SideShift sign-in, saved test creator
+email and password, both submissions, authenticated `/home`. No manual input or 1Password prompt.
+
+## Agent Chrome
 
 1. Open the sign-in page in your own tab (your chat's window in the agent Chrome).
 2. Run `node ~/.claude/bin/agent-login.mjs --url <part of the tab's URL> --submit`.
@@ -105,13 +145,28 @@ recipient to the intended test account; a saved item's title alone does not prov
 pairing. Do not print recovery URLs or tokens. Open the verified recovery link in the
 task's browser. A new password still requires Liam to enter, confirm and submit it.
 
+## Codes sent by text message
+
+When the page says the site texted a code to Liam's phone, run it with `--sms-code` (add
+`--submit`). Liam's iPhone forwards texts to this Mac's Messages app; the tool reads them there
+(read-only) and waits up to 2 min for the text, with no prompt. A text's sender cannot be checked,
+so it works only on a site with a login saved in 1Password, and takes a code only from a text that
+arrived in the last 5 minutes and names the page's site as a word ("Your LinkedIn code is …") or
+ends with the site's `@site.com #123456` line. A text that names no site ("Your code is 123456") is
+skipped: hand that step to Liam. It refuses customer sites on shared
+platforms, SideShift previews included. `node ~/.claude/bin/agent-sms.mjs status` shows whether
+Messages can be read and when the last text arrived. "No Full Disk Access" means this session's
+terminal lost it (it can after an app update): tell Liam. Never read the Messages database any
+other way, and never print a code or a text. Not yet proven on a live sign-in (10-30): on the
+first real use, confirm the page signed in, then tell Liam it worked and delete this sentence.
+
 | Exit | Meaning | What to do |
 |---|---|---|
 | 0 | Filled; it names the fields | Check that the page moved on. |
 | 2 | Several logins or tabs match; it lists them | Run again with `--item <id>` or `--account <username>`. If the task does not say which account, ask Liam. |
 | 3 | No sign-in field is showing, or 1Password holds no value for it | Bring the field up (close a cookie banner, click "Log in") and run again, or hand the step to Liam. |
-| 4 | Waiting for Liam's approval (only when the service-account token is missing from the Keychain) | Tell Liam in chat that the token is missing and to approve the 1Password prompt on the Mac, then run it again. |
-| 1 | Error, for example the login is saved for another site, or no emailed code arrived | Read the message. Never add a website to an item unless Liam says that site is right. On a SideShift preview or local server the script refuses: sign in with `board-browser.mjs` (it signs in a test account), never ask Liam. |
+| 4 | The service token is missing or Keychain is locked | Report the missing token or locked Keychain. No interactive 1Password fallback is attempted. |
+| 1 | Error, for example the login is saved for another site, or no emailed or texted code arrived | Read the message. Never add a website to an item unless Liam says that site is right. On a SideShift preview or local server the script refuses: sign in with `board-browser.mjs` (it signs in a test account), never ask Liam. |
 
 ## Rules
 
@@ -138,8 +193,8 @@ task's browser. A new password still requires Liam to enter, confirm and submit 
   app"), then run the tool again for the code. This gets agents into Google Cloud console, which
   always asks for a passkey (proven 10-28).
 - Hand the step to Liam in Session Board's pane when the tool cannot do it: a passkey with no
-  other way, a Google sign-in that Google refuses in this browser, picture puzzles (TikTok), codes
-  sent by text message, sign-in links without authorized inbox access, and OAuth consent.
+  other way, a Google sign-in that Google refuses in this browser, picture puzzles (TikTok), texted
+  codes that name no site, sign-in links without authorized inbox access, and OAuth consent.
 - An OAuth connect as an account Liam is already signed in to in his own browser (Arc), such as
   another person's Facebook: do not sign that account in here (it sends him a device approval).
   Give him the click-by-click steps for Arc instead, with what to pick on each screen (10-28).

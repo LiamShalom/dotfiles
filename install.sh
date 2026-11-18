@@ -73,6 +73,7 @@ LINKS=(
 	"claude/bin/loom-read.mjs:.claude/bin/loom-read"
 	"claude/bin/board-priority.mjs:.claude/bin/board-priority.mjs"
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
+	"claude/bin/agent-chrome-proxy.mjs:.claude/bin/agent-chrome-proxy.mjs"
 	"claude/bin/open-in-pane.sh:.claude/bin/open-in-pane.sh"
 	"claude/bin/chrome-devtools-mcp.sh:.claude/bin/chrome-devtools-mcp.sh"
 	"claude/bin/chrome-devtools-mcp-proxy.mjs:.claude/bin/chrome-devtools-mcp-proxy.mjs"
@@ -81,14 +82,19 @@ LINKS=(
 	"claude/bin/mcp-shared-auth.sh:.claude/bin/mcp-shared-auth.sh"
 	"claude/bin/heavy:.claude/bin/heavy"
 	"claude/bin/agent-login.mjs:.claude/bin/agent-login.mjs"
+	"claude/bin/agent-login-core.mjs:.claude/bin/agent-login-core.mjs"
+	"claude/bin/agent-login-codex.mjs:.claude/bin/agent-login-codex.mjs"
 	"claude/bin/agent-mail.mjs:.claude/bin/agent-mail.mjs"
 	"claude/bin/agent-sms.mjs:.claude/bin/agent-sms.mjs"
+	"claude/bin/run-until-done:.claude/bin/run-until-done"
+	"claude/bin/run-until-done.mjs:.claude/bin/run-until-done.mjs"
+	"claude/bin/android-port-nightly.sh:.claude/bin/android-port-nightly.sh"
+	"claude/agents/skeptical-verifier.md:.claude/agents/skeptical-verifier.md"
 
 	"codex/rules/default.rules:.codex/rules/default.rules"
 	"codex/hooks.json:.codex/hooks.json"
-	"claude/bin/run-until-done:.claude/bin/run-until-done"
-	"claude/bin/android-port-nightly.sh:.claude/bin/android-port-nightly.sh"
-	"claude/agents/skeptical-verifier.md:.claude/agents/skeptical-verifier.md"
+	"codex/hooks:.codex/hooks"
+	"codex/agents:.codex/agents"
 )
 
 for entry in "${LINKS[@]}"; do

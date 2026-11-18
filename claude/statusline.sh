@@ -1,49 +1,46 @@
-#!/bin/sh
-input=$(cat)
+#!/bin/bash
+# Every session runs this on each refresh, so ~30 sessions run it at once. Keep it
+# to one jq and shell builtins: on 2026-10-21 the old version started ~50
+# processes per run (a cut per field, git status every second), which at
+# refreshInterval 1 was ~1,400 processes/s and 80% kernel CPU on this Mac.
 
-# --- usage sensor (weekly cap) ----------------------------------------------
-# statusLine stdin is the ONLY place rate_limits.* is exposed; hooks never see
-# it. Mirror it to a state file so the UserPromptSubmit/PreToolUse cap hook can
-# read it. Best-effort: never fail or slow the status line.
-printf '%s' "$input" | jq -c '{
-  ts: (now | floor),
-  seven_day: (.rate_limits.seven_day.used_percentage // null),
-  seven_day_resets_at: (.rate_limits.seven_day.resets_at // null),
-  five_hour: (.rate_limits.five_hour.used_percentage // null)
-}' > "$HOME/.claude/usage-state.json.tmp" 2>/dev/null \
-  && mv -f "$HOME/.claude/usage-state.json.tmp" "$HOME/.claude/usage-state.json" 2>/dev/null
-# ----------------------------------------------------------------------------
+ESC=$'\033'
 
-# Single jq pass (tab-separated fields)
-parsed=$(echo "$input" | jq -r '[
-  (.model.display_name // "?"),
-  (.effort.level // ""),
-  (.context_window.used_percentage // "" | tostring),
-  (.rate_limits.five_hour.used_percentage // "" | tostring),
-  (.rate_limits.five_hour.resets_at // "" | tostring),
-  (.rate_limits.seven_day.used_percentage // "" | tostring),
-  (.cost.total_lines_added // 0 | tostring),
-  (.cost.total_lines_removed // 0 | tostring),
-  (.session_name // ""),
-  (.cwd // ""),
-  (.session_id // "")
-] | join("\t")')
+# One jq pass over stdin. @sh quotes each value, so the eval is safe.
+eval "$(jq -r '
+  def pct: if . == null or . == "" then "" else (tonumber | round | tostring) end;
+  (.rate_limits.five_hour.resets_at // null | tonumber? // null) as $rst
+  | @sh "model=\(.model.display_name // "?")",
+    @sh "effort=\(.effort.level // "")",
+    @sh "ctx=\(.context_window.used_percentage | pct)",
+    @sh "five_h=\(.rate_limits.five_hour.used_percentage | pct)",
+    @sh "clock=\(if $rst then ($rst | strflocaltime("%l:%M%p") | ascii_downcase | gsub(" "; "")) else "" end)",
+    @sh "weekly=\(.rate_limits.seven_day.used_percentage | pct)",
+    @sh "added=\(.cost.total_lines_added // 0 | tostring)",
+    @sh "removed=\(.cost.total_lines_removed // 0 | tostring)",
+    @sh "sess=\(.session_name // "")",
+    @sh "cwd=\(.cwd // "")",
+    @sh "sess_id=\(.session_id // "")",
+    @sh "now_s=\(now | floor | tostring)",
+    # --- usage sensor (weekly cap) ---------------------------------------------
+    # statusLine stdin is the ONLY place rate_limits.* is exposed; hooks never see
+    # it, so it is mirrored to a state file for the cap hook. Only when present:
+    # through the gateway it is always null, and rewriting nulls every run is churn.
+    @sh "usage_json=\(if .rate_limits then {
+        ts: (now | floor),
+        seven_day: (.rate_limits.seven_day.used_percentage // null),
+        seven_day_resets_at: (.rate_limits.seven_day.resets_at // null),
+        five_hour: (.rate_limits.five_hour.used_percentage // null)
+      } | tojson else "" end)"
+' 2>/dev/null)"
 
-model=$(echo "$parsed"      | cut -f1)
-effort=$(echo "$parsed"     | cut -f2)
-ctx=$(echo "$parsed"        | cut -f3)
-five_h=$(echo "$parsed"     | cut -f4)
-five_h_rst=$(echo "$parsed" | cut -f5)
-weekly=$(echo "$parsed"     | cut -f6)
-added=$(echo "$parsed"      | cut -f7)
-removed=$(echo "$parsed"    | cut -f8)
-sess=$(echo "$parsed"       | cut -f9)
-cwd=$(echo "$parsed"        | cut -f10)
-sess_id=$(echo "$parsed"    | cut -f11)
+if [ -n "$usage_json" ]; then
+  printf '%s' "$usage_json" > "$HOME/.claude/usage-state.json.tmp" 2>/dev/null \
+    && mv -f "$HOME/.claude/usage-state.json.tmp" "$HOME/.claude/usage-state.json" 2>/dev/null
+fi
 
 # --- Colors -----------------------------------------------------------------
 # Every item between the | separators is a single flat color of its own.
-ESC=$(printf '\033')
 RST="${ESC}[0m"
 BOLD="${ESC}[1m"
 DIM="${ESC}[38;5;244m"          # grey — separators only
@@ -60,13 +57,12 @@ C_SESS="${ESC}[38;5;180m"       # tan
 C_ID="${ESC}[38;5;108m"         # sage
 SEP="${DIM} │ ${RST}"
 
-# Render "<label> N%" (or "<label> --") entirely in one color. $3 = suffix.
+# Render "<label> N%" (or "<label> --") entirely in one color into $REPLY.
 pct_str() { # $1=label $2=value $3=color $4=suffix
   if [ -n "$2" ]; then
-    p=$(printf "%.0f" "$2")
-    printf '%s' "${3}$1 ${p}%${4}${RST}"
+    REPLY="${3}$1 $2%${4}${RST}"
   else
-    printf '%s' "${3}$1 --${RST}"
+    REPLY="${3}$1 --${RST}"
   fi
 }
 
@@ -78,27 +74,47 @@ fi
 
 # 5h reset clock (local time, e.g. ↻9:10pm) — same color as the 5h item
 reset_str=""
-if [ -n "$five_h_rst" ]; then
-  clock=$(date -r "$five_h_rst" '+%l:%M%p' 2>/dev/null | tr 'APM' 'apm' | tr -d ' ')
-  [ -n "$clock" ] && reset_str=" ↻${clock}"
-fi
+[ -n "$clock" ] && reset_str=" ↻${clock}"
 
-ctx_str=$(pct_str "ctx" "$ctx" "$C_CTX")
-five_h_str=$(pct_str "5h" "$five_h" "$C_5H" "$reset_str")
-weekly_str=$(pct_str "wk" "$weekly" "$C_WK")
+pct_str "ctx" "$ctx" "$C_CTX"; ctx_str=$REPLY
+pct_str "5h" "$five_h" "$C_5H" "$reset_str"; five_h_str=$REPLY
+pct_str "wk" "$weekly" "$C_WK"; weekly_str=$REPLY
 
-# Git branch + dirty marker — one color
+# Git branch + dirty marker — one color. The branch is read from HEAD directly.
+# The dirty check is the one expensive part (git status stats every tracked
+# file), so it runs at most every 30 s per checkout, shared by every session in
+# it, and without the optional index lock that blocks other git commands.
 git_str=""
-if [ -n "$cwd" ]; then
-  branch=$(git -C "$cwd" branch --show-current 2>/dev/null)
-  if [ -n "$branch" ]; then
-    if [ -n "$(git -C "$cwd" status --porcelain --untracked-files=no 2>/dev/null | head -1)" ]; then
-      mark="✗"
-    else
-      mark="✓"
-    fi
-    git_str="${C_GIT}${branch} ${mark}${RST}"
+top=$cwd
+while [ -n "$top" ] && [ ! -e "$top/.git" ]; do top=${top%/*}; done
+if [ -n "$top" ]; then
+  gd="$top/.git"
+  if [ -f "$gd" ]; then
+    IFS= read -r gd < "$gd"
+    gd=${gd#gitdir: }
+    case $gd in /*) ;; *) gd="$top/$gd" ;; esac
   fi
+  head=""
+  IFS= read -r head < "$gd/HEAD" 2>/dev/null
+  case $head in
+    "ref: refs/heads/"*)
+      branch=${head#ref: refs/heads/}
+      dir="$HOME/.claude/statusline-cache/git"
+      key=${gd//\//%}
+      ts=0 mark=""
+      [ -f "$dir/$key" ] && read -r ts mark < "$dir/$key"
+      if [ -z "$mark" ] || [ $((now_s - ts)) -ge 30 ]; then
+        if [ -n "$(git --no-optional-locks -C "$top" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+          mark="✗"
+        else
+          mark="✓"
+        fi
+        [ -d "$dir" ] || mkdir -p "$dir" 2>/dev/null
+        printf '%s %s\n' "$now_s" "$mark" > "$dir/$key" 2>/dev/null
+      fi
+      git_str="${C_GIT}${branch} ${mark}${RST}"
+      ;;
+  esac
 fi
 
 # Lines changed this session — green added / red removed
@@ -106,15 +122,16 @@ lines_str="${GREEN}+${added}${RST}${DIM}/${RST}${RED}-${removed}${RST}"
 
 # Directory: ~ for $HOME, keep only last 2 segments if deep
 if [ -n "$cwd" ]; then
-  short_cwd="${cwd#$HOME}"
+  short_cwd="${cwd#"$HOME"}"
   [ "$short_cwd" != "$cwd" ] && short_cwd="~$short_cwd"
 else
-  short_cwd="$(pwd)"
+  short_cwd="$PWD"
 fi
-depth=$(printf '%s' "$short_cwd" | awk -F/ '{print NF}')
-if [ "$depth" -gt 4 ]; then
-  tail_path=$(printf '%s' "$short_cwd" | awk -F/ '{print $(NF-1)"/"$NF}')
-  short_cwd="…/$tail_path"
+not_slash='[!/]'
+slashes=${short_cwd//$not_slash/}
+if [ $(( ${#slashes} + 1 )) -gt 4 ]; then
+  rest=${short_cwd%/*}
+  short_cwd="…/${rest##*/}/${short_cwd##*/}"
 fi
 dir_str="${C_DIR}${short_cwd}${RST}"
 
@@ -124,5 +141,33 @@ line="${model_str}${SEP}${ctx_str}${SEP}${five_h_str}${SEP}${weekly_str}"
 line="${line}${SEP}${lines_str}${SEP}${dir_str}"
 [ -n "$sess" ] && line="${line}${SEP}${C_SESS}${sess}${RST}"
 [ -n "$sess_id" ] && line="${line}${SEP}${C_ID}${sess_id}${RST}"
+
+# --- cache for the session-chrome mod ----------------------------------------
+# Claude Code hides this bar while a question dialog is open; the mod draws the
+# cached line there, and reads the name to make a bare /clear drop it. Written
+# only when it changes; JSON is escaped here to avoid a second jq.
+json_str() {
+  local s=$1
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$ESC/\\u001b}
+  s=${s//$'\t'/\\t}
+  s=${s//$'\n'/\\n}
+  REPLY="\"$s\""
+}
+if [ -n "$sess_id" ]; then
+  cache="$HOME/.claude/statusline-cache"
+  json_str "$line"; j_line=$REPLY
+  json_str "$sess"; j_name=$REPLY
+  new="{\"line\":${j_line},\"name\":${j_name}}"
+  old=""
+  [ -f "$cache/$sess_id.json" ] && IFS= read -r old < "$cache/$sess_id.json"
+  if [ "$old" != "$new" ]; then
+    [ -d "$cache" ] || mkdir -p "$cache" 2>/dev/null
+    printf '%s\n' "$new" > "$cache/$sess_id.json.tmp" 2>/dev/null \
+      && mv -f "$cache/$sess_id.json.tmp" "$cache/$sess_id.json" 2>/dev/null
+  fi
+fi
+# ----------------------------------------------------------------------------
 
 printf '%s' "$line"
