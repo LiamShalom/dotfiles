@@ -43,6 +43,14 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   Requirements. A terms save re-checks the hold (`lib/api/contracts/held-release.ts`, #10610, live
   2026-11-17). Removing a platform from the campaign also releases held creators
   (`campaigns-leftovers-update.usecase.ts`), but then nobody can add it.
+- **The Join row's accounts are a preview, not part of the request.** The Requests tab shows a
+  pending join row (`platform` null) with the creator's connected accounts (#10528, #10713). Approving
+  it approves the contract only: `approve-core.ts` skips `applyHandleRequestToProfiles` for a join.
+  Each account then arrives as its own `handle_requests` row that the brand approves or rejects one by
+  one (`juno: approve single accounts`, 2026-11-18: join approved 11-17, typed account rows 9-27 h
+  later, each reviewed by a brand member). Before sign-first, the apply itself made one row per
+  platform. So "we can only approve or decline the whole bundle" is answered by: accept the join,
+  then decide each account. Exception: on OAuth platforms a proven account auto-approves (next line).
 - **A proven handle is approved with no brand review** once the brand chose the creator and the
   creator signs in to the account: `reviewed_by` is empty and it is approved in the same second
   (`lib/handle-requests/creator-proven-approval.ts`, #9845).
