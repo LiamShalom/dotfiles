@@ -23,6 +23,33 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ "${VENDOR_CONTACT_OK:-}" != 1 ] && 
   fi
 fi
 
+# An agent's thread reply stays short and tags a person once per thread (olive 11-18: six replies of
+# 300-450 characters, each tagging the reporter). LONG_OK=1 / RETAG_OK=1 when Liam asked for it.
+tag_mark=""
+if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ "$1" = chat.postMessage ]; then
+  text="" thread="" channel=""
+  for arg in "$@"; do
+    case "$arg" in
+      text=*) text="${arg#text=}" ;;
+      thread_ts=*) thread="${arg#thread_ts=}" ;;
+      channel=*) channel="${arg#channel=}" ;;
+    esac
+  done
+  body=$(printf '%s' "$text" | sed -E '1s/^[[:space:]]*<@[A-Z0-9]+(\|[^>]*)?>[[:space:]]*//')
+  if [ "${LONG_OK:-}" != 1 ] && [ "${#body}" -gt 280 ]; then
+    echo "slack-as-liam: this reply is ${#body} characters; Liam's stay under 280, most one line. Cut it to the answer and the one number or fact the reader needs (LONG_OK=1 only when he asked for a long one)." >&2
+    exit 2
+  fi
+  tag=$(printf '%s' "$text" | sed -nE '1s/^[[:space:]]*<@([A-Z0-9]+).*/\1/p')
+  if [ -n "$thread" ] && [ -n "$tag" ]; then
+    tag_mark="$HOME/.cache/slack-as-liam/tagged/${channel}_${thread}_${tag}"
+    if [ -e "$tag_mark" ] && [ "${RETAG_OK:-}" != 1 ]; then
+      echo "slack-as-liam: you already tagged <@$tag> in this thread. Drop the tag: they are in the conversation (RETAG_OK=1 only after a long gap)." >&2
+      exit 2
+    fi
+  fi
+fi
+
 if ! token=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null); then
   echo "slack-as-liam: no token in Keychain (service claude-slack-user-token). See ~/dotfiles/claude/slack/README.md" >&2
   exit 1
@@ -70,5 +97,6 @@ out=$(api "$@") || rc=$?
 printf '%s\n' "$out"
 [ "$rc" = 0 ] || exit "$rc"
 if [ "$(jq -r '.ok // false' <<<"$out" 2>/dev/null)" = true ]; then
+  if [ -n "$tag_mark" ]; then mkdir -p "$(dirname "$tag_mark")"; : > "$tag_mark"; fi
   follow "$(jq -r '.channel // empty' <<<"$out")" "$(jq -r '.ts // empty' <<<"$out")" "$(jq -r '.message.thread_ts // empty' <<<"$out")"
 fi

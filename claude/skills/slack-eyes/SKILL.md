@@ -183,11 +183,18 @@ What the reply says depends on the outcome:
 
 Every fact in the reply must match your evidence.
 
-A tag notifies the person, so tag only when the reply needs them: it gives the fix ("fixed and
-deployed"), the answer, or asks them to do or tell you something ("needs their input",
-"customer action", step 5b). Then start the reply with `<@USERID>` for the person who raised the
-issue (the author of the message Liam put :eyes: on; the watcher's prompt names them on its
-"Reporter to tag" line). A status reply tags nobody: "found it, fixing" (step 4), "fix held for
+**Short.** One or two lines, under 280 characters (Liam's median is 35, p90 153). Give the answer
+and the one number or fact they need to act. No bullet lists, no recap of earlier replies, no
+working shown. A follow-up question gets a follow-up-sized answer. Settle every fact before you
+post, so the thread never needs a "one correction" reply. The watcher sends a longer reply back,
+and slack-as-liam refuses one.
+
+**Tag once per thread.** A tag notifies the person, so tag only the first reply that gives them
+the fix or the answer, or asks them for something (step 5b). Start that reply with `<@USERID>` for
+the person who raised the issue (the author of the message Liam put :eyes: on; the watcher's
+prompt names them on its "Reporter to tag" line). After that they are in the conversation: later
+replies in the same thread go untagged. The watcher drops a repeat tag, and slack-as-liam refuses
+one. A status reply tags nobody: "found it, fixing" (step 4), "fix held for
 review", "held for Liam's decision", "still looking", and the watcher's "taking a look" and
 interim updates. Never tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a
 message with a `bot_id` or the subtype `bot_message` came from an app, so tag nobody.

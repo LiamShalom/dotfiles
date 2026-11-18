@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isAnswered, isThanks, isClosing, thanksReactions, resultSchema, wantsOpus, opusPrompt, wantsProof, unprovenClaims, verifyPrompt, otherJobsNote, prompt, isIncident, replyPlan, postedAlready, followUpPrompt, notAnsweredPrompt, handoffPrompt } from './slack-eyes.mjs'
+import { isAnswered, isThanks, isClosing, thanksReactions, resultSchema, wantsOpus, opusPrompt, wantsProof, unprovenClaims, verifyPrompt, otherJobsNote, prompt, isIncident, replyPlan, postedAlready, followUpPrompt, notAnsweredPrompt, handoffPrompt, tooLong, dropRepeatTag, REPLY_MAX_CHARS } from './slack-eyes.mjs'
 
 const LIAM = 'U0B78R52DFT'
 const REPORTER = 'U0REPORTER1'
@@ -799,4 +799,20 @@ test('--headless: a waiting :saluting_face: note starts a headless turn now, not
   const plan = lowerPlan(boardJob({ requestNote: { ts: '5.0', text: 'build it' } }), { id: 'b1', pid: 42, status: 'idle', sessionId: 's-new' })
   assert.equal(plan.busy, true)
   assert.deepEqual(plan.fields.lowered, { stopped: false })
+})
+
+// olive: instagram stopped tracking (11-18): six 300-450 character replies, each tagging the reporter.
+const OLIVE_LONG = `<@${REPORTER}> simplest way with no mess: leave all 11 excluded in sideshift and pay her for the 8 yourself. excluded videos are skipped in every payout calculation, so nothing gets counted twice\nfor those 8:\n- up to nov 9, the cutoff for the october payment: 233,633 views, about $350 at $1.50 cpm\n- after nov 9 theyve added 98,819 views so far`
+
+test('a reply over the length cap is too long; a one-liner is not, and the tag does not count', () => {
+  assert.equal(tooLong(OLIVE_LONG), true)
+  assert.equal(tooLong(`<@${REPORTER}> ${'x'.repeat(REPLY_MAX_CHARS)}`), false)
+  assert.equal(tooLong(`<@${REPORTER}> its $498.68 so far, final after nov 25`), false)
+})
+
+test('the reporter is tagged once per thread: a later reply drops the tag', () => {
+  const thread = [eyes, agent('101.0', 'taking a look'), agent('102.0', `<@${REPORTER}> her ig is tracking again`), person('103.0', 'and the pay?')]
+  assert.equal(dropRepeatTag(thread, '100.0', `<@${REPORTER}> $498.68 so far`), '$498.68 so far')
+  assert.equal(dropRepeatTag([eyes, agent('101.0', 'taking a look')], '100.0', `<@${REPORTER}> fixed`), `<@${REPORTER}> fixed`)
+  assert.equal(dropRepeatTag(thread, '100.0', 'no tag here'), 'no tag here')
 })

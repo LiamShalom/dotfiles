@@ -63,7 +63,7 @@ export const resultSchema = (model) => JSON.stringify({
     status: { type: 'string', enum: model === 'opus' ? ['done', 'needs_liam', 'needs_reporter'] : ['done', 'needs_liam', 'needs_reporter', 'needs_opus'] },
     name: { type: 'string', description: '"<brand>: <issue in 2-5 words>", lowercase' },
     summary: { type: 'string' },
-    reply: { type: 'string', description: 'The message to post as Liam in the job\'s own thread: your answer, your question to the reporter, or the proven facts before a hold. Start it with the <@USERID> tag when the skill says to tag. Do not post it yourself: the watcher checks it and posts it after you return, so every return carries the full reply still to post. Empty when nothing should be posted (already answered, a thanks, a teammate is handling it)' },
+    reply: { type: 'string', description: 'The message to post as Liam in the job\'s own thread: your answer, your question to the reporter, or the proven facts before a hold. Start it with the <@USERID> tag only on the first reply that gives the reporter the answer or asks them something; later replies in the thread go untagged. Keep it to one or two lines under 280 characters. Do not post it yourself: the watcher checks it and posts it after you return, so every return carries the full reply still to post. Empty when nothing should be posted (already answered, a thanks, a teammate is handling it)' },
     reply_images: { type: 'array', items: { type: 'string' }, description: 'Absolute paths of marked PNG screenshots (skill step 5a) to upload right after the reply, in click order. Empty when none' },
     unproven_claims: { type: 'array', items: { type: 'string' }, description: 'Each statement in `reply` that no query result, log line or code read in this session proves: an assumption, a promise for someone else, or a cause read off an error message alone. Empty only when every claim in it is proven. A reply with unproven claims is not posted' },
     question: { type: 'string', description: 'needs_liam: the one thing Liam must answer. needs_reporter: the question in your reply. needs_opus: what is left to do' },
@@ -909,6 +909,21 @@ export function replyPlan(out) {
   const images = (Array.isArray(out.reply_images) ? out.reply_images : []).filter((p) => typeof p === 'string' && p.startsWith('/') && p.endsWith('.png'))
   return { text, images }
 }
+// Liam's replies run 35 characters at the median and 153 at p90 (slack-voice.md). On 11-18 an Olive
+// thread got six replies of 300-450 characters, each tagging the reporter; Liam called it heinous.
+export const REPLY_MAX_CHARS = 280
+const untagged = (text) => String(text ?? '').replace(/^\s*<@[A-Z0-9]+(\|[^>]*)?>\s*/, '')
+export const tooLong = (text) => untagged(text).length > REPLY_MAX_CHARS
+export const tooLongPrompt = (text) => `Your reply has not been posted: it is ${untagged(text).length} characters, and Liam's replies stay under ${REPLY_MAX_CHARS} (most are one line). Rewrite \`reply\` as one or two short lines: the answer and only the number or fact the reader needs to act. No bullet lists, no recap of earlier replies, no working shown. Return the result again with the shorter reply.`
+// A tag notifies: once the reporter is tagged in this thread, later replies go untagged. They are in
+// a live back-and-forth and see the thread anyway.
+export const dropRepeatTag = (thread, fromTs, text) => {
+  const tag = String(text ?? '').match(/^\s*<@([A-Z0-9]+)/)?.[1]
+  if (!tag) return text
+  const tagged = thread.some((m) => m.user === LIAM && Number(m.ts) > Number(fromTs) && String(m.text ?? '').includes(`<@${tag}`))
+  return tagged ? untagged(text) : text
+}
+
 // The run posted the same text itself (an old session that still posts): do not post it twice.
 export const postedAlready = (thread, fromTs, text) => thread.some((m) => m.user === LIAM && Number(m.ts) > Number(fromTs) && plainText(m.text) === plainText(text))
 
@@ -996,6 +1011,7 @@ async function postReply(job, { text, images }) {
     log('reply_skipped', { key: job.hit.key, why: 'the run already posted the same text' })
     return { posted: true }
   }
+  text = dropRepeatTag(thread, job.hit.ts, text)
   const ts = (await slack('chat.postMessage', { channel: job.hit.channel, thread_ts: job.hit.threadTs, text })).ts
   let uploaded = 0
   for (const png of images) {
@@ -1056,6 +1072,9 @@ async function runJob(file) {
       } else if (unprovenClaims(out).length && !sent.has('verify')) {
         log('unproven_claims_refused', { key: job.hit.key, model: modelOf(job), claims: unprovenClaims(out) })
         sent.add('verify'); refused.push(...unprovenClaims(out)); next = verifyPrompt(unprovenClaims(out))
+      } else if (replyPlan(out) && tooLong(out.reply) && !sent.has('short')) {
+        log('reply_too_long', { key: job.hit.key, chars: String(out.reply).length })
+        sent.add('short'); next = tooLongPrompt(out.reply)
       } else if (out?.status === 'done' && !messages && !String(out.reply ?? '').trim() && !sent.has('answer')) {
         // A first run can stop before it replies: a done with no reply goes back once, unless Liam or
         // a teammate already answered (then staying quiet is right). A follow-up may need no reply.
