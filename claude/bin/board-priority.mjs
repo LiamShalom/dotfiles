@@ -78,6 +78,17 @@ export function isSlotHolder(row) {
   return row.name === 'lockf' && /\/agent-heavy-\d+\/\w+\.\d+ /.test(row.args)
 }
 
+// A test run or type check. Targeted runs skip the heavy queue on purpose, so the slot exemption
+// above never reached them, and in the background band the disk throttle stretched them the same
+// way (11-18: one small test file took 18 s at normal priority and was still running after 52 min
+// in the background). They run at normal priority, with their workers. The editor's tsc --lsp
+// helper stays in the background.
+export function isTestRun(row) {
+  if (/(^|\s)--lsp(\s|$)/.test(row.args)) return false
+  if (row.name === 'vitest' || row.name === 'jest' || row.name === 'tsc') return true
+  return /\/vitest(\/dist\/workers\/|\.mjs| |$)|\/\.bin\/(vitest|jest|tsc)( |$)|\/lib\/tsc( |$)|\/playwright test( |$)|\/\.bin\/playwright test( |$)/.test(row.args)
+}
+
 function ancestorsIn(rows) {
   const byPid = new Map(rows.map((row) => [row.pid, row]))
   return (row) => {
@@ -92,7 +103,7 @@ function ancestorsIn(rows) {
 }
 
 function inSlot(row, chain) {
-  return isSlotHolder(row) || chain.some(isSlotHolder)
+  return isSlotHolder(row) || chain.some(isSlotHolder) || isTestRun(row) || chain.some(isTestRun)
 }
 
 // Which processes to move back to normal priority.
