@@ -33,8 +33,9 @@ save progress to a file before compaction instead.
 When the work is done and checked, stop and report. Don't add features, files or refactors I
 didn't ask for; if one would help, mention it at the end.
 
-A second model checks each turn end (`~/.claude/hooks/finish-judge.sh`). When it sends you
-back with "Finish check", do what it says; if it is wrong, say why in one line and continue.
+A second model checks substantive turn ends. In Claude, when the hook sends you back
+with "Finish check", follow the feedback. If it is wrong, say why in one line and continue.
+In Codex, the Stop hook records its verdict in `~/.codex/logs/finish-gate.jsonl`.
 
 ## How to explain things to me
 
@@ -131,6 +132,23 @@ where the decision is made), and log it in `~/dotfiles/claude/learning/ledger.md
   `~/.claude/bin/run-until-done <dir>`: a fresh session per iteration until every check
   passes.
 
+### Codex execution
+
+- In Codex, use the `skeptical_verifier` custom agent for independent review. Its model
+  and effort are configured in `~/.codex/agents/skeptical_verifier.toml`; Claude model
+  aliases above apply only to Claude. If the role is unavailable in an existing chat,
+  use a clean-context default agent with an available frontier model and explicit high
+  effort. Give it the request and artifacts, not your verdict. Do not review a review.
+- For work I explicitly ask to run autonomously or until complete, use a native Goal
+  with the requested outcome and evidence requirements. Keep the existing approval
+  boundaries. A Goal or a completion checker cannot authorize a reserved action.
+- For unattended Codex work, use `~/.claude/bin/run-until-done --engine codex <dir>`.
+  Every acceptance item needs an executable `check`; the runner checks results and
+  invokes its reviewer independently. Keep checkpoint notes in `progress.md`. A retry,
+  timeout, checker failure, or unavailable credential means incomplete, never success.
+- The Stop checker evaluates transcript evidence and logs its verdict locally. Run the
+  required checks and independent code review before finishing.
+
 ## Managing your own context
 
 - When context gets compacted, keep the current task, the file paths in play, test results, and
@@ -157,8 +175,27 @@ You may merge a PR on my behalf when **all** of these hold:
   new screen, flow, modal or component, or a visible layout change — those need my approval.
   If unsure, treat it as large.
 - Every CI check passes. A check that is red on `main` too does not count as passing.
+- It is not a large feature PR. **Never merge a large feature PR without my explicit
+  permission for that PR**, even when every other condition holds and even when I told you to
+  run the task end to end. Large means a new feature, integration or product area (for
+  example, a new ad platform such as Google Ads), a multi-commit feature branch, or a diff
+  that touches many files across several areas. Bug fixes, small tweaks and schema-migration
+  PRs are not large. If unsure, treat it as large and ask.
 
 If any condition fails, get the PR ready, tell me what is missing, and stop.
+
+**When my UI approval is the only thing left**, put the change in front of me before you
+stop, so I can approve it at a glance. Make it a local page: a clickable copy of the changed
+page whose buttons, tabs, modals and form states work. Capture the real page with
+`~/.claude/bin/page-snapshot.mjs [--as brand|creator] <preview-url> --out <file.html>` (signed
+in, every style and image inlined); never redraw it by hand. Then add the interactions with
+fixture state in inline JS. Put the Vercel preview link in it. Open it in Session Board's
+browser pane: `node ~/session-board/scripts/board-browser.mjs <file.html> "<what changed, what
+to look at>"`, and edit the same file each round (the pane reloads it). Your own verification
+still runs on the real preview. For an iOS change,
+show the simulator on the changed screen with `--simulator`. In chat, say what I'm
+approving. A link or a screenshot path in chat alone is not enough. If the board is not
+running, open the page or file with `open` instead.
 
 To merge, use `/pr-approve` in the monorepo (`.claude/skills/pr-approve/scripts/gh-approve
 <pr> --merge`). It approves as the shared reviewer account, which branch protection needs,
@@ -180,6 +217,26 @@ type narrowing, data deletes or rewrites, or long locks on large tables. If it i
 change the migration until it is (add the new shape, leave the old one in place) instead
 of asking me.
 
+## Testing: no permission needed, except for real money
+
+Everything you do for testing is OK without asking me first. That includes creating and
+changing test data in production (test brands, test creators, campaigns, contracts, posts,
+connections), running jobs and scripts against production for test accounts, reading
+production keys into a local process for a test, connecting test accounts to providers, and
+giving a test account the access a test needs. Testing means work on test accounts, test
+brands or synthetic data; a real customer's account or data is never test data.
+
+**Never test on my personal accounts** (my Instagram, Facebook, TikTok, X, YouTube and so
+on): never connect one to a test user or post, message or publish through one. When a test
+needs a real third-party app, create a test account there (or reuse one, like the
+@sideshiftadsqa-liam YouTube channel), so nothing lands on mine. If you can't make one, ask.
+
+The one exception: **ask me before anything that spends real money**, such as live payments,
+payouts or withdrawals, ad spend on a real ad account, live Stripe charges, purchases, or a
+paid plan or API tier. Test-mode and sandbox money is fine.
+
+This covers testing only. Shipping still follows the rules above: merging is not testing.
+
 ## Bash commands
 
 **One command per Bash tool call — never chain.** No `&&`, `||`, `;`, or `|` into another
@@ -197,7 +254,11 @@ shell scripts you're writing are unaffected.
   the same lockfile (or updates the nearest one with `npm install`), and runs
   `npm run build:packages`. Run it again after `package-lock.json` changes or a rebase.
 - **Type errors arrive after each edit** (the `ts7-lsp` mod) with your next tool result. Fix
-  them as they appear; still run `npm run typecheck` once before you commit.
+  them as they appear. Do not run a whole-repo type check in the monorepo (`npm run typecheck`,
+  `typecheck:tests`, a bare `tsc --noEmit`): each holds about 10 GB, and PR CI runs them on
+  every push. The heavy-gate hook refuses them. Push, then read the `Typecheck app` and `Typecheck tests` jobs, and do
+  not report types as checked until they are green. `LOCAL_TYPECHECK=1 <command>` runs one
+  locally, only to reproduce a CI type error or when I ask.
 - **Commit everything before you hand the branch back.** Uncommitted work is invisible to
   `git merge`, so it may as well not exist.
 - **Squash down to one commit** — three separate Bash calls: `git add -A`, then
@@ -296,6 +357,10 @@ window in it: its tabs never mix with another chat's.
   until I say I'm done, then find the tab with `list_pages`. If the command fails (the board is
   not running), open the page in a background tab of the agent Chrome, tell me the URL and what
   to do, and wait. Never route browser or computer-use work to Codex.
+- **To show me a file you made** (a temp HTML review page, a screenshot, a PDF, a Markdown or
+  text report, a folder), run `node ~/session-board/scripts/board-browser.mjs <path> "<what it
+  is>"` instead of `open <file>`. It opens in Session Board's browser pane. Chrome downloads
+  `.csv` and `.yaml`, so the script refuses them. If the board is not running, use `open`.
 - **For a UI design round, pick the surface that fits; the Session Board canvas is one
   option.** Use the canvas when I will want to mark up static screens (compare options,
   sketch, point with arrows) or when the rounds should stay together as history. Use the
@@ -316,14 +381,40 @@ window in it: its tabs never mix with another chat's.
   ~/session-board/scripts/artifact.mjs db|comments <file.html>`. Edit the same file each round:
   the pane reloads it. Publish a claude.ai Artifact (the `Artifact` tool) only for a page
   someone else has to open.
+- **To show me an iOS simulator or Android emulator** (a build to try, a flow to check, a sign-in
+  only I can do), run `node ~/session-board/scripts/board-browser.mjs --simulator <udid | name |
+  adb serial | AVD name> "<what to do>"`. It opens as a tab in Session Board's pane, where I tap,
+  scroll and type in it. Keep the simulator or emulator running until I say I'm done. If the board
+  is not running, ask me to open Simulator.app (or the emulator's window) instead.
 
-## Heavy commands: two machine-wide slots
+### In the Claude desktop app
+
+When `CLAUDE_CODE_ENTRYPOINT` is `claude-desktop`, I'm looking at the desktop app, not Session
+Board. Wherever this file or a skill says to show me something in Session Board's pane or with
+`board-browser.mjs`, do this instead (the `open-to-pane` hook refuses `board-browser.mjs` there):
+
+- **A page** (a preview, a sign-in, 2FA, consent, an artifact URL): open it in the app's browser
+  pane with `mcp__Claude_Browser__preview_start` and its `url`, and check with `tabs_context` that
+  the pane is showing. It keeps my sign-ins between sessions. It cannot open `file://` pages.
+- **A file** (a screenshot, PDF, report): `SendUserFile` with `display: "render"`. An HTML page
+  goes up as an Artifact.
+- **A UI design round** (`board-canvas.mjs`): an Artifact with each option's screenshots, your
+  pick at the top, and each option's preview link.
+- **An iOS simulator:** `mcp__Claude_Code_iOS_Simulator__control` with `attach`. An Android
+  emulator has no pane there: ask me to use its window.
+- **A SideShift page signed in as a test account, for your own checks:** `node
+  ~/.claude/bin/agent-signin.mjs [--as creator] <url>`. It opens the page in your chat's agent
+  Chrome window, signed in, without Session Board. That tab is yours, not mine.
+
+## Heavy commands and shared resources
 
 Many agents share this Mac's memory, so a hook (`~/.claude/hooks/heavy-gate.sh`) rewrites heavy
 commands before they run: Vitest runs on the default config get `--maxWorkers=4`, and full test
 suites, builds and whole-repo typecheck or lint wait for one of two slots (`~/.claude/bin/heavy`).
-A `next build` (40-60 GB here) runs one at a time and waits for 45% of memory to be free; other
-heavy jobs wait for 20%. The agent preflight (`scripts/agent-preflight.mjs`) takes a slot too.
+iOS builds and tests wait for one of two separate iOS slots, and `xcodebuild test` runs with
+`-parallel-testing-enabled NO`, so a run boots one simulator, not one clone per worker.
+A `next build` (40-60 GB here) runs one at a time and waits for 35% of memory to be free; other
+heavy jobs wait for 10% (`~/.claude/bin/heavy --mem-free` prints the figure: RAM that is not app, wired or compressed memory). The agent preflight (`scripts/agent-preflight.mjs`) takes a slot too.
 
 - **"heavy: all 2 slots are busy" or "only N% of memory is free" means wait, not fail.** Don't work around the queue or the
   worker cap (no `--maxWorkers` overrides, no `bash -c` wrappers) unless I ask.
@@ -332,6 +423,36 @@ heavy jobs wait for 20%. The agent preflight (`scripts/agent-preflight.mjs`) tak
   Don't set `DISK_GUARD_OFF` or delete files to get past it unless I ask.
 - **While iterating, run the specific test files you changed.** Targeted runs skip the queue;
   save the full suite for the final check.
+- **Dev servers are capped.** The same hook refuses a new `next dev` / `npm run dev` while
+  4 dev servers run. Reuse a server you started, or stop one of yours; never stop another
+  session's server.
+- **Clean up what you started before you finish a task**: stop your dev server, background
+  tasks and pollers (`until gh pr checks …; sleep 30`, `cloud-sql-proxy`, watchers), and
+  Docker containers (`docker stop <name>` keeps the data); shut down your simulator; close your
+  tabs. A background task outlives its session when the session is stopped or handed to a new
+  job, and then runs for days with nobody reading it. Delete throwaway test records you made
+  (a one-off campaign, listing, post); named test accounts stay. A Stop hook
+  (`hooks/cleanup-check.mjs`) names what this session still runs, once per item, and the
+  finish judge sends you back for leftover test records.
+- **Use the shared Docker VM.** Run containers in the default Colima VM (6 GB, shared by every
+  agent). Don't create another Colima profile or resize one; ask me first.
+- **Anything that runs once per session must be cheap.** The statusline, hooks, MCP servers and
+  timers run in every session, about 30 at once. Start one or two processes per run at most,
+  cache anything slow, never run `git status` on a timer (if you must, cache it and pass
+  `--no-optional-locks`), and no 1-second intervals. On 2026-10-21 a statusline with a
+  1-second timer started 1,400 processes a second and held the kernel at 84% CPU.
+- **Install dependencies only when you will build or test.** A `node_modules` is about 180,000
+  files, and creating one floods file events for every app on the Mac. A read-only or docs task
+  needs none.
+- **Leftovers are cleaned up on a schedule** (`~/.claude/bin/agent-reaper.mjs`, every 5 minutes,
+  log in `~/.claude/logs/agent-reaper.log`): a simulator with nothing running in it for 20
+  minutes is shut down; an Android emulator over 12 GB that nothing used for 10 minutes is
+  stopped (they bloat: a 4 GB phone reached 35 GB in a day); the Kotlin compiler daemon over
+  5 GB is stopped once it has compiled nothing for 5 minutes; an agent's dev server over 12 GB, or with no client for 2 hours, is
+  stopped; an agent Chrome tab unused for 6 hours is closed; a background task whose session is
+  gone is killed after 30 minutes; a container in the default Colima VM with no traffic for 24
+  hours is stopped (`docker start <name>` brings it back with its data). If your simulator,
+  server, tab, task or container disappeared, check that log, then start it again.
 
 ## Codex session names and browser use
 
@@ -378,3 +499,17 @@ emulator handoffs. This section takes precedence over the shared agent Chrome to
   interrupt the user's work there. If window placement cannot be controlled, report the
   limitation instead of claiming it is enforced.
 - Never open or show the floating mini screen preview in Codex. The user wants it hidden permanently.
+- Continue routine, reversible setup and verification steps within an authorized task without
+  asking again. This includes temporarily resetting and restoring the same OAuth permission
+  to record an approved flow, with the same app, account, Page and access scope. Ask for manual
+  input only when it is needed, such as a password or sign-in code that is not available.
+  Keep confirmations required for new or broader access and legal commitments, except for
+  testing (see "Testing" above: only real money needs my OK).
+
+## SideShift test credentials
+
+- SideShift test credentials are stored in the 1Password vault `Agent-Test`, with an encrypted local copy in macOS login Keychain for access without repeated 1Password prompts. `/Users/liamshalom/sideshift-monorepo/.env.test.local` contains only `op://` references. Do not use these references as literal credentials.
+- For authorized test commands, use `/Users/liamshalom/sideshift-monorepo/.codex/with-test-secrets <command> [args...]`. It reads macOS Keychain and injects the existing variable names without accessing 1Password. It preserves the command's current directory, including in worktrees.
+- After changing these values in 1Password, run `/Users/liamshalom/sideshift-monorepo/.codex/with-test-secrets --refresh` to update Keychain. Refresh uses `op run` and can require 1Password authorization. Ordinary commands do not refresh automatically.
+- Items: `SideShift Test Creator`, `SideShift User`, and `SideShift Stripe Test`. Do not change account passwords or generate replacement tokens without a task that requires it.
+- Do not print secrets, dump the vault or Keychain, put secrets in command arguments, or write plaintext credentials back to env files. A locked macOS login Keychain can still require the owner to unlock it. Credential access does not grant permission for unrelated external actions.
