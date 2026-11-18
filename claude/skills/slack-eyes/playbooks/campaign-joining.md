@@ -159,3 +159,11 @@ while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: 
   new single-use invite link for the creator. Before a restore, list the contracts with
   `expire_reason` "Campaign archived" (check 6): the restore reactivates those. Do not promise a
   manual contract or payout: that is a customer-data and money write.
+- **Brand asks to "bypass" a creator outside the campaign's countries** (invite modal shows "Outside
+  campaign countries", or the creator's verified ID country is not in `requirements.verifiedResidenceTargeting`):
+  no code change. Grant a per-creator exception with the staff script, dry run first:
+  `npx tsx scripts/set-campaign-residence-exception.ts --company=<id> --campaign=<id> --creator=<uid> --actor=aHvxZwk6eYczQLCfCu5aDms9ysY2 --action=grant --reason="..."`
+  then the same with `--execute`. The verified country is `users.withdrawalApprovalCountry`; pick the
+  account with `withdrawalApprovalProfileStatus` approved when two users share a name. The invite
+  modal then shows "Manually approved", and the send (`send-campaign-invite`, `create-batch`) and the
+  creator's accept modal honor it. It is per campaign: a wrong campaign id was an earlier mistake here.
