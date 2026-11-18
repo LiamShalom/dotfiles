@@ -245,7 +245,7 @@ needs a real third-party app, create a test account there (or reuse one, like th
 The one exception: **ask me before anything that spends real money**, such as live payments,
 payouts or withdrawals, ad spend on a real ad account, live Stripe charges, purchases, or a
 paid plan or API tier. Test-mode and sandbox money is fine, and so are Vercel preview builds
-(`npm run vercel:preview` in the monorepo, about $1 each): build one whenever a check needs it.
+(`npm run vercel:preview` in the monorepo): build one whenever a check needs it.
 
 This covers testing only. Shipping still follows the rules above: merging is not testing.
 
