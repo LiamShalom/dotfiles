@@ -170,3 +170,10 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
   and `firestore_count_collection contractsv2/<id>/posts` (0). Proven on `wheelz: dispute continue greyed`.
 - The "Other" dispute type needs no cycle, and the create route (create.usecase.ts) has no contract-status
   check, so a cancelled contract can still file one.
+
+## Agency client offboarded while the agency plan pays (aydus: veed, 2026-11-18)
+
+- Sign: a client (sub-account) shows `offboarded_reason = 'Grace window expired — subscription not restored'` while its agency has an active plan. Check `companies` for the client: its own `stripe_customer_id` differs from the parent's, and its own old sub was cancelled.
+- Cause before #10843: the grace opener (`utils/firebase/admin-billing.ts`) and the hourly sweep (`lib/api/cron/dunning-sweep.usecase.ts`) only read the client's own Stripe customer. Since #10843 both call `agencyPlanCoversClient` (`lib/billing/agency-plan-coverage.ts`), so this should not recur.
+- Repair: `PG_ALLOW_PRODUCTION=1 npx tsx scripts/restore-false-churn-offboards.ts --company <id>` (dry run), then add `--apply --notify`. It refuses without the env flag before writing anything. Check after: `offboarded_at` null, no campaigns with `archived_reason like 'Grace%'` still archived.
+- Handle approvals refused with "linked contract is declined" after a restore: the creator declined the invite. Not caused by the restore; the brand can reject the requests or re-invite.
