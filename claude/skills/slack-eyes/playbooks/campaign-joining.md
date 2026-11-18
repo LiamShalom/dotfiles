@@ -51,6 +51,9 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   later, each reviewed by a brand member). Before sign-first, the apply itself made one row per
   platform. So "we can only approve or decline the whole bundle" is answered by: accept the join,
   then decide each account. Exception: on OAuth platforms a proven account auto-approves (next line).
+  A brand asking to bring back accounts-at-apply for its campaigns: Liam said no on 2026-11-18 (juno
+  thread). SideShift pushes creators to link (OAuth) accounts, not typed handle requests: a linked
+  account needs no handle request, and tracking survives a handle change. Do not build a per-campaign switch.
 - **A proven handle is approved with no brand review** once the brand chose the creator and the
   creator signs in to the account: `reviewed_by` is empty and it is approved in the same second
   (`lib/handle-requests/creator-proven-approval.ts`, #9845).
