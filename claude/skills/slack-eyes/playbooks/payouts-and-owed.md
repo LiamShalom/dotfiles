@@ -114,6 +114,16 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
    `payment_method_type` or `payin_status` column on `wallet_ledger` (`postgres_describe_table wallet_ledger`). The
    amount is `source_amount_cents` (`amount_cents` is null on a pending row). Several brands can have one at
    once: ask which brand before you pick.
+11. A brand wired money and it is "not in the wallet" (mangolabs, 11-18). Non-agency wires go to the company's own
+   Stripe virtual account (`stripe-bank-transfer-topup.ts`, customer cash balance in `manual` mode). The ledger shows
+   nothing until Stripe receives the funds, so read Stripe, not only `wallet_ledger`. The agents-billing key
+   (`STRIPE_SECRET_KEY` in `~/.config/sideshift/env.local`; load it with `eval "$(grep ^STRIPE_SECRET_KEY= …)"`, not
+   `source`: the file does not source cleanly) can read
+   `GET /v1/customers/<cus>/cash_balance` and `GET /v1/events?type=customer_cash_balance_transaction.created&limit=50`
+   (all customers, with sender name, reference and amount). No `funded` event for the amount on any customer means
+   Stripe has not received it: ask for the bank's trace (Fed IMAD/OMAD or SWIFT MT103/UETR). Every `funded` event is
+   followed seconds later by `applied_to_payment`, so the credit path works. The key cannot read funding instructions
+   (POST needs `funding_instruction_write`).
 10. Top-up fees (ACH, card) and caps. `FeeConfig` is `percentFee` + `fixedFeeCents` + optional `maxFeeCents`
    (a per-top-up cap, #10765, 11-17). The cap lives only on a `customFees` doc, must be a number, and is never applied
    to wires. The dashboard fee API cannot set it yet: write it with firebase-admin (`ref.update({maxFeeCents})`). Prove
