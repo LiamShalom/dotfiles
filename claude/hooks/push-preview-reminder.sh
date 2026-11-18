@@ -7,6 +7,6 @@
 jq -c '(.tool_input.command // "") as $c | (.cwd // "") as $d
   | if ($c | test("(^|[;&|[:space:]])git( -C [^ ]+)? push\\b")) and ($d | test("sideshift-(monorepo|mobile)"))
     then (if env.CLAUDE_CODE_ENTRYPOINT == "claude-desktop" then "in the desktop app'"'"'s browser pane (mcp__Claude_Browser__preview_start; a simulator: mcp__Claude_Code_iOS_Simulator__control attach)" else "with board-browser.mjs" end) as $how
-    | {hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: "You pushed. If this push changes anything a user sees, do not end the turn yet: wait for this commit'"'"'s preview build (or rebuild the simulator), open it on the changed screen \($how), screenshot that tab, and say where it is. No UI change: ignore this."}}
+    | {hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: "You pushed. If this push changes anything a user sees, do not end the turn yet: build this commit'"'"'s preview (monorepo: a push builds none; run npm run vercel:preview, no permission needed) or rebuild the simulator, open it on the changed screen \($how), screenshot that tab, and say where it is. No UI change: ignore this."}}
     else empty end' 2>/dev/null
 exit 0
