@@ -34,6 +34,10 @@ fewer. Run the ones for the error, then post one reply. Never say what kind of a
   2-second window) shows `postablePageCount`; the 403 never names the Page Meta sent.
 - Meta's "Continue as <name>? continue with your previous settings" resends the Pages ticked last
   time. A creator who must share another Page taps Edit settings, not Continue.
+- After the Pages step Meta shows a Businesses step (business portfolios, not Pages) and an Instagram
+  step. Creators stop there thinking their Page is missing. Neither choice changes the Page match:
+  tell them to pick any one and keep tapping Continue until it returns to SideShift. An oauth_start
+  with no oauth_callback means they stopped inside Meta's screens (melaxin, 2026-11-18).
 - **Tracking does not need OAuth.** Reels of a public profile or Page are scraped publicly. The
   contract `cTKIgr0UPjx4jHZmIzTT` had 68 Facebook posts (534K views) with no Facebook grant at all, and
   they appear in the brand's posts search (`lib/analytics/pg/posts-search-query.ts`). A Page connection
