@@ -114,6 +114,11 @@ Never fill the gap with a guess in the reply.
    Instagram links work the same way: `instagram.entry.ts` refuses any signed-in username other than the
    link's `handle` with `requested_account_mismatch`, and the page then asks for a new sign-in (it looks
    like a loop). Gloria (2026-11-17) was signed in to a different Instagram account than the link's.
+   **Instagram "Invalid Request … Invalid scope: …"** on `instagram.com/oauth/authorize/third_party/error`
+   (2026-11-19, plutus): not our request. `creator_social_oauth_states.signed_state` (base64 JSON) shows what
+   the start sent; a plain connect asks for basic, manage_insights, manage_comments, manage_messages. A
+   personal test account gets "Change to professional profile?" (not this error), and after switching it
+   reaches SideShift's consent screen with all four. Ask for the full error line: its end names the refused scope.
    Read a screen recording with ffmpeg: frames at `fps=1/2`, tiled `5x2` into one image.
    **A screenshot can be hours old.** Its time may be a reshared one (a screenshot of a screenshot shows
    an inner clock). When a 10-minute window around the Slack post finds nothing, search the requested
