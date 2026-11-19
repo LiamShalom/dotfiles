@@ -42,3 +42,12 @@ be there" as the cause.
   reach their account without the email or company they sign in with.
 - `git grep` across the monorepo in a foreground Bash call timed out at 120 s. Use the dashboard
   `code_search` (with `path`) and `code_read_file` instead.
+
+## "Set us up with SideChat / the internal ManyChat" (grant it)
+
+- `campaign_comment_dm` is company-only (`agencyInheritable: false` in `lib/flags/registry.ts`): grant the company
+  that owns the campaign, not only a sub-account. No code change, no admin token: a tsx script calling
+  `setCompanyFlag` (`lib/api/flags/flags-admin.usecase.ts`) with `{ kind: 'manual-script' }` as ctx, run from the
+  monorepo root with `PG_ALLOW_PRODUCTION=1 npx tsx --conditions=react-server --env-file=.env.local <script>`.
+- `canAccessFeature` caches per process: an "after" read in the same run still says false. Check with a second run
+  or `feature_grants` on the replica (hardlaunch: sidechat setup, 2026-11-19).
