@@ -73,6 +73,11 @@ button whose comments arrive in this session as prompts, and a reload whenever t
    comments come to you as prompts (`Comment on <file> at "<element>" …`); all of them:
    `artifact.mjs comments <file.html>`. For the next round, edit the same file: the pane
    reloads it. Never open a new file for each iteration.
+5. Before each next round, write down the operator's last message word for word and what it
+   settles. Every option in the new round keeps what he settled (if he said the tabs become
+   navbar items, no option nests them). A short or vague word ("sort", "better", "inspo")
+   applies to the question he raised last; if it still fits two readings, ask in one line
+   before you build. Research you add answers his question, not your pick.
 
 Publish a claude.ai Artifact (the `Artifact` tool) only when someone other than the operator
 must open the page. Use the local server when Session Board is not running (board-browser.mjs
