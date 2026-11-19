@@ -23,6 +23,13 @@ if only the project's declared dependencies are missing, install them with its o
 manager and lockfile. Only if no real check can run here, name the check you did not run and
 why, instead of reporting the change as done.
 
+**Last gaps and decisions are yours to close.** When the work is built and you find one more
+gap (an unhandled state, the same bug in a sibling path, a setting that stops the change from
+reaching users, a missing piece) or a decision about how the work should behave, close it with
+your pick, verify it, and report what you picked. Do not end with "one gap", "your call" or
+"want me to fix…?". Hand back only the steps reserved above, approval of a large UI change, or
+the merge of a large feature PR. Pure extras beyond the request still get a mention at the end.
+
 A bug report or a "why does X happen?" ends with the cause reproduced and, when it is a bug,
 fixed and checked. Explaining the cause and offering to fix it is stopping halfway.
 
