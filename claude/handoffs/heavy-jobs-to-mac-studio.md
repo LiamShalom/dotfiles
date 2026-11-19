@@ -48,7 +48,18 @@ Liam said "this isn't the right solution" about item 2. He wants the Studio hand
 not ask to revert. Keep items 1 and 2 unless he says to remove them: the Studio has a quarter of
 the MacBook's memory, so local jobs still need them.
 
-## Blocked on
+## Update 2026-11-18: network unblocked
+
+The MacBook no longer runs the NordVPN desktop tunnel (Nord app open but disconnected,
+`connectOnDemand = 0`; traffic exits via the office line 38.104.167.240/31). With that:
+Tailscale is online, the Studio is online on a direct LAN path, SSH works
+(`ssh -i ~/.config/sideshift-pool/macbook_ed25519 -o IdentitiesOnly=yes -o UseKeychain=yes
+-o BatchMode=yes -o UserKnownHostsFile=~/.config/sideshift-pool/known_hosts sideshift@100.118.88.90`),
+the Studio reaches Session Board's tailnet URL (401 sign-in gate), and the relay's
+`check-nordvpn` still verifies 6 distinct IPs. Studio disk is 26% used, so the 10-26 "97% full"
+note is stale. Items 1 and 2 below are resolved; the Design section can start.
+
+## Blocked on (as of 11-17; resolved 11-18, see above)
 
 1. **Network: this Mac cannot reach the Studio while NordVPN is connected.** Tailscale on this
    Mac reports `Online: false` and "Unable to connect to the Tailscale coordination server".
