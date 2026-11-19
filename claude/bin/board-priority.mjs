@@ -19,7 +19,7 @@
 //
 // Usage:  board-priority.mjs           run forever
 //         board-priority.mjs --once    one pass, print what it changed
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -174,12 +174,64 @@ function log(line) {
 // The Claude daemon, which starts every background session, in the background band. That happens
 // when a launchd ProcessType=Background job started it (11-18: slack-eyes did). Its sessions inherit
 // a throttle that taskpolicy -B cannot lift, so no promotion here takes effect until the daemon
-// restarts from a normal process.
+// restarts from a normal process. The daemon's self-restart on a Claude Code upgrade keeps the
+// throttle (11-18: 18:10 clamp survived the 20:17 upgrade).
 export function clampedDaemon(rows) {
   return rows.find((row) => isSession(row) && / daemon run( |$)/.test(row.args) && row.pri <= 4)
 }
 
-let clampWarnedAt = 0
+// Restart a clamped daemon from this (normal priority) process. --keep-workers leaves every
+// session running; the new daemon adopts them. Sessions it starts from then on, and the spares new
+// sessions claim, run at normal priority. Sessions that already run keep the throttle until they
+// end or retire, then resume unthrottled.
+const CLAUDE = join(homedir(), '.local', 'bin', 'claude')
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+export async function unclampDaemon(pid, io = {}) {
+  const {
+    stop = () => run(CLAUDE, ['daemon', 'stop', '--any', '--keep-workers'], { timeout: 30_000 }),
+    alive = isAlive,
+    start = () =>
+      new Promise((resolve, reject) => {
+        const child = spawn(CLAUDE, ['daemon', 'run', '--origin', 'transient'], { detached: true, stdio: 'ignore' })
+        child.once('error', reject)
+        child.once('spawn', () => {
+          child.unref()
+          resolve()
+        })
+      }),
+    daemon = async () => clampedOrRunningDaemon(await processes()),
+    sleep = wait,
+    waitMs = 30_000,
+    settleMs = 3_000,
+  } = io
+  // A stop that errors may still have stopped it: the pid check below decides.
+  await stop().catch(() => {})
+  // stop returns before the old daemon exits, and a new one refuses to start while it runs.
+  for (let waited = 0; alive(pid) && waited < waitMs; waited += 100) await sleep(100)
+  if (alive(pid)) return `WARNING Claude daemon ${pid} runs at background priority and did not stop`
+  // Start it here at once: `claude agents --json` does not start it, and the next client to start
+  // it on demand may be a throttled session, which would clamp it again.
+  await start()
+  await sleep(settleMs)
+  const now = await daemon()
+  if (!now) return `WARNING restarted clamped Claude daemon ${pid}, but no daemon runs now`
+  if (now.pri <= 4) return `WARNING restarted clamped Claude daemon ${pid}, but daemon ${now.pid} is at background priority`
+  return `restarted clamped Claude daemon ${pid} as ${now.pid} at normal priority (sessions kept)`
+}
+
+function clampedOrRunningDaemon(rows) {
+  return rows.find((row) => isSession(row) && / daemon run( |$)/.test(row.args))
+}
+
+let clampFixedAt = 0
 
 // Processes already moved, by pid: the flag used and their arguments (to tell a reused pid apart).
 const moved = new Map()
@@ -188,9 +240,9 @@ async function pass() {
   const rows = await processes()
   const pinned = pinnedSessionPids()
   const clamped = clampedDaemon(rows)
-  if (clamped && Date.now() - clampWarnedAt > 3600_000) {
-    clampWarnedAt = Date.now()
-    log(`WARNING Claude daemon ${clamped.pid} runs at background priority: sessions cannot be promoted until it restarts from a normal process`)
+  if (clamped && Date.now() - clampFixedAt > 600_000) {
+    clampFixedAt = Date.now()
+    log(await unclampDaemon(clamped.pid).catch((error) => `WARNING Claude daemon ${clamped.pid} runs at background priority; restart failed: ${error.message}`))
   }
   const live = new Set(rows.map((row) => row.pid))
   for (const pid of moved.keys()) if (!live.has(pid)) moved.delete(pid)

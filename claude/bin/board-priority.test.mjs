@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { clampedDaemon, toDemote, toPromote } from './board-priority.mjs'
+import { clampedDaemon, toDemote, toPromote, unclampDaemon } from './board-priority.mjs'
 
 const slotArgs = 'lockf -s -t 0 /tmp/agent-heavy-501/slot.2 /bin/sh -c : > "$1"; exec "$@" sh /tmp/agent-heavy-501/started.1 /tmp/agent-heavy-501/queued.1 npm run build:packages'
 const rows = [
@@ -60,4 +60,30 @@ test('a Claude daemon in the background band is reported', () => {
   const daemon = { pid: 80, ppid: 1, name: 'claude', args: '/u/.local/bin/claude daemon run --origin transient', pri: 4 }
   assert.equal(clampedDaemon([rows[0], daemon])?.pid, 80)
   assert.equal(clampedDaemon([rows[0], { ...daemon, pri: 31 }]), undefined)
+})
+
+const io = (over = {}) => ({ stop: async () => {}, alive: () => false, start: async () => {}, daemon: async () => ({ pid: 90, pri: 31 }), sleep: async () => {}, ...over })
+
+test('a clamped daemon restarts at normal priority', async () => {
+  assert.match(await unclampDaemon(80, io()), /^restarted .* as 90 at normal priority/)
+})
+
+test('a stop that errors still restarts when the old daemon is gone', async () => {
+  let started = false
+  const result = await unclampDaemon(80, io({ stop: async () => { throw new Error('timeout') }, start: async () => { started = true } }))
+  assert.equal(started, true)
+  assert.match(result, /^restarted/)
+})
+
+test('no new daemon starts while the old one still runs', async () => {
+  let started = false
+  const result = await unclampDaemon(80, io({ alive: () => true, waitMs: 300, start: async () => { started = true } }))
+  assert.equal(started, false)
+  assert.match(result, /^WARNING .*did not stop/)
+})
+
+test('a failed start rejects instead of crashing, and a daemon that is missing or still throttled is reported', async () => {
+  await assert.rejects(unclampDaemon(80, io({ start: async () => { throw new Error('ENOENT') } })), /ENOENT/)
+  assert.match(await unclampDaemon(80, io({ daemon: async () => undefined })), /^WARNING .*no daemon runs/)
+  assert.match(await unclampDaemon(80, io({ daemon: async () => ({ pid: 91, pri: 4 }) })), /^WARNING .*background priority/)
 })
