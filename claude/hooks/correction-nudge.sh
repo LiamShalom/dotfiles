@@ -41,4 +41,14 @@ if [[ $prompt =~ $value_ask ]] && [[ $prompt =~ $value_src ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/value-review-nudge.log"
   echo "If this asks you to judge which features or gaps are real or worth building: a code read (yours or a subagent's) is not proof that a screen lacks something. Before you report a UI gap, open the live app as a test brand in each state that matters (for example no account, connected but empty, active) and read what it shows. Mark every item as checked on screen, checked in code only, or not checked."
 fi
+
+# Short design feedback read one way without asking: on 2026-11-19 (brand v4 navbar) "the sort
+# could be a little better" meant section structure, not item order; "instead of the weird logo
+# lets just call it settings" meant the placeholder logo, not the brand row. The visual-companion
+# step that covers this did not load, so the reminder fires here on every such prompt.
+design_ask='(^|[^a-z])(nav|navbar|sidebar|section|sections|layout|design|logo|icon|menu|group|grouping|sort|structure|header|footer|switcher|inspo|cleaner|option)([^a-z]|$)'
+if [ ${#prompt} -le 600 ] && [[ $prompt =~ $design_ask ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/design-feedback-nudge.log"
+  echo "If this is feedback on a design or option you showed: before you change anything, say in one line what this message settles and what it leaves as it was. Keep every earlier decision in every option. If a phrase fits two readings (\"the logo\" = the placeholder image or the whole row; \"sort\" = item order or section structure), ask in one line, or build both and say so. Do not pick one reading silently."
+fi
 exit 0
