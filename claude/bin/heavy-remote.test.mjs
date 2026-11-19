@@ -207,3 +207,29 @@ for (const [script, reason] of [
 test('xcodebuild in the general pool stays local', () => {
   assert.equal(plan(`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'`).ok, false);
 });
+
+test('a DerivedData path followed by a shell separator stops at the separator', () => {
+  const r = iosPlan(`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}' -derivedDataPath ${home}/.cache/x-dd; echo done`);
+  assert.equal(r.ok, true, r.reason);
+  assert.deepEqual(r.caches, [[`${home}/.cache/x-dd`, '/Users/s/hr/dd/k']]);
+  assert.deepEqual(r.outputs, []);
+});
+
+test('the same simulator in two destinations is still one simulator', () => {
+  const d = `-destination 'platform=iOS Simulator,id=${UDID}'`;
+  const r = iosPlan(`xcodebuild build-for-testing -scheme S ${d} && xcodebuild test-without-building -scheme S ${d}`);
+  assert.equal(r.ok, true, r.reason);
+  assert.deepEqual(r.sims, [UDID]);
+});
+
+for (const [script, reason] of [
+  [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}' -derivedDataPath build/dd`, /relative build folder/],
+  [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}' -allowProvisioningDeviceRegistration`, /signs/],
+  [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'; codesign -s X a.app`, /signs/],
+]) {
+  test(`iOS stays local: ${script.slice(-45)}`, () => {
+    const r = iosPlan(script);
+    assert.equal(r.ok, false);
+    assert.match(r.reason, reason);
+  });
+}

@@ -108,7 +108,7 @@ case "$POOL" in
 esac
 
 # While this job would wait here, run it on the Mac Studio instead
-# (bin/heavy-remote.mjs; pool `slot` only, at most one attempt per
+# (bin/heavy-remote.mjs; pools `slot` and `xcode`, at most one attempt per
 # HEAVY_REMOTE_RETRY_SECS). Exits with the job's code when it ran there.
 REMOTE="$(dirname "$(readlink -f "$0")")/heavy-remote.mjs"
 remote_next=0

@@ -149,7 +149,7 @@ run-locked)
 		rm -f "$out/wd.deleted"
 	fi
 	# The MacBook's .env.local (owner-only copy), so tests load what they load there.
-	if [ -f "$R/secrets/env.local" ]; then ln -sfn "$R/secrets/env.local" "$wd/.env.local"; else rm -f "$wd/.env.local"; fi
+	if [ "$depkey" != none ] && [ -f "$R/secrets/env.local" ]; then ln -sfn "$R/secrets/env.local" "$wd/.env.local"; else rm -f "$wd/.env.local"; fi
 	t_sync=$((SECONDS - t0 - t_checkout))
 	export PATH="$NODE_BIN:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
 	# Dependencies: clone the cached install for this lockfile (none for the mobile repo).
@@ -189,7 +189,10 @@ run-locked)
 			' "$runtime" "$target")
 			[ -n "$new" ] || new=$(xcrun simctl create "$target" "$dtype" "$runtime" 2>&1) || fail "could not create simulator $target: $new"
 			script="${script//$udid/$new}"
+			simmap="${simmap:+$simmap;}$new=$udid"
 		done
+		# The MacBook maps these back in the job's output.
+		echo "heavy-remote: sims $simmap" >&2
 	fi
 	# The SSH session that carries this job. Each run uses its own connection (no
 	# multiplexing), so the session ends when the MacBook side dies, even by SIGKILL.
@@ -282,7 +285,7 @@ collect)
 			lockf -s -t 0 "$R/state/$k.lock" true; then
 			repo=$(git -C "$wdir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
 			git -C "${repo:-$MIRROR}" worktree remove --force "$wdir" 2>/dev/null || rm -rf "$wdir"
-			rm -rf "$R/state/$k" "$R/state/$k.lock" "$R/dd/$k"
+			rm -rf "$R/state/$k" "$R/state/$k.lock" "$R/dd/$k" "$R/dd/$k-spm"
 			[ -n "$repo" ] && git -C "$repo" update-ref -d "refs/heavy/$k" 2>/dev/null
 		fi
 	done

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // heavy-remote.mjs — run one queued heavy job on the Mac Studio instead of
 // waiting for a MacBook slot. bin/heavy calls it while every local slot is busy
-// (pool `slot` only); the agent sees the same output, exit code and files.
+// (pools `slot` and `xcode`); the agent sees the same output, exit code and files.
 //
 //   node heavy-remote.mjs --started F --queued F --skip F --max-secs N -- <command...>
 //
@@ -83,19 +83,22 @@ export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = s
   let sims = [];
   if (pool === 'xcode') {
     if (!/\bxcodebuild\b/.test(script)) return { ok: false, reason: 'not an xcodebuild job' };
-    if (/\barchive\b|-exportArchive|-allowProvisioningUpdates|-resultBundlePath|\binstall\b/.test(script)) {
+    if (/\barchive\b|-exportArchive|-allowProvisioning\w*|-resultBundlePath|\binstall\b|\bcodesign\b/.test(script)) {
       return { ok: false, reason: 'archives, signs or writes a result bundle' };
     }
     const platforms = [...script.matchAll(/platform=([^,'"]*)/g)].map((m) => m[1]);
     if (!platforms.length || platforms.some((p) => p !== 'iOS Simulator')) return { ok: false, reason: 'not an iOS Simulator destination' };
-    sims = [...new Set([...script.matchAll(/\bid=([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/g)].map((m) => m[1]))];
+    const ids = [...script.matchAll(/\bid=([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/g)].map((m) => m[1]);
     // A destination by name (name=iPhone 17) would need that simulator on the Studio.
-    if (sims.length < platforms.length) return { ok: false, reason: 'names a simulator by name, not id' };
+    if (ids.length < platforms.length) return { ok: false, reason: 'names a simulator by name, not id' };
+    sims = [...new Set(ids)];
+    // A relative DerivedData folder would sit in the Studio worktree and come back as worktree files.
+    if (/-(derivedDataPath|clonedSourcePackagesDirPath)\s+['"]?[^/\s'"]/.test(script)) return { ok: false, reason: 'uses a relative build folder' };
   } else if (/\bxcodebuild\b/.test(script)) return { ok: false, reason: 'needs a device or browser' };
   // Build caches stay on the Studio (kept per worktree), never copied back.
   const caches = [];
   for (const [flag, sub] of [['-derivedDataPath', ''], ['-clonedSourcePackagesDirPath', '-spm']]) {
-    const m = script.match(new RegExp(`${flag}\\s+['"]?(/[^\\s'"]+)`));
+    const m = script.match(new RegExp(`${flag}\\s+['"]?(/[^\\s'";&|<>()]+)`));
     if (m && remote.dd) caches.push([m[1].replace(/\/+$/, ''), remote.dd + sub]);
   }
   for (const [, name] of script.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) {
@@ -317,7 +320,12 @@ async function main() {
   const root = fs.realpathSync(top.trim());
   const repo = (git(root, ['config', 'remote.origin.url']) ?? '').trim().match(/([^/:]+?)(\.git)?$/)?.[1];
   if (!['sideshift-monorepo', 'sideshift-mobile'].includes(repo)) return skip('not a sideshift-monorepo or sideshift-mobile checkout');
-  if (hint && cwd !== root && !cwd.startsWith(root + '/')) cwd = root;
+  // The agent's own folder counts only when it is in the same checkout: a worktree
+  // nested inside the main checkout is a different repo root.
+  if (hint) {
+    const own = git(cwd, ['rev-parse', '--show-toplevel'])?.trim();
+    if (!own || fs.realpathSync(own) !== root) cwd = root;
+  }
   const mirror = repo === 'sideshift-monorepo' ? 'mirror.git' : `mirrors/${repo}.git`;
 
   const c = connection();
@@ -360,7 +368,9 @@ async function main() {
   if (probe.status !== 0) return log(`busy: studio unreachable (${(probe.stderr || '').trim().split('\n').pop()})`), 0;
   const p = Object.fromEntries(probe.stdout.trim().split(/\s+/).map((kv) => kv.split('=')));
   if (Number(p.slots) < 1) return log('busy: no free studio slot'), 0;
-  if (Number(p.disk_gb) < MIN_DISK_GB) return log(`busy: studio disk ${p.disk_gb} GB`), 0;
+  // The helper's own floor: an iOS build's DerivedData is about 9 GB.
+  const minDisk = pool === 'xcode' ? Math.max(MIN_DISK_GB, Number(process.env.HEAVY_REMOTE_XCODE_MIN_DISK_GB || 30)) : MIN_DISK_GB;
+  if (Number(p.disk_gb) < minDisk) return log(`busy: studio disk ${p.disk_gb} GB`), 0;
   if (Number(p.mem) < 15) return log(`busy: studio memory ${p.mem}%`), 0;
   if (p.install === 'building') return log('busy: studio install building'), 0;
   // Keep the Studio's copy of this worktree's .env.local current (owner-only).
@@ -446,7 +456,11 @@ async function main() {
   tar.stdout.pipe(child.stdin);
   child.stdin.on('error', () => {});
   // Studio paths in the output (ESLint, tsc, pwd) read as this Mac's paths.
+  // Longest first, so dd/<key>-spm is not read as dd/<key> + "-spm". Simulator
+  // ids and their Studio folders are added when the helper reports them.
   const pairs = [[remote.out, ''], ...plan.caches.map(([local, there]) => [there, local]), [remote.wd, root]];
+  const sortPairs = () => pairs.sort((a, b) => b[0].length - a[0].length);
+  sortPairs();
   const out = pathRewriter(pairs, (s) => process.stdout.write(s));
   const err = pathRewriter(pairs, (s) => process.stderr.write(s));
   child.stdout.on('data', (buf) => out.write(buf));
@@ -465,6 +479,10 @@ async function main() {
     if (opts.pinwait) fs.rmSync(opts.pinwait, { force: true });
     const secs = (a, b) => ((b - a) / 1000).toFixed(1);
     const studio = pre.match(/heavy-remote: timing (.*)/)?.[1] ?? '';
+    for (const [, studioId, macId] of (pre.match(/heavy-remote: sims (.*)/)?.[1] ?? '').matchAll(/([0-9A-F-]{36})=([0-9A-F-]{36})/g)) {
+      pairs.push([`/Users/${c.user}/Library/Developer/CoreSimulator/Devices/${studioId}`, `${HOME}/Library/Developer/CoreSimulator/Devices/${macId}`], [studioId, macId]);
+    }
+    sortPairs();
     log(`remote: started ${key} after ${secs(started, Date.now())}s (probe ${secs(started, tProbe)}s, push ${secs(tProbe, tPush)}s, stage ${secs(tPush, tStage)}s, studio ${studio}) :: ${command.join(' ').slice(0, 200)}`);
     const rest = pre.slice(i + START_MARK.length).replace(/^\n/, '');
     if (rest) err.write(Buffer.from(rest));
