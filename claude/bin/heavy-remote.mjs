@@ -157,6 +157,51 @@ export function pathRewriter(pairs, emit) {
   };
 }
 
+/**
+ * Where a file the Studio sent back may be written on this Mac, or null.
+ * abs/<path>: only an output path the job's command named, in a folder that
+ * really is under /tmp or ~/.claude/jobs. wd-changed/<path>: inside the
+ * worktree, never under .git, never through a symlink. Creates the parent
+ * folders inside the worktree unless mkdir is false.
+ */
+export function copyDestination(kind, rel, { root, outputs, home, mkdir = true }) {
+  const lst = (p) => {
+    try {
+      return fs.lstatSync(p);
+    } catch {
+      return null;
+    }
+  };
+  const real = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return null;
+    }
+  };
+  if (path.isAbsolute(rel) || rel.split('/').includes('..')) return null;
+  if (kind === 'abs') {
+    const to = '/' + rel;
+    if (!outputs.includes(to)) return null;
+    const parent = real(path.dirname(to));
+    const roots = ['/private/tmp', real(path.join(home, '.claude', 'jobs'))].filter(Boolean);
+    if (!parent || !roots.some((r) => parent === r || parent.startsWith(r + '/'))) return null;
+    if (lst(to)?.isSymbolicLink()) return null;
+    return to;
+  }
+  if (kind !== 'wd-changed' || rel.split('/')[0] === '.git') return null;
+  const realRoot = real(root);
+  const to = path.join(root, rel);
+  // The deepest folder that exists must resolve inside the worktree.
+  let existing = path.dirname(to);
+  while (!lst(existing)) existing = path.dirname(existing);
+  const r = real(existing);
+  if (!realRoot || !r || (r !== realRoot && !r.startsWith(realRoot + '/'))) return null;
+  if (lst(to)?.isSymbolicLink()) return null;
+  if (mkdir) fs.mkdirSync(path.dirname(to), { recursive: true });
+  return to;
+}
+
 function statOrNull(p) {
   try {
     return fs.statSync(p);
@@ -400,15 +445,16 @@ async function main() {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) walk(full, fn);
-      else fn(full);
+      else if (e.isFile()) fn(full);
     }
   };
-  for (const [sub, dest] of [['abs', '/'], ['wd-changed', root]]) {
-    const base = path.join(back, sub);
+  for (const kind of ['abs', 'wd-changed']) {
+    const base = path.join(back, kind);
     if (!fs.existsSync(base)) continue;
     walk(base, (f) => {
-      const to = path.join(dest, path.relative(base, f));
-      fs.mkdirSync(path.dirname(to), { recursive: true });
+      // The Studio is a shared machine: write only where this job was meant to.
+      const to = copyDestination(kind, path.relative(base, f), { root, outputs: plan.outputs, home: HOME });
+      if (!to) return void log(`refused copy-back of ${kind}/${path.relative(base, f)}`);
       const data = fs.readFileSync(f);
       // Text files (logs, reports) get this Mac's paths, like the live output.
       const text =
@@ -426,8 +472,8 @@ async function main() {
   const deletedFile = path.join(back, 'wd-deleted');
   if (statOrNull(deletedFile)) {
     for (const f of fs.readFileSync(deletedFile, 'utf8').split('\0').filter(Boolean)) {
-      const target2 = path.resolve(root, f);
-      if (target2.startsWith(root + '/')) fs.rmSync(target2, { force: true });
+      const target2 = copyDestination('wd-changed', f, { root, outputs: [], home: HOME, mkdir: false });
+      if (target2) fs.rmSync(target2, { force: true });
     }
   }
   return rc;

@@ -1,7 +1,34 @@
 // node --test claude/bin/heavy-remote.test.mjs
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { planJob } from './heavy-remote.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { copyDestination, planJob } from './heavy-remote.mjs';
+
+test('copy-back writes only where the job was meant to', () => {
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hr-copy-')));
+  const wt = path.join(tmp, 'wt');
+  const home2 = path.join(tmp, 'home');
+  fs.mkdirSync(path.join(wt, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(home2, '.claude', 'jobs', 'j', 'tmp'), { recursive: true });
+  fs.symlinkSync('/etc', path.join(wt, 'link-out'));
+  fs.symlinkSync('/etc/hosts', path.join(wt, 'hosts-link'));
+  const log = path.join(home2, '.claude', 'jobs', 'j', 'tmp', 'p.log');
+  const o = { root: wt, outputs: [log], home: home2 };
+  try {
+    assert.equal(copyDestination('abs', log.slice(1), o), log);
+    assert.equal(copyDestination('abs', 'Users/x/.zshrc', o), null, 'not a named output');
+    assert.equal(copyDestination('abs', 'etc/hosts', { ...o, outputs: ['/etc/hosts'] }), null, 'outside the output roots');
+    assert.equal(copyDestination('wd-changed', 'lib/a.ts', o), path.join(wt, 'lib/a.ts'));
+    assert.equal(copyDestination('wd-changed', '.git/hooks/pre-commit', o), null);
+    assert.equal(copyDestination('wd-changed', '../escape.txt', o), null);
+    assert.equal(copyDestination('wd-changed', 'link-out/passwd', o), null, 'through a symlink');
+    assert.equal(copyDestination('wd-changed', 'hosts-link', o), null, 'onto a symlink');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
 
 const home = '/Users/liam';
 const root = '/Users/liam/sideshift-monorepo/.claude/worktrees/fix-x';
