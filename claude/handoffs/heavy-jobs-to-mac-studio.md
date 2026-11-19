@@ -59,6 +59,31 @@ the Studio reaches Session Board's tailnet URL (401 sign-in gate), and the relay
 `check-nordvpn` still verifies 6 distinct IPs. Studio disk is 26% used, so the 10-26 "97% full"
 note is stale. Items 1 and 2 below are resolved; the Design section can start.
 
+## Shipped 11-19 ("tailscale migration" session) — on by default
+
+- `claude/bin/heavy` `try_remote`: while a `slot`-pool job waits for memory or a slot, at most
+  every 30 s it calls `claude/bin/heavy-remote.mjs`, which runs the job on the Studio via
+  `claude/bin/heavy-remote-helper.sh` (uploaded to `~/heavy-remote/bin/helper-<hash>.sh`).
+  `HEAVY_REMOTE=0` turns it off; `HEAVY_REMOTE_FORCE=1` tries the Studio first (testing).
+  Unit tests: `node --test claude/bin/heavy-remote.test.mjs`. Log: `~/.claude/logs/heavy-remote.log`.
+- Studio `~/heavy-remote`: `node24` (official v24.22.1; Studio Homebrew untouched), `mirror.git`
+  (bare; MacBook pushes HEAD + origin/main), `work/<key>` one reused worktree per MacBook
+  worktree (max 6, removed after a day idle), `installs/<lock hash>` cached npm install
+  (built in the background on first use, ~35 s), 2 slots, refuses below 10 GB disk / 15% memory.
+- Stays local: iOS/build pools; secrets/`.env`, `~`/`$HOME`/any variable from the agent's
+  environment; local tools (gh, vercel, docker, curl, ssh); git state changes; devices;
+  servers; installs; builds whose ignored output the Mac needs (`build:packages`, `tsc -b`);
+  emulator/Postgres test scripts; `scripts/` runs other than the preflight and `scripts/ci/`;
+  paths outside the worktree, `/tmp` and `~/.claude/jobs`.
+- Verified e2e: preflight (same findings and exit code, 2 s vs 81 s), vitest file (identical
+  output apart from timings, 1 s vs 52 s), exit codes, stdout/stderr, files written to /tmp and
+  job dirs, worktree edits/ignored files/deletions copied back, Studio unreachable → local,
+  SIGTERM and SIGKILL cancel stop the Studio job, pinned job clears its pinwait.
+- Known differences: the Studio has no `.env.local` (CI-like); output that truncates a Studio
+  path cannot be mapped back; remote start costs ~10-20 s (git status of the worktree + push).
+- Studio disk is the limit (10-22 GB free, fluctuating). The Studio's Codex user has 45 GB in
+  `~/.codex/tmp/google-ads-4341-e2e` (untouched since 10-05); deleting it is Liam's call.
+
 ## Blocked on (as of 11-17; resolved 11-18, see above)
 
 1. **Network: this Mac cannot reach the Studio while NordVPN is connected.** Tailscale on this

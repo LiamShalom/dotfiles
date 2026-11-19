@@ -94,7 +94,41 @@ mkdir -p "$DIR" 2>/dev/null && : > "$queued" 2>/dev/null
 # pinwait.<pool>.<pid>: a pinned job waits for a slot in <pool>, so other jobs
 # in that pool let it go first.
 pinwait="$DIR/pinwait.$POOL.$$"
-trap 'rm -f "$queued" "$pinwait"' EXIT
+started="$DIR/started.$$"
+# remote-skip.<pid>: heavy-remote.mjs found this job cannot run on the Studio.
+remote_skip="$DIR/remote-skip.$$"
+trap 'rm -f "$queued" "$pinwait" "$remote_skip"' EXIT
+
+# A job may hold a slot for at most MAX_SECS, then it is stopped with everything
+# it started. On 11-17 hung iOS runs held both iOS slots for 4 and 6 hours, and
+# their sessions sat in Working with nothing to act on.
+case "$POOL" in
+	xcode) MAX_SECS="${HEAVY_XCODE_MAX_SECS:-3600}" ;;
+	*) MAX_SECS="${HEAVY_MAX_SECS:-2700}" ;;
+esac
+
+# While this job would wait here, run it on the Mac Studio instead
+# (bin/heavy-remote.mjs; pool `slot` only, at most one attempt per
+# HEAVY_REMOTE_RETRY_SECS). Exits with the job's code when it ran there.
+REMOTE="$(dirname "$(readlink -f "$0")")/heavy-remote.mjs"
+remote_next=0
+try_remote() {
+	[ "$POOL" = slot ] && [ "${HEAVY_REMOTE:-1}" != 0 ] && [ -f "$REMOTE" ] && [ ! -e "$remote_skip" ] || return 1
+	local now rc
+	now=$(date +%s)
+	[ "$now" -ge "$remote_next" ] || return 1
+	remote_next=$((now + ${HEAVY_REMOTE_RETRY_SECS:-30}))
+	rm -f "$started"
+	node "$REMOTE" --started "$started" --queued "$queued" --pinwait "$pinwait" --skip "$remote_skip" --max-secs "$MAX_SECS" -- "$@"
+	rc=$?
+	if [ -e "$started" ]; then
+		rm -f "$started"
+		exit "$rc"
+	fi
+	return 1
+}
+# HEAVY_REMOTE_FORCE=1: try the Studio first, even with a local slot free.
+[ "${HEAVY_REMOTE_FORCE:-0}" = 1 ] && remote_next=0 && try_remote "$@"
 
 # Wait for free memory, at most MEM_WAIT seconds; after that run anyway, so a
 # machine that stays full never blocks every agent for good.
@@ -108,10 +142,10 @@ while :; do
 		break
 	fi
 	[ "$waited" -eq 0 ] && echo "heavy: only ${free}% of memory is free (need ${MIN_FREE}% for $WHAT); waiting..." >&2
+	try_remote "$@"
 	sleep 10
 	waited=$((waited + 10))
 done
-started="$DIR/started.$$"
 
 unqueued() {
 	echo "heavy: cannot use the job slots in $DIR; running without the queue" >&2
@@ -120,13 +154,6 @@ unqueued() {
 }
 mkdir -p "$DIR" 2>/dev/null && [ -w "$DIR" ] || unqueued "$@"
 
-# A job may hold a slot for at most MAX_SECS, then it is stopped with everything
-# it started. On 11-17 hung iOS runs held both iOS slots for 4 and 6 hours, and
-# their sessions sat in Working with nothing to act on.
-case "$POOL" in
-	xcode) MAX_SECS="${HEAVY_XCODE_MAX_SECS:-3600}" ;;
-	*) MAX_SECS="${HEAVY_MAX_SECS:-2700}" ;;
-esac
 # Runs inside the slot: the job in its own process group (set -m), a watchdog
 # that stops that group at the limit, and a trap that passes a cancel on to it.
 # shellcheck disable=SC2016
@@ -200,5 +227,6 @@ while :; do
 		fi
 		notified=1
 	fi
+	try_remote "$@"
 	sleep 5
 done
