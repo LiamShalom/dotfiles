@@ -189,7 +189,8 @@ export function copyDestination(kind, rel, { root, outputs, home, mkdir = true }
     if (lst(to)?.isSymbolicLink()) return null;
     return to;
   }
-  if (kind !== 'wd-changed' || rel.split('/')[0] === '.git') return null;
+  // macOS names are case- and normalization-insensitive: .GIT is .git.
+  if (kind !== 'wd-changed' || rel.split('/').some((s) => s.normalize('NFC').toLowerCase() === '.git')) return null;
   const realRoot = real(root);
   const to = path.join(root, rel);
   // The deepest folder that exists must resolve inside the worktree.

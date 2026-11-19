@@ -22,6 +22,8 @@ test('copy-back writes only where the job was meant to', () => {
     assert.equal(copyDestination('abs', 'etc/hosts', { ...o, outputs: ['/etc/hosts'] }), null, 'outside the output roots');
     assert.equal(copyDestination('wd-changed', 'lib/a.ts', o), path.join(wt, 'lib/a.ts'));
     assert.equal(copyDestination('wd-changed', '.git/hooks/pre-commit', o), null);
+    assert.equal(copyDestination('wd-changed', '.GIT/hooks/pre-commit', o), null);
+    assert.equal(copyDestination('wd-changed', 'packages/x/.Git/config', o), null);
     assert.equal(copyDestination('wd-changed', '../escape.txt', o), null);
     assert.equal(copyDestination('wd-changed', 'link-out/passwd', o), null, 'through a symlink');
     assert.equal(copyDestination('wd-changed', 'hosts-link', o), null, 'onto a symlink');
