@@ -24,10 +24,12 @@
 	<!-- Each :eyes: job runs in a detached process for up to 4 hours; launchd must not kill it when the check exits. -->
 	<key>AbandonProcessGroup</key>
 	<true/>
+	<!-- Standard, not Background: its background claude call can start the Claude daemon, and the
+	     daemon and every background session under it inherit this class. Under Background they
+	     all ran throttled and taskpolicy -B (board-priority.mjs) could not lift them (11-18).
+	     board-priority.mjs moves the sessions' work to the background itself. -->
 	<key>ProcessType</key>
-	<string>Background</string>
-	<key>LowPriorityIO</key>
-	<true/>
+	<string>Standard</string>
 	<key>StandardOutPath</key>
 	<string>__HOME__/.claude/logs/slack-eyes.launchd.log</string>
 	<key>StandardErrorPath</key>

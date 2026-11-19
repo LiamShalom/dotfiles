@@ -12,6 +12,10 @@
 # --pool keeps a separate set of slots: iOS builds and tests (`--pool xcode`)
 # queue among themselves, so a long UI test run never holds up a Vitest suite.
 #
+# A job from a session pinned in Session Board goes first: jobs from other
+# sessions wait while it waits, and it may also use spare slots that only
+# pinned jobs use (HEAVY_PINNED_SLOTS, 1 by default, none for the build pool).
+#
 # Usage:  heavy [--pool NAME] <command> [args...]
 #         HEAVY_SLOTS=2 by default; the xcode pool uses HEAVY_XCODE_SLOTS=2
 set -uo pipefail
@@ -23,6 +27,7 @@ WHAT="test suites or builds"
 # alone count jobs, not gigabytes: on 2026-11-04 a `next build` (~45 GB)
 # beside three full typechecks (6-12 GB each) filled all 128 GB.
 MIN_FREE="${HEAVY_MIN_FREE_PCT:-10}"
+PIN_SLOTS="${HEAVY_PINNED_SLOTS:-1}"
 
 # Percent of RAM that is not wired, app memory or the compressor's own pages.
 # kern.memorystatus_level is not used: it counts compressed memory as free, and
@@ -55,7 +60,18 @@ if [ "${1:-}" = "--pool" ]; then
 		SLOTS="${HEAVY_BUILD_SLOTS:-1}"
 		WHAT="a next build"
 		MIN_FREE="${HEAVY_BUILD_MIN_FREE_PCT:-35}"
+		# A second 40-60 GB build would fill the memory, pinned or not.
+		PIN_SLOTS=0
 	fi
+fi
+
+# HEAVY_PINNED=1 or 0 overrides the check (for tests).
+if [ -n "${HEAVY_PINNED:-}" ]; then
+	PINNED="$HEAVY_PINNED"
+elif node "$HOME/.claude/bin/pinned-sessions.mjs" --pid $$ 2>/dev/null; then
+	PINNED=1
+else
+	PINNED=0
 fi
 
 # Refuse when the disk is nearly full: unlike memory, it does not free itself
@@ -75,7 +91,10 @@ DIR="/tmp/agent-heavy-$(id -u)"
 # Needs you once it has waited an hour.
 queued="$DIR/queued.$$"
 mkdir -p "$DIR" 2>/dev/null && : > "$queued" 2>/dev/null
-trap 'rm -f "$queued"' EXIT
+# pinwait.<pool>.<pid>: a pinned job waits for a slot in <pool>, so other jobs
+# in that pool let it go first.
+pinwait="$DIR/pinwait.$POOL.$$"
+trap 'rm -f "$queued" "$pinwait"' EXIT
 
 # Wait for free memory, at most MEM_WAIT seconds; after that run anyway, so a
 # machine that stays full never blocks every agent for good.
@@ -111,7 +130,7 @@ esac
 # Runs inside the slot: the job in its own process group (set -m), a watchdog
 # that stops that group at the limit, and a trap that passes a cancel on to it.
 # shellcheck disable=SC2016
-RUN_JOB=': > "$1"; rm -f "$2"; max=$3; shift 3
+RUN_JOB=': > "$1"; rm -f "$2" "$4"; max=$3; shift 4
 set -m
 "$@" &
 job=$!
@@ -131,13 +150,39 @@ while kill -0 "$job" 2>/dev/null; do wait "$job"; rc=$?; done
 kill -- "-$dog" 2>/dev/null
 exit "$rc"'
 
+# True while a job from a pinned session waits for a slot in this pool. A file
+# left by a killed waiter is removed.
+pinned_waiting() {
+	local f
+	for f in "$DIR/pinwait.$POOL".*; do
+		[ -e "$f" ] || continue
+		kill -0 "${f##*.}" 2>/dev/null && return 0
+		rm -f "$f"
+	done
+	return 1
+}
+
+slot_files=()
+for i in $(seq 1 "$SLOTS"); do slot_files+=("$DIR/$POOL.$i"); done
+if [ "$PINNED" = 1 ]; then
+	: > "$pinwait" 2>/dev/null
+	# The spare slots come last, so they stay free for the next pinned job.
+	# (Not seq: macOS `seq 1 0` counts down and would make a slot.)
+	for ((i = 1; i <= PIN_SLOTS; i++)); do slot_files+=("$DIR/${POOL}pin.$i"); done
+fi
+
 notified=0
 while :; do
-	for i in $(seq 1 "$SLOTS"); do
+	if [ "$PINNED" != 1 ] && pinned_waiting; then
+		slots_now=()
+	else
+		slots_now=("${slot_files[@]}")
+	fi
+	for slot in ${slots_now[@]+"${slots_now[@]}"}; do
 		rm -f "$started"
 		# lockf exits 75 when the slot is busy; the marker file tells that apart
 		# from the job itself exiting 75.
-		lockf -s -t 0 "$DIR/$POOL.$i" /bin/sh -c "$RUN_JOB" sh "$started" "$queued" "$MAX_SECS" "$@"
+		lockf -s -t 0 "$slot" /bin/sh -c "$RUN_JOB" sh "$started" "$queued" "$MAX_SECS" "$pinwait" "$@"
 		rc=$?
 		if [ -e "$started" ]; then
 			rm -f "$started"
@@ -148,7 +193,11 @@ while :; do
 		[ "$rc" -eq 75 ] || unqueued "$@"
 	done
 	if [ "$notified" -eq 0 ]; then
-		echo "heavy: all $SLOTS slots are busy (other agents are running $WHAT); waiting for one..." >&2
+		if [ "${#slots_now[@]}" -eq 0 ]; then
+			echo "heavy: jobs from pinned sessions go first; waiting for a slot..." >&2
+		else
+			echo "heavy: all ${#slots_now[@]} slots are busy (other agents are running $WHAT); waiting for one..." >&2
+		fi
 		notified=1
 	fi
 	sleep 5

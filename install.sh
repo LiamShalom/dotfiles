@@ -72,6 +72,7 @@ LINKS=(
 	"claude/bin/slack-eyes.mjs:.claude/bin/slack-eyes.mjs"
 	"claude/bin/loom-read.mjs:.claude/bin/loom-read"
 	"claude/bin/board-priority.mjs:.claude/bin/board-priority.mjs"
+	"claude/bin/pinned-sessions.mjs:.claude/bin/pinned-sessions.mjs"
 	"claude/bin/agent-chrome.sh:.claude/bin/agent-chrome.sh"
 	"claude/bin/agent-chrome-proxy.mjs:.claude/bin/agent-chrome-proxy.mjs"
 	"claude/bin/open-in-pane.sh:.claude/bin/open-in-pane.sh"

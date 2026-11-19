@@ -11,7 +11,8 @@
 // MCP servers, hooks); the agents' shared services (headless agent Chrome, MCP bridges); iOS
 // simulators and the Docker VM; and heavy tools that run detached from any terminal (a Gradle
 // daemon, the Android emulator). Untouched: the session processes themselves (they draw the
-// terminal you type into), the board, and what you start yourself from a terminal. Also in the
+// terminal you type into), the board, what you start yourself from a terminal, and all the work
+// of a session you pinned in Session Board. Also in the
 // background: every iOS simulator and any Gradle daemon, whoever started them.
 // Children inherit background priority, so a process is changed once. launchd keeps this running
 // (launchd/com.sideshift.board-priority.plist).
@@ -23,6 +24,7 @@ import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
+import { pinnedSessionPids } from './pinned-sessions.mjs'
 
 const run = promisify(execFile)
 const EVERY_MS = 5000
@@ -102,23 +104,33 @@ function ancestorsIn(rows) {
   }
 }
 
+// Work of a session you pinned in Session Board (pinned-sessions.mjs gives their pids). You pin
+// the sessions you are waiting on, so their builds and tests get the CPU first (11-18).
+function inPinned(chain, pinned) {
+  return chain.some((up) => pinned.has(up.pid))
+}
+
 function inSlot(row, chain) {
   return isSlotHolder(row) || chain.some(isSlotHolder) || isTestRun(row) || chain.some(isTestRun)
 }
 
-// Which processes to move back to normal priority.
-export function toPromote(rows) {
+// Which processes to move back to normal priority. `pinned`: pids of pinned sessions.
+export function toPromote(rows, pinned = new Set()) {
   const ancestors = ancestorsIn(rows)
-  return rows.filter((row) => isAssetCompiler(row) || inSlot(row, ancestors(row)))
+  return rows.filter((row) => {
+    if (isAssetCompiler(row)) return true
+    const chain = ancestors(row)
+    return inSlot(row, chain) || inPinned(chain, pinned)
+  })
 }
 
 // Which processes to move to the background: rows of { pid, ppid, name, args }.
-export function toDemote(rows) {
+export function toDemote(rows, pinned = new Set()) {
   const ancestors = ancestorsIn(rows)
   return rows.filter((row) => {
     if (isSession(row) || isAssetCompiler(row)) return false
     const chain = ancestors(row)
-    if (inSlot(row, chain)) return false
+    if (inSlot(row, chain) || inPinned(chain, pinned)) return false
     if (isAgentService(row) || chain.some((up) => isSession(up) || isAgentService(up))) return true
     // Detached: every process above it is another heavy tool (the emulator above its qemu). Rows
     // of other users and launchd itself are not listed, so a chain ends there.
@@ -135,17 +147,17 @@ export function seconds(etime) {
 async function processes() {
   const ps = (columns) => run('/bin/ps', ['-U', String(process.getuid()), '-o', columns], { maxBuffer: 64 * 1024 * 1024, timeout: CALL_TIMEOUT_MS })
   // Two listings: the program path and the arguments can each contain spaces.
-  const [comm, args] = await Promise.all([ps('pid=,ppid=,etime=,comm='), ps('pid=,args=')])
+  const [comm, args] = await Promise.all([ps('pid=,ppid=,etime=,pri=,comm='), ps('pid=,args=')])
   const argsOf = new Map()
   for (const line of args.stdout.split('\n')) {
     const match = /^\s*(\d+)\s+(.*)$/.exec(line)
     if (match) argsOf.set(Number(match[1]), match[2])
   }
   return comm.stdout.split('\n').flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)
+    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(.*)$/.exec(line)
     if (!match) return []
     const pid = Number(match[1])
-    return [{ pid, ppid: Number(match[2]), ageS: seconds(match[3]), name: basename(match[4]), args: argsOf.get(pid) ?? '' }]
+    return [{ pid, ppid: Number(match[2]), ageS: seconds(match[3]), pri: Number(match[4]), name: basename(match[5]), args: argsOf.get(pid) ?? '' }]
   })
 }
 
@@ -159,18 +171,34 @@ function log(line) {
   }
 }
 
+// The Claude daemon, which starts every background session, in the background band. That happens
+// when a launchd ProcessType=Background job started it (11-18: slack-eyes did). Its sessions inherit
+// a throttle that taskpolicy -B cannot lift, so no promotion here takes effect until the daemon
+// restarts from a normal process.
+export function clampedDaemon(rows) {
+  return rows.find((row) => isSession(row) && / daemon run( |$)/.test(row.args) && row.pri <= 4)
+}
+
+let clampWarnedAt = 0
+
 // Processes already moved, by pid: the flag used and their arguments (to tell a reused pid apart).
 const moved = new Map()
 
 async function pass() {
   const rows = await processes()
+  const pinned = pinnedSessionPids()
+  const clamped = clampedDaemon(rows)
+  if (clamped && Date.now() - clampWarnedAt > 3600_000) {
+    clampWarnedAt = Date.now()
+    log(`WARNING Claude daemon ${clamped.pid} runs at background priority: sessions cannot be promoted until it restarts from a normal process`)
+  }
   const live = new Set(rows.map((row) => row.pid))
   for (const pid of moved.keys()) if (!live.has(pid)) moved.delete(pid)
   const changed = []
   const promoted = []
   const plan = [
-    ...toDemote(rows).map((row) => [row, '-b', changed]),
-    ...toPromote(rows).map((row) => [row, '-B', promoted]),
+    ...toDemote(rows, pinned).map((row) => [row, '-b', changed]),
+    ...toPromote(rows, pinned).map((row) => [row, '-B', promoted]),
   ]
   for (const [row, flag, list] of plan) {
     if (row.ageS < MIN_AGE_S) continue

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { toDemote, toPromote } from './board-priority.mjs'
+import { clampedDaemon, toDemote, toPromote } from './board-priority.mjs'
 
 const slotArgs = 'lockf -s -t 0 /tmp/agent-heavy-501/slot.2 /bin/sh -c : > "$1"; exec "$@" sh /tmp/agent-heavy-501/started.1 /tmp/agent-heavy-501/queued.1 npm run build:packages'
 const rows = [
@@ -41,4 +41,23 @@ test('a targeted test run or type check runs at normal priority, with its worker
   ]
   assert.deepEqual(pids(toPromote(runs)), [42, 43, 50, 51])
   assert.deepEqual(pids(toDemote(runs)), [40, 41, 60])
+})
+
+test('all work of a pinned session runs at normal priority; other sessions stay in the background', () => {
+  const two = [
+    ...rows,
+    { pid: 70, ppid: 1, name: 'claude', args: 'claude bg-spare' },
+    { pid: 71, ppid: 70, name: 'zsh', args: 'zsh -c npm run build' },
+    { pid: 72, ppid: 71, name: 'node', args: 'node next-server' },
+  ]
+  const pinned = new Set([70])
+  assert.deepEqual(pids(toPromote(two, pinned)), [13, 14, 15, 71, 72])
+  assert.deepEqual(pids(toDemote(two, pinned)), [11, 12, 20])
+  assert.deepEqual(pids(toDemote(two)), [11, 12, 20, 71, 72])
+})
+
+test('a Claude daemon in the background band is reported', () => {
+  const daemon = { pid: 80, ppid: 1, name: 'claude', args: '/u/.local/bin/claude daemon run --origin transient', pri: 4 }
+  assert.equal(clampedDaemon([rows[0], daemon])?.pid, 80)
+  assert.equal(clampedDaemon([rows[0], { ...daemon, pri: 31 }]), undefined)
 })
