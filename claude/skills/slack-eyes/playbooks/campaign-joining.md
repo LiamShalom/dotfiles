@@ -88,7 +88,13 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   counts as done when the connect has `biz.spark.auth`. The creator's iOS build: PostHog
   `execute-sql` on `events` where `distinct_id` = creator id, `properties.$app_version`/`$app_build`.
   On 2026-11-19 (`plutus: remove wrong creator account`), Vercel log search timed out or returned
-  `ExceedsBillingLimitError` even for same-day windows.
+  `ExceedsBillingLimitError` even for same-day windows. Use the Vercel MCP `get_runtime_logs`
+  (project `prj_7XAyuxYeC5acULBSrmnOB5lkd9f5`, team `team_5b6u1x436MeurtU4qBa1Y1lC`, 1-day retention).
+- **"Turn on partnership ads" opens an Accounts tab with no ads section (iOS ≤ 2.30):** the section's
+  load sat on an empty SwiftUI `Group` and never ran; fixed in mobile PR #400 (ships with the next iOS
+  release). Workaround that works now: the creator opens
+  `https://app.sideshift.app/ad-authorization/<contractId>` and taps Approve. List the brand's held
+  contracts with `activation_blocked_by = 'ad_authorization'` and give one link per creator.
 - **Ended and archived campaigns.** An email invite is refused one day after the end date
   (`send-campaign-invite.usecase.ts`). Creating an invite link checks no end date
   (`createCampaignInvite`); redeeming it fails if the link is expired or used up
