@@ -43,6 +43,11 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   Requirements. A terms save re-checks the hold (`lib/api/contracts/held-release.ts`, #10610, live
   2026-11-17). Removing a platform from the campaign also releases held creators
   (`campaigns-leftovers-update.usecase.ts`), but then nobody can add it.
+- **Invite-link sign-ups are decided on Applicants, not Requests** (#10964, live 2026-11-19): job
+  picker "Via invite link", `/campaigns?tab=applicants&jobId=invite-link`. Handles added after the
+  accept are approved at once (except a handle another creator holds, or after a rejected one). Direct
+  invites and handle requests stay in Requests. The creator row's "Review request" opened Requests for
+  invite-link rows until #11121.
 - **The Join row's accounts are a preview, not part of the request.** The Requests tab shows a
   pending join row (`platform` null) with the creator's connected accounts (#10528, #10713). Approving
   it approves the contract only: `approve-core.ts` skips `applyHandleRequestToProfiles` for a join.

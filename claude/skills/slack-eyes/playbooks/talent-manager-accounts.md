@@ -24,10 +24,13 @@ the finish check bounced it. Prove a manager action from code or a real session 
   campaign invite link signed in, picks or adds the creator it is for, and signs.
 - **A managed creator can have no email.** `find_account` by that creator's name returned nothing; find
   the creator id from the campaign's contracts (`contracts.contractor_id`), then `find_account` by id.
-- **Sign first, accounts after** applies here too: see `campaign-joining.md`. The brand's Requests tab
-  shows the Join row only; the contract stays `pending` with no accounts; a brand cannot write handles
-  on a pending contract. A typed handle goes to the brand for review; an account picked from a
-  sign-in connection is approved with no brand review (`lib/handle-requests/creator-proven-approval.ts`).
+- **Sign first, accounts after** applies here too: see `campaign-joining.md`. A manager signs through
+  the invite link, so since #10964 (live 2026-11-19 ~15:00Z) the join is decided on Applicants → job
+  picker "Via invite link", not Requests (`isPendingInviteLinkApplication`,
+  `lib/api/applications/handle-requests-applicants.ts`). The contract stays `pending` with no accounts
+  and a brand cannot write handles on it. Since #10964, handles a creator adds after the brand
+  accepted are approved at once; a handle another creator holds, or any after a rejected one, still
+  goes to the brand.
 - **Not proven:** that a manager session can connect the managed creator's accounts. The talent switch
   mints a session for the creator (`request-credential.ts:101-130`, claims `fromUserId`, `representationId`),
   but no one tested the connect flow in it.
@@ -52,8 +55,9 @@ the finish check bounced it. Prove a manager action from code or a real session 
 
 ## What to reply
 
-- **Join row, no accounts:** approve the join; accounts come from the creator's side; the brand cannot
-  add them. A typed handle comes back to the brand to approve, a connected one goes through on its own.
+- **Join row, no accounts / "he is not in Requests":** accept him on Applicants → "Via invite link";
+  accounts come from the creator's side and go through on their own after the accept. The creator
+  row's "Review request" opened Requests until #11121.
   Do not say what the manager does inside the creator session until it is tested.
 - **Manager account request:** convert the user in place, then tell the teammate the person signs in as
   usual and the contract goes through the campaign invite link.
