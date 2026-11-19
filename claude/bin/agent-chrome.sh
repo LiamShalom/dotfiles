@@ -17,7 +17,12 @@
 # its own session for the same reason.
 #
 # Usage:  agent-chrome.sh          # prints http://127.0.0.1:9222
+#         agent-chrome.sh --chrome # also starts the headless Chrome while Session Board serves
+#                                  # 9222 (the board's 1Password tabs stream from it)
 set -euo pipefail
+
+NEED_CHROME=0
+[ "${1:-}" = "--chrome" ] && NEED_CHROME=1
 
 PORT="${AGENT_CHROME_PORT:-9222}"
 CHROME_PORT="${AGENT_CHROME_INTERNAL_PORT:-9223}"
@@ -36,7 +41,7 @@ chrome_up() { curl -fsS --max-time 2 "http://127.0.0.1:$CHROME_PORT/json/version
 
 # The proxy can outlive what it routes to (Session Board gone, then the headless Chrome gone too):
 # then it still answers its own check, but every page request hangs. Start Chrome in that case.
-if up && { chrome_up || curl -fsS --max-time 2 "$URL/json/version" >/dev/null 2>&1; }; then
+if up && { chrome_up || { [ "$NEED_CHROME" = 0 ] && curl -fsS --max-time 2 "$URL/json/version" >/dev/null 2>&1; }; }; then
 	echo "$URL"
 	exit 0
 fi
@@ -122,7 +127,7 @@ if chrome_up && ! up; then
 	done
 fi
 
-if up; then
+if up && { [ "$NEED_CHROME" = 0 ] || chrome_up; }; then
 	echo "$URL"
 	exit 0
 fi

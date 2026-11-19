@@ -195,6 +195,10 @@ first real use, confirm the page signed in, then tell Liam it worked and delete 
 - Hand the step to Liam in Session Board's pane when the tool cannot do it: a passkey with no
   other way, a Google sign-in that Google refuses in this browser, picture puzzles (TikTok), texted
   codes that name no site, sign-in links without authorized inbox access, and OAuth consent.
+  A passkey sign-in, or one that needs 1Password's autofill, goes there with
+  `node ~/session-board/scripts/board-browser.mjs --1password <https-url> "<what to do>"`: the
+  pane's own pages cannot run 1Password, this tab can. When Liam closes it, the sign-in lands in
+  this chat's window; open the site with `new_page` and it is signed in.
 - An OAuth connect as an account Liam is already signed in to in his own browser (Arc), such as
   another person's Facebook: do not sign that account in here (it sends him a device approval).
   Give him the click-by-click steps for Arc instead, with what to pick on each screen (10-28).
