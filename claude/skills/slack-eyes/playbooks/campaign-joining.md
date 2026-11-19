@@ -80,6 +80,15 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   primary PG flags from `repair.md`. Loading the imports took about 10 minutes, so run it in the
   background. The dashboard `postgres_query` refuses `contract_social_profiles`, so check
   `contractsv2/<id>.socialProfiles[].retiredAt` in Firestore instead.
+- **Held on `ad_authorization` (partnership ads).** What the app gets: run
+  `getCreatorAdAuthorizations(creatorId, {contractId})` in a script, with the iOS header
+  `x-sideshift-capabilities: social-oauth-any-provider,ad-authorization-x` and the PG flags from
+  `repair.md` (without them the readiness read is refused and `brandReady` comes back false). Which
+  row still holds it: `resolveAdAuthorizationGate` (`lib/ads/creator-auth-activation.ts`); TikTok
+  counts as done when the connect has `biz.spark.auth`. The creator's iOS build: PostHog
+  `execute-sql` on `events` where `distinct_id` = creator id, `properties.$app_version`/`$app_build`.
+  On 2026-11-19 (`plutus: remove wrong creator account`), Vercel log search timed out or returned
+  `ExceedsBillingLimitError` even for same-day windows.
 - **Ended and archived campaigns.** An email invite is refused one day after the end date
   (`send-campaign-invite.usecase.ts`). Creating an invite link checks no end date
   (`createCampaignInvite`); redeeming it fails if the link is expired or used up
