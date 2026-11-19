@@ -161,3 +161,14 @@ test('pathRewriter maps Studio paths back, across chunk boundaries', async () =>
 test('a code comment or URL in the script is not a path', () => {
   assert.equal(plan('echo "// note" >> lib/a.ts; grep -c "https://example.com/x" lib/a.ts').ok, true);
 });
+
+test('a sed address or regex that starts with / is not a path', () => {
+  const r = plan(`node scripts/agent-preflight.mjs > ${home}/.claude/jobs/d/tmp/p.log 2>&1; sed -n '/summary/,$p' ${home}/.claude/jobs/d/tmp/p.log`);
+  assert.equal(r.ok, true);
+  assert.match(r.script, /sed -n '\/summary\/,\$p'/);
+});
+
+test('--base refs are reported so the mirror gets them', () => {
+  assert.deepEqual(plan('node scripts/agent-preflight.mjs --base origin/feat/listing-boost-tiers > /tmp/p.log').refs, ['origin/feat/listing-boost-tiers']);
+  assert.deepEqual(plan('node scripts/agent-preflight.mjs --base=main').refs, ['main']);
+});

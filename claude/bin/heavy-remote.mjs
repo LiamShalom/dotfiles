@@ -70,7 +70,7 @@ export const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
  * {ok:true, script, subdir, outputs: [local paths], uploads: [local files]}.
  * `stat` is injectable for tests.
  */
-export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env = process.env }) {
+export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env = process.env, rootDirExists = (d) => fs.existsSync('/' + d) }) {
   let script;
   if (argv.length === 3 && SHELLS.has(argv[0]) && argv[1] === '-c') script = argv[2];
   else if (SHELLS.has(argv[0])) return { ok: false, reason: 'unusual shell invocation' };
@@ -92,6 +92,10 @@ export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env 
   const rewritten = script.replace(PATH_TOKEN, (p) => {
     // `//` starts a URL's host (https://x) or a code comment, not a path.
     if (reason || p.startsWith('//')) return p;
+    // A path starts with a folder that exists at / (Users, tmp, opt...); text like
+    // sed's '/summary/,$p' or a regex does not.
+    const first = p.split('/')[1];
+    if (!first || !rootDirExists(first)) return p;
     const clean = p.length > 1 ? p.replace(/\/+$/, '') : p;
     if (clean === root || clean.startsWith(root + '/')) return remote.wd + clean.slice(root.length);
     if (p.startsWith(NODE24)) return remote.node + '/' + p.slice(NODE24.length);
@@ -116,6 +120,8 @@ export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env 
     return p;
   });
   if (reason) return { ok: false, reason };
+  // The preflight diffs against --base <ref>; the Studio's mirror must have it.
+  const refs = [...script.matchAll(/--base[\s=]+([^\s'";|&<>]+)/g)].map((m) => m[1]);
   const exports = ENV_PASS.filter((k) => env[k] !== undefined).map((k) => `export ${k}=${shq(env[k])}`);
   return {
     ok: true,
@@ -123,6 +129,7 @@ export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env 
     subdir,
     outputs: [...outputs],
     uploads: [...uploads],
+    refs,
   };
 }
 
@@ -320,6 +327,15 @@ async function main() {
   const sshCmd = ['ssh', ...ssh].map(shq).join(' ');
   const refspecs = [`+${sha}:refs/heavy/${key}`];
   if (git(root, ['rev-parse', '-q', '--verify', 'refs/remotes/origin/main'])) refspecs.push('+refs/remotes/origin/main:refs/remotes/origin/main');
+  for (const ref of plan.refs) {
+    const full = git(root, ['rev-parse', '--symbolic-full-name', ref])?.trim();
+    if (full?.startsWith('refs/')) refspecs.push(`+${full}:${full}`);
+    else {
+      const commit = git(root, ['rev-parse', '-q', '--verify', `${ref}^{commit}`])?.trim();
+      if (!commit) return skip(`--base ${ref} does not resolve here`);
+      refspecs.push(`+${commit}:refs/heavy-base/${key}`);
+    }
+  }
   const push = spawnSync('git', ['-C', root, 'push', '-q', '--no-verify', `${target}:heavy-remote/mirror.git`, ...refspecs], {
     encoding: 'utf8',
     env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
