@@ -31,9 +31,11 @@ the finish check bounced it. Prove a manager action from code or a real session 
   and a brand cannot write handles on it. Since #10964, handles a creator adds after the brand
   accepted are approved at once; a handle another creator holds, or any after a rejected one, still
   goes to the brand.
-- **Not proven:** that a manager session can connect the managed creator's accounts. The talent switch
-  mints a session for the creator (`request-credential.ts:101-130`, claims `fromUserId`, `representationId`),
-  but no one tested the connect flow in it.
+- **A manager can add the creator's accounts.** Switched into the creator, the session is the creator's
+  login with talent claims (`request-credential.ts:101-130`). `talentRouteClass`
+  (`lib/api/talent/talent-route-policy.ts:519-523`) refuses only routes classed `never` or `payouts`;
+  everything else is `open`, including handle submit and `internal/creator/social-oauth/connect/*`
+  (lines 248, 262-274). Not tested in a live manager session.
 
 ## Symptom → cause → proof
 
