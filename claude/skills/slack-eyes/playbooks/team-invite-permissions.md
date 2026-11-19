@@ -31,6 +31,14 @@ Nov 24). 3 + 2 = 5. Reply: the pending invites hold seats; cancelling an unused 
 Query the invites with the `sideshift-firestore` MCP `query_collection` (`invites`, single-field filter on
 `companyId`, select `email,status,createdAt,expiresAt`). The internal-dashboard Firestore tool refuses this path.
 
+### Granting extra seats (once Liam approves)
+
+No admin token is needed. Write a throwaway script at the main checkout's root that imports
+`@/scripts/_server-only-shim`, then calls `getTeamSeatGrant` and `setTeamSeatGrant({ companyId, extraSeats, actorUserId, reason })`
+from `lib/api/admin/team-seats/team-seats.usecase.ts`. Run it with
+`PG_ALLOW_PRODUCTION=1 npx tsx --env-file=.env.local <file>`, then delete the file. `extraSeats` is the absolute
+total grant, not an addition to the current one. The view it returns shows `maxSeats` before and after (openart, 2026-11-19: 5 to 15).
+
 ## Missing permissions when campaigns are selected
 
 `components/settings/team-scope-picker.tsx` (line 27, 53) filters the catalog by `CAMPAIGN_LIMITED_SCOPES`
