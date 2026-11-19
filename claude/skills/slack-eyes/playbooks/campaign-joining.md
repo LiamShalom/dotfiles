@@ -170,3 +170,9 @@ while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: 
   account with `withdrawalApprovalProfileStatus` approved when two users share a name. The invite
   modal then shows "Manually approved", and the send (`send-campaign-invite`, `create-batch`) and the
   creator's accept modal honor it. It is per campaign: a wrong campaign id was an earlier mistake here.
+
+## Join requests in Messages (elevenlabs: handle approval missing in chat, 2026-11-19)
+
+- Since #10036 (11-13) a creator can accept before adding accounts. That writes a `handle_requests` row with `platform`/`handle` null: a join request. The chat profile panel on the right shows it as a "Join request" card with Approve/Reject while `status='pending'` (`dm-creator-context.usecase.ts`). No card means nothing is pending: check `handle_requests.reviewed_at` against the screenshot time.
+- The header's "Handles Awaiting Review" was cached per page and did not clear after an approval until reload. Fixed in #11102: `use-creator-status.ts` re-reads on the `refreshPendingRequests` window event. Sidekick decisions still fire no such event, and the inbox rail dot refreshes only every 2 min or on focus.
+- `reviewed_by` = `invite_<40 hex>` is a team member uid from `team-invite-claim.ts`, not a campaign invite.
