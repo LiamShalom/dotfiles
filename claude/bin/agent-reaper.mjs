@@ -39,6 +39,11 @@
 //                hour (hard-coded) unless it is pinned, so the reaper pins each
 //                running session and unpins it once idle that long. A pin set or
 //                removed by hand (Ctrl+T in `claude agents`) is left alone.
+//   stalled      Type a nudge into a background chat that ended its turn on its
+//                own background work (status "shell"), still says Working, and
+//                has not changed for STALL_MIN (45) minutes. Claude Code should
+//                wake it when that work ends, but the wake-up can be lost, and a
+//                poller can wait on CI that never runs. One nudge per stretch.
 //
 // Idle time is observed, not guessed: each run records what it saw in
 // ~/.cache/agent-reaper/state.json and counts idle time from the last run that
@@ -46,7 +51,7 @@
 //
 // Usage:  agent-reaper.mjs             act; actions go to ~/.claude/logs/agent-reaper.log
 //         agent-reaper.mjs --dry-run   print every decision, stop nothing
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { homedir } from "node:os";
@@ -74,8 +79,11 @@ const CONTAINER_ACTIVE_BYTES = 16 * 1024;
 const KEEP_CONTAINERS = new Set(["sideshift-pg-local", ...(process.env.KEEP_CONTAINERS ?? "").split(",").filter(Boolean)]);
 // 1 h since 2026-11-11 (was 12): an idle session holds 0.4-1 GB, and memory limits how many agents run.
 const AWAKE_MS = env("SESSION_AWAKE_HOURS", 1) * 3600e3;
+const STALL_MS = env("STALL_MIN", 45) * 60e3;
 const CLAUDE = join(HOME, ".local/bin/claude");
 const JOBS = join(HOME, ".claude/jobs");
+const REGISTRY = join(HOME, ".claude/sessions");
+const TYPER = join(dirname(fileURLToPath(import.meta.url)), "slack-eyes-type.py");
 const PINS = join(JOBS, "pins.json");
 const DOCKER_SOCK = join(HOME, ".colima/default/docker.sock");
 const CHROME = `http://127.0.0.1:${process.env.AGENT_CHROME_PORT || 9222}`;
@@ -547,6 +555,59 @@ export function runningSessions() {
 	return out;
 }
 
+// Background chats as Claude Code's session registry (~/.claude/sessions/<pid>.json) sees them,
+// with their job's state. The registry keeps the status `claude agents --json` folds into
+// "busy": "shell" means the turn has ended and only the chat's own background commands run.
+export function chatStatuses(alive, registry = REGISTRY, jobs = JOBS) {
+	const out = [];
+	let files = [];
+	try {
+		files = readdirSync(registry).filter((f) => f.endsWith(".json"));
+	} catch {
+		return out;
+	}
+	for (const f of files) {
+		try {
+			const r = JSON.parse(readFileSync(join(registry, f), "utf8"));
+			if (!r.jobId || !alive.has(r.pid) || r.cwd?.startsWith(join(HOME, "Library/Caches/"))) continue;
+			const job = JSON.parse(readFileSync(join(jobs, r.jobId, "state.json"), "utf8"));
+			out.push({ id: r.jobId, pid: r.pid, name: r.name ?? r.jobId, status: r.status, statusAt: r.statusUpdatedAt, jobState: job.state, jobAt: Date.parse(job.updatedAt) });
+		} catch {}
+	}
+	return out;
+}
+
+// Chats that wait on a wake-up that has not come. 11-19: two chats sat in Working for 6-8 h. One
+// poller died with no notification; one notification was queued and never delivered; and one poller
+// waited for CI on a PR that conflicted with main, where GitHub runs none. A chat that ends another
+// turn gets a new statusAt, so `nudged` (id -> the statusAt it was nudged at) allows one per stretch.
+export function stalledChats(chats, now, stallMs = STALL_MS, nudged = {}) {
+	return chats.filter(
+		(c) =>
+			c.status === "shell" &&
+			c.jobState === "working" &&
+			now - Math.max(c.statusAt || 0, c.jobAt || 0) >= stallMs &&
+			nudged[c.id] !== c.statusAt,
+	);
+}
+
+// The nudges to remember into the next run. A chat this run did not see (ps failed, its state.json
+// was mid-write) keeps its entry, or it would be nudged again for the same stretch; entries go
+// when the chat is seen in a new stretch, or after a week.
+export function carryNudged(prev, chats, now) {
+	const out = {};
+	const seen = new Map(chats.map((c) => [c.id, c.statusAt]));
+	for (const [id, at] of Object.entries(prev ?? {})) {
+		if (seen.has(id) ? seen.get(id) === at : now - at < 7 * 86400e3) out[id] = at;
+	}
+	return out;
+}
+
+export const nudgeText = (minutes) =>
+	`[agent-reaper] This chat ended its turn ${minutes} min ago to wait on its own background work, and nothing has woken it since. ` +
+	`Wake-ups get lost: a background command can die with no notification, a notification can stay undelivered, and GitHub runs no CI on a PR that conflicts with main (check \`gh pr view --json mergeStateStatus\`). ` +
+	`Check now whether what you wait on is done or can still finish, then carry on with the task. If it is still running, wait on it in the foreground instead of ending your turn.`;
+
 // Claude Code's pin list. A missing file is empty; an unreadable one throws, so
 // nobody's pins are overwritten.
 function readPins() {
@@ -851,6 +912,18 @@ async function main() {
 		next.pins = state.pins ?? {};
 	}
 	if (dry) next.pins = state.pins ?? {};
+
+	const chats = chatStatuses(new Set(procs.map((p) => p.pid)));
+	next.nudged = carryNudged(state.nudged, chats, now);
+	for (const c of stalledChats(chats, now, STALL_MS, state.nudged ?? {})) {
+		const minutes = Math.round((now - Math.max(c.statusAt || 0, c.jobAt || 0)) / 60e3);
+		act(`NUDGE session "${c.name}" (${c.id}): turn ended ${ago(minutes * 60e3)} ago on its own background work, still Working, nothing woke it`, () => {
+			const r = spawnSync("/usr/bin/python3", ["-I", TYPER, CLAUDE, c.id], { input: nudgeText(minutes), encoding: "utf8", timeout: 40000 });
+			if (r.status !== 0) throw new Error((r.stderr || r.error?.message || `exit ${r.status}`).trim().slice(0, 200));
+			next.nudged[c.id] = c.statusAt;
+		});
+	}
+	if (dry) next.nudged = state.nudged ?? {};
 
 	await Promise.all(pending);
 	mkdirSync(dirname(STATE), { recursive: true });
