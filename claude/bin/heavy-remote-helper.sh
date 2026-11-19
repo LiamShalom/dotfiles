@@ -7,7 +7,9 @@
 # Layout under ~/heavy-remote (R):
 #   node24/             official Node 24 build (the monorepo's version); the
 #                       Studio's own Homebrew node stays untouched
-#   mirror.git          bare repo the MacBook pushes job commits into
+#   mirror.git          bare repo the MacBook pushes monorepo job commits into
+#   mirrors/<repo>.git  the same for other repos (sideshift-mobile)
+#   dd/<key>/           Xcode DerivedData per MacBook worktree (iOS jobs), kept here
 #   work/<key>/         one worktree per MacBook worktree, reused between jobs
 #   state/<key>/        markers for that worktree (deps key, packages hash, pgid)
 #   installs/<depkey>/  cached node_modules per package-lock.json, APFS-cloned
@@ -15,8 +17,10 @@
 #   slots/              lockf slot files
 #
 # Commands:
-#   probe <depkey>          print "slots=N disk_gb=N mem=N install=yes|no|building"
+#   probe <depkey> [pool]   print "slots=N disk_gb=N mem=N install=yes|no|building env=…"
 #   run <key> <sha> <depkey> <job> <maxsecs> <script>
+#                           env: HEAVY_REMOTE_POOL (slot|xcode), HEAVY_REMOTE_MIRROR,
+#                           HEAVY_REMOTE_SUBDIR, HEAVY_REMOTE_SIMS (iOS simulators to map)
 #                           stdin: tar of dirty files (wd/...) and inputs (out/...)
 #                           stdin also carries deleted paths in wd.deleted
 #   collect <job>           stdout: tar of the job's output files; then removes them
@@ -25,8 +29,16 @@ set -uo pipefail
 
 R="$HOME/heavy-remote"
 NODE_BIN="$R/node24/bin"
-SLOTS="${HEAVY_REMOTE_SLOTS:-2}"
-MIN_DISK_GB="${HEAVY_REMOTE_MIN_DISK_GB:-10}"
+POOL="${HEAVY_REMOTE_POOL:-slot}"
+MIRROR="$R/${HEAVY_REMOTE_MIRROR:-mirror.git}"
+if [ "$POOL" = xcode ]; then
+	SLOTS="${HEAVY_REMOTE_XCODE_SLOTS:-2}"
+	# An iOS build's DerivedData is about 9 GB.
+	MIN_DISK_GB="${HEAVY_REMOTE_XCODE_MIN_DISK_GB:-30}"
+else
+	SLOTS="${HEAVY_REMOTE_SLOTS:-2}"
+	MIN_DISK_GB="${HEAVY_REMOTE_MIN_DISK_GB:-10}"
+fi
 MIN_MEM="${HEAVY_REMOTE_MIN_MEM_PCT:-15}"
 START_MARK=$'\x01HEAVY-REMOTE-START'
 
@@ -46,12 +58,12 @@ disk_free_gb() { df -g "$R" | awk 'NR == 2 { print $4 }'; }
 free_slots() {
 	local n=0 i
 	for ((i = 1; i <= SLOTS; i++)); do
-		lockf -s -t 0 "$R/slots/slot.$i" true 2>/dev/null && n=$((n + 1))
+		lockf -s -t 0 "$R/slots/$POOL.$i" true 2>/dev/null && n=$((n + 1))
 	done
 	echo "$n"
 }
 install_state() {
-	if [ -f "$R/installs/$1/manifest" ]; then echo yes
+	if [ "$1" = none ] || [ -f "$R/installs/$1/manifest" ]; then echo yes
 	elif ! lockf -s -t 0 "$R/installs/$1.lock" true 2>/dev/null; then echo building
 	else echo no; fi
 }
@@ -83,10 +95,11 @@ build_install() {
 
 cmd="${1:-}"
 shift || true
-mkdir -p "$R/slots" "$R/state" "$R/work" "$R/installs" "$R/out"
+mkdir -p "$R/slots" "$R/state" "$R/work" "$R/installs" "$R/out" "$R/dd" "$R/mirrors"
 
 case "$cmd" in
 probe)
+	[ -n "${2:-}" ] && POOL="$2" && [ "$POOL" = xcode ] && SLOTS="${HEAVY_REMOTE_XCODE_SLOTS:-2}"
 	envsum=$(shasum -a 256 "$R/secrets/env.local" 2>/dev/null | cut -c1-12)
 	echo "slots=$(free_slots) disk_gb=$(disk_free_gb) mem=$(mem_free_pct) install=$(install_state "$1") env=${envsum:-none}"
 	;;
@@ -95,8 +108,8 @@ run)
 	key="$1" sha="$2" depkey="$3" job="$4" maxsecs="$5" script="$6"
 	# Take a slot, then this worktree's lock. Busy: exit 75 without the start mark.
 	for ((i = 1; i <= SLOTS; i++)); do
-		lockf -s -t 0 "$R/slots/slot.$i" lockf -s -t 0 "$R/state/$key.lock" \
-			"$0" run-locked "$key" "$sha" "$depkey" "$job" "$maxsecs" "$script"
+		lockf -s -t 0 "$R/slots/$POOL.$i" lockf -s -t 0 "$R/state/$key.lock" \
+			"$0" run-locked "$key" "$sha" "$depkey" "$job" "$maxsecs" "$script" "$i"
 		rc=$?
 		# 75 from lockf: that slot or this worktree is busy, nothing read from stdin yet.
 		[ "$rc" -eq 75 ] && [ ! -e "$R/out/$job/.started" ] && continue
@@ -107,7 +120,7 @@ run)
 	;;
 
 run-locked)
-	key="$1" sha="$2" depkey="$3" job="$4" maxsecs="$5" script="$6"
+	key="$1" sha="$2" depkey="$3" job="$4" maxsecs="$5" script="$6" slot="$7"
 	wd="$R/work/$key" st="$R/state/$key" out="$R/out/$job"
 	mkdir -p "$st" "$out"
 	# 76: set-up failed after stdin was read; the MacBook runs the job itself.
@@ -120,7 +133,7 @@ run-locked)
 	# Code: the pushed commit, then the MacBook's uncommitted files on top.
 	if [ ! -e "$wd/.git" ]; then
 		rm -rf "$wd"
-		git -C "$R/mirror.git" worktree add -q --detach "$wd" "$sha" >&2 || fail "worktree add failed"
+		git -C "$MIRROR" worktree add -q --detach "$wd" "$sha" >&2 || fail "worktree add failed"
 	else
 		git -C "$wd" checkout -q -f --detach "$sha" >&2 || fail "checkout failed"
 		git -C "$wd" clean -q -f -d >&2
@@ -139,8 +152,8 @@ run-locked)
 	if [ -f "$R/secrets/env.local" ]; then ln -sfn "$R/secrets/env.local" "$wd/.env.local"; else rm -f "$wd/.env.local"; fi
 	t_sync=$((SECONDS - t0 - t_checkout))
 	export PATH="$NODE_BIN:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
-	# Dependencies: clone the cached install for this lockfile.
-	if [ "$(cat "$st/deps" 2>/dev/null)" != "$depkey" ]; then
+	# Dependencies: clone the cached install for this lockfile (none for the mobile repo).
+	if [ "$depkey" != none ] && [ "$(cat "$st/deps" 2>/dev/null)" != "$depkey" ]; then
 		case "$(install_state "$depkey")" in
 		yes) ;;
 		building) fail "dependencies are still installing" ;;
@@ -159,9 +172,24 @@ run-locked)
 	fi
 	# Workspace packages: rebuild when their sources changed since the last build.
 	pk=$( (cd "$wd" && git ls-files -s packages; git -C "$wd" status --porcelain -- packages | while read -r _ f; do [ -f "$wd/$f" ] && shasum "$wd/$f"; done) | shasum | cut -c1-40)
-	if [ "$(cat "$st/packages" 2>/dev/null)" != "$pk" ]; then
+	if [ "$depkey" != none ] && [ "$(cat "$st/packages" 2>/dev/null)" != "$pk" ]; then
 		(cd "$wd" && npm run -s build:packages) >"$st/build.log" 2>&1 || fail "build:packages failed (see $st/build.log)"
 		echo "$pk" >"$st/packages"
+	fi
+	# iOS: the MacBook's simulator becomes one of this slot's own simulators with the
+	# same device type and runtime, so two jobs never share a simulator.
+	if [ -n "${HEAVY_REMOTE_SIMS:-}" ]; then
+		IFS=';' read -ra sims <<<"$HEAVY_REMOTE_SIMS"
+		for spec in "${sims[@]}"; do
+			IFS='|' read -r udid name dtype runtime <<<"$spec"
+			target="heavy $slot $name"
+			new=$(xcrun simctl list devices -j | "$NODE_BIN/node" -e '
+				const [rt, nm] = process.argv.slice(1); let s = ""; process.stdin.on("data", (d) => (s += d));
+				process.stdin.on("end", () => { const d = (JSON.parse(s).devices[rt] || []).find((x) => x.name === nm && x.isAvailable); if (d) console.log(d.udid); });
+			' "$runtime" "$target")
+			[ -n "$new" ] || new=$(xcrun simctl create "$target" "$dtype" "$runtime" 2>&1) || fail "could not create simulator $target: $new"
+			script="${script//$udid/$new}"
+		done
 	fi
 	# The SSH session that carries this job. Each run uses its own connection (no
 	# multiplexing), so the session ends when the MacBook side dies, even by SIGKILL.
@@ -252,12 +280,23 @@ collect)
 		n=$((n + 1))
 		if { [ "$n" -gt "${WORK_KEEP:-6}" ] || [ -n "$(find "$R/state/$k" -maxdepth 0 -mtime +0 2>/dev/null)" ]; } &&
 			lockf -s -t 0 "$R/state/$k.lock" true; then
-			git -C "$R/mirror.git" worktree remove --force "$wdir" 2>/dev/null || rm -rf "$wdir"
-			rm -rf "$R/state/$k" "$R/state/$k.lock"
-			git -C "$R/mirror.git" update-ref -d "refs/heavy/$k" 2>/dev/null
+			repo=$(git -C "$wdir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+			git -C "${repo:-$MIRROR}" worktree remove --force "$wdir" 2>/dev/null || rm -rf "$wdir"
+			rm -rf "$R/state/$k" "$R/state/$k.lock" "$R/dd/$k"
+			[ -n "$repo" ] && git -C "$repo" update-ref -d "refs/heavy/$k" 2>/dev/null
 		fi
 	done
-	git -C "$R/mirror.git" worktree prune 2>/dev/null
+	for m in "$R/mirror.git" "$R"/mirrors/*.git; do [ -d "$m" ] && git -C "$m" worktree prune 2>/dev/null; done
+	;;
+
+init-mirror)
+	# init-mirror <path under R> <repo>: a bare mirror filled from GitHub's main.
+	m="$R/$1"
+	[ -d "$m" ] && exit 0
+	git init -q --bare "$m.tmp" &&
+		git -C "$m.tmp" config credential.helper '!/opt/homebrew/bin/gh auth git-credential' &&
+		git -C "$m.tmp" fetch -q "https://github.com/SideShiftApp/$2.git" '+refs/heads/main:refs/remotes/origin/main' &&
+		mv "$m.tmp" "$m"
 	;;
 
 kill)

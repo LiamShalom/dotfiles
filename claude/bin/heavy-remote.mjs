@@ -39,7 +39,7 @@ const LOCAL_ONLY = [
   [/with-test-secrets|\bop\s+(run|read|inject)\b/, 'uses secrets'],
   [/\b(vercel|gcloud|firebase|cloud-sql-proxy|psql|docker|colima|gh|ssh|scp|rsync|curl|wget|open)\b/, 'uses a local tool or account'],
   [/\bgit\s+(push|pull|fetch|worktree|stash|checkout|switch|reset|commit|merge|rebase)\b/, 'changes git state'],
-  [/\b(xcodebuild|simctl|adb|emulator|playwright)\b/, 'needs a device or browser'],
+  [/\b(simctl|devicectl|adb|emulator|playwright)\b/, 'needs a device or browser'],
   [/\bnext\s+(dev|build|start)\b|\bnpm\s+(run\s+)?(dev|start)\b/, 'starts a server or build'],
   [/\bnpm\s+(ci|install|i|add|uninstall|update)\b|sideshift-setup/, 'installs packages'],
   // Build output is git-ignored, so it would stay on the Studio; the job exists to make it here.
@@ -69,7 +69,7 @@ export const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
  * {ok:true, script, subdir, outputs: [local paths], uploads: [local files]}.
  * `stat` is injectable for tests.
  */
-export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env = process.env, rootDirExists = (d) => fs.existsSync('/' + d) }) {
+export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = statOrNull, env = process.env, rootDirExists = (d) => fs.existsSync('/' + d) }) {
   let script;
   if (argv.length === 3 && SHELLS.has(argv[0]) && argv[1] === '-c') script = argv[2];
   else if (SHELLS.has(argv[0])) return { ok: false, reason: 'unusual shell invocation' };
@@ -78,13 +78,33 @@ export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env 
   const subdir = path.relative(root, cwd);
   if (subdir.startsWith('..') || path.isAbsolute(subdir)) return { ok: false, reason: 'runs outside its worktree' };
   for (const [re, reason] of LOCAL_ONLY) if (re.test(script)) return { ok: false, reason };
+  // iOS (pool xcode): simulator builds and tests only. The MacBook's simulators
+  // are named by id; the Studio maps each to one of its own.
+  let sims = [];
+  if (pool === 'xcode') {
+    if (!/\bxcodebuild\b/.test(script)) return { ok: false, reason: 'not an xcodebuild job' };
+    if (/\barchive\b|-exportArchive|-allowProvisioningUpdates|-resultBundlePath|\binstall\b/.test(script)) {
+      return { ok: false, reason: 'archives, signs or writes a result bundle' };
+    }
+    const platforms = [...script.matchAll(/platform=([^,'"]*)/g)].map((m) => m[1]);
+    if (!platforms.length || platforms.some((p) => p !== 'iOS Simulator')) return { ok: false, reason: 'not an iOS Simulator destination' };
+    sims = [...new Set([...script.matchAll(/\bid=([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/g)].map((m) => m[1]))];
+    // A destination by name (name=iPhone 17) would need that simulator on the Studio.
+    if (sims.length < platforms.length) return { ok: false, reason: 'names a simulator by name, not id' };
+  } else if (/\bxcodebuild\b/.test(script)) return { ok: false, reason: 'needs a device or browser' };
+  // Build caches stay on the Studio (kept per worktree), never copied back.
+  const caches = [];
+  for (const [flag, sub] of [['-derivedDataPath', ''], ['-clonedSourcePackagesDirPath', '-spm']]) {
+    const m = script.match(new RegExp(`${flag}\\s+['"]?(/[^\\s'"]+)`));
+    if (m && remote.dd) caches.push([m[1].replace(/\/+$/, ''), remote.dd + sub]);
+  }
   for (const [, name] of script.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) {
     if (env[name] !== undefined && !ENV_PASS.includes(name) && !SHELL_VARS.has(name)) {
       return { ok: false, reason: `uses $${name} from this Mac's environment` };
     }
   }
 
-  const outRoots = [path.join(home, '.claude', 'jobs') + '/', '/tmp/', '/private/tmp/'];
+  const outRoots = [path.join(home, '.claude', 'jobs') + '/', path.join(home, '.cache') + '/', '/tmp/', '/private/tmp/'];
   const outputs = new Set();
   const uploads = new Set();
   let reason = null;
@@ -96,6 +116,7 @@ export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env 
     const first = p.split('/')[1];
     if (!first || !rootDirExists(first)) return p;
     const clean = p.length > 1 ? p.replace(/\/+$/, '') : p;
+    for (const [local, there] of caches) if (clean === local || clean.startsWith(local + '/')) return there + clean.slice(local.length);
     if (clean === root || clean.startsWith(root + '/')) return remote.wd + clean.slice(root.length);
     if (p.startsWith(NODE24)) return remote.node + '/' + p.slice(NODE24.length);
     if (SYSTEM_PATHS.some((s) => p === s.replace(/\/$/, '') || p.startsWith(s))) return p;
@@ -129,6 +150,8 @@ export function planJob(argv, { cwd, root, home, remote, stat = statOrNull, env 
     outputs: [...outputs],
     uploads: [...uploads],
     refs,
+    sims,
+    caches,
   };
 }
 
@@ -190,7 +213,7 @@ export function copyDestination(kind, rel, { root, outputs, home, mkdir = true }
     const to = '/' + rel;
     if (!outputs.includes(to)) return null;
     const parent = real(path.dirname(to));
-    const roots = ['/private/tmp', real(path.join(home, '.claude', 'jobs'))].filter(Boolean);
+    const roots = ['/private/tmp', real(path.join(home, '.claude', 'jobs')), real(path.join(home, '.cache'))].filter(Boolean);
     if (!parent || !roots.some((r) => parent === r || parent.startsWith(r + '/'))) return null;
     if (lst(to)?.isSymbolicLink()) return null;
     return to;
@@ -282,22 +305,44 @@ async function main() {
   };
   if (process.env.HEAVY_REMOTE === '0' || !command.length) return skip('disabled');
 
-  const cwd = fs.realpathSync(process.cwd());
-  const top = git(cwd, ['rev-parse', '--show-toplevel']);
+  const pool = opts.pool || 'slot';
+  let cwd = fs.realpathSync(process.cwd());
+  // Agents often start with `cd <worktree> &&` or name `-project <path>`: that
+  // names the repo, whatever directory the agent's shell is in.
+  const text = command.length === 3 && SHELLS.has(command[0]) ? command[2] : command.join(' ');
+  const hint = text.match(/^\s*cd\s+['"]?(\/[^\s'";&|]+)/)?.[1] ?? (pool === 'xcode' ? text.match(/-(?:project|workspace)\s+['"]?(\/[^\s'";&|]+)/)?.[1] : undefined);
+  const base = hint ? (statOrNull(hint)?.isDirectory() ? hint : path.dirname(hint)) : cwd;
+  const top = statOrNull(base) ? git(base, ['rev-parse', '--show-toplevel']) : null;
   if (!top) return skip('not in a git checkout');
   const root = fs.realpathSync(top.trim());
-  if (!/sideshift-monorepo/.test(git(root, ['config', 'remote.origin.url']) ?? '')) return skip('not a sideshift-monorepo checkout');
+  const repo = (git(root, ['config', 'remote.origin.url']) ?? '').trim().match(/([^/:]+?)(\.git)?$/)?.[1];
+  if (!['sideshift-monorepo', 'sideshift-mobile'].includes(repo)) return skip('not a sideshift-monorepo or sideshift-mobile checkout');
+  if (hint && cwd !== root && !cwd.startsWith(root + '/')) cwd = root;
+  const mirror = repo === 'sideshift-monorepo' ? 'mirror.git' : `mirrors/${repo}.git`;
 
   const c = connection();
   const job = `${Date.now()}-${process.pid}`;
   const key = `${path.basename(root).replace(/[^\w.-]/g, '_').slice(0, 40)}-${sha256(root).slice(0, 8)}`;
   const rhome = `/Users/${c.user}/heavy-remote`;
-  const remote = { wd: `${rhome}/work/${key}`, out: `${rhome}/out/${job}/abs`, node: `${rhome}/node24/bin` };
-  const plan = planJob(command, { cwd, root, home: HOME, remote });
+  const remote = { wd: `${rhome}/work/${key}`, out: `${rhome}/out/${job}/abs`, node: `${rhome}/node24/bin`, dd: `${rhome}/dd/${key}` };
+  const plan = planJob(command, { cwd, root, home: HOME, remote, pool });
   if (!plan.ok) return skip(plan.reason);
+  // Each MacBook simulator the job names: its device type and runtime, so the
+  // Studio can use one of the same kind.
+  let sims = '';
+  if (plan.sims.length) {
+    const list = JSON.parse(spawnSync('xcrun', ['simctl', 'list', 'devices', '-j'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '{}');
+    const specs = [];
+    for (const udid of plan.sims) {
+      const found = Object.entries(list.devices ?? {}).flatMap(([rt, ds]) => ds.map((d) => ({ ...d, rt }))).find((d) => d.udid === udid);
+      if (!found) return skip(`simulator ${udid} is not on this Mac`);
+      specs.push([udid, found.name, found.deviceTypeIdentifier, found.rt].join('|'));
+    }
+    sims = specs.join(';');
+  }
 
   const read = (f) => statOrNull(path.join(root, f)) ? fs.readFileSync(path.join(root, f)) : Buffer.alloc(0);
-  const depkey = sha256(read('package-lock.json'), read('.npmrc'), NODE_VERSION).slice(0, 20);
+  const depkey = statOrNull(path.join(root, 'package-lock.json')) ? sha256(read('package-lock.json'), read('.npmrc'), NODE_VERSION).slice(0, 20) : 'none';
   const ssh = sshOptions(c);
   const target = `${c.user}@${c.host}`;
   const helperHash = sha256(fs.readFileSync(HELPER)).slice(0, 12);
@@ -306,11 +351,11 @@ async function main() {
     spawnSync('ssh', [...ssh, target, args], { input, encoding: 'utf8', timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
 
   // 1. Probe: is the Studio up, with a free slot, disk and memory?
-  let probe = remoteCall(`${helper} probe ${depkey}`);
+  let probe = remoteCall(`${helper} probe ${depkey} ${pool}`);
   if (probe.status === 127 || /No such file/.test(probe.stderr ?? '')) {
     const up = remoteCall(`mkdir -p ${rhome}/bin && cat > ${helper}.tmp && chmod +x ${helper}.tmp && mv ${helper}.tmp ${helper}`, fs.readFileSync(HELPER));
     if (up.status !== 0) return log(`busy: helper upload failed: ${up.stderr?.trim()}`), 0;
-    probe = remoteCall(`${helper} probe ${depkey}`);
+    probe = remoteCall(`${helper} probe ${depkey} ${pool}`);
   }
   if (probe.status !== 0) return log(`busy: studio unreachable (${(probe.stderr || '').trim().split('\n').pop()})`), 0;
   const p = Object.fromEntries(probe.stdout.trim().split(/\s+/).map((kv) => kv.split('=')));
@@ -327,6 +372,11 @@ async function main() {
     log('synced .env.local to the studio');
   }
 
+  // A repo's first job creates its mirror, filled from GitHub so the push is small.
+  if (mirror !== 'mirror.git') {
+    const init = spawnSync('ssh', [...ssh, target, `${helper} init-mirror ${mirror} ${repo}`], { encoding: 'utf8', timeout: 900_000 });
+    if (init.status !== 0) return log(`busy: mirror init failed: ${(init.stderr || '').trim().split('\n').pop()}`), 0;
+  }
   const tProbe = Date.now();
   // 2. Code: push HEAD (and origin/main, the preflight's base) to the mirror.
   const sha = git(root, ['rev-parse', 'HEAD'])?.trim();
@@ -343,7 +393,7 @@ async function main() {
       refspecs.push(`+${commit}:refs/heavy-base/${key}`);
     }
   }
-  const push = spawnSync('git', ['-C', root, 'push', '-q', '--no-verify', `${target}:heavy-remote/mirror.git`, ...refspecs], {
+  const push = spawnSync('git', ['-C', root, 'push', '-q', '--no-verify', `${target}:heavy-remote/${mirror}`, ...refspecs], {
     encoding: 'utf8',
     env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
     timeout: 300_000,
@@ -390,13 +440,13 @@ async function main() {
   // 4. Run. stdout streams straight through; stderr is held until the start
   // mark, so a job that never starts leaves no trace in the agent's output.
   const maxSecs = Number(opts['max-secs'] || 2700);
-  const remoteCmd = `HEAVY_REMOTE_SUBDIR=${shq(plan.subdir || '.')} ${helper} run ${key} ${sha} ${depkey} ${job} ${maxSecs} ${shq(plan.script)}`;
+  const remoteCmd = `HEAVY_REMOTE_SUBDIR=${shq(plan.subdir || '.')} HEAVY_REMOTE_POOL=${pool} HEAVY_REMOTE_MIRROR=${shq(mirror)} HEAVY_REMOTE_SIMS=${shq(sims)} ${helper} run ${key} ${sha} ${depkey} ${job} ${maxSecs} ${shq(plan.script)}`;
   const tar = spawn('tar', ['-cf', '-', '-C', stage, '.'], { stdio: ['ignore', 'pipe', 'ignore'] });
   const child = spawn('ssh', [...sshOptions(c, { shared: false }), target, remoteCmd], { stdio: ['pipe', 'pipe', 'pipe'] });
   tar.stdout.pipe(child.stdin);
   child.stdin.on('error', () => {});
   // Studio paths in the output (ESLint, tsc, pwd) read as this Mac's paths.
-  const pairs = [[remote.out, ''], [remote.wd, root]];
+  const pairs = [[remote.out, ''], ...plan.caches.map(([local, there]) => [there, local]), [remote.wd, root]];
   const out = pathRewriter(pairs, (s) => process.stdout.write(s));
   const err = pathRewriter(pairs, (s) => process.stderr.write(s));
   child.stdout.on('data', (buf) => out.write(buf));

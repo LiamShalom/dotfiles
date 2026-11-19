@@ -113,13 +113,13 @@ esac
 REMOTE="$(dirname "$(readlink -f "$0")")/heavy-remote.mjs"
 remote_next=0
 try_remote() {
-	[ "$POOL" = slot ] && [ "${HEAVY_REMOTE:-1}" != 0 ] && [ -f "$REMOTE" ] && [ ! -e "$remote_skip" ] || return 1
+	{ [ "$POOL" = slot ] || [ "$POOL" = xcode ]; } && [ "${HEAVY_REMOTE:-1}" != 0 ] && [ -f "$REMOTE" ] && [ ! -e "$remote_skip" ] || return 1
 	local now rc
 	now=$(date +%s)
 	[ "$now" -ge "$remote_next" ] || return 1
 	remote_next=$((now + ${HEAVY_REMOTE_RETRY_SECS:-30}))
 	rm -f "$started"
-	node "$REMOTE" --started "$started" --queued "$queued" --pinwait "$pinwait" --skip "$remote_skip" --max-secs "$MAX_SECS" -- "$@"
+	node "$REMOTE" --pool "$POOL" --started "$started" --queued "$queued" --pinwait "$pinwait" --skip "$remote_skip" --max-secs "$MAX_SECS" -- "$@"
 	rc=$?
 	if [ -e "$started" ]; then
 		rm -f "$started"

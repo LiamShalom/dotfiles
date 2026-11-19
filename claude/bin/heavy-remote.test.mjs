@@ -172,3 +172,38 @@ test('--base refs are reported so the mirror gets them', () => {
   assert.deepEqual(plan('node scripts/agent-preflight.mjs --base origin/feat/listing-boost-tiers > /tmp/p.log').refs, ['origin/feat/listing-boost-tiers']);
   assert.deepEqual(plan('node scripts/agent-preflight.mjs --base=main').refs, ['main']);
 });
+
+const mob = '/Users/liam/sideshift-mobile-wt-reconnect';
+const iosPlan = (script) =>
+  planJob(['/bin/zsh', '-c', script], { cwd: mob, root: mob, home, remote: { ...remote, dd: '/Users/s/hr/dd/k' }, stat, env: {}, pool: 'xcode' });
+const UDID = 'D1B92C58-6B6F-4918-B2D2-4CA7469AF443';
+
+test('an iOS simulator test maps its project, DerivedData, simulator and log', () => {
+  const r = iosPlan(
+    `cd ${mob} && xcodebuild -parallel-testing-enabled NO test -quiet -project SideShift.xcodeproj -scheme SideShiftTests -destination 'platform=iOS Simulator,id=${UDID}' -derivedDataPath ${home}/.cache/sideshift-reconnect-dd -only-testing:SideShiftTests/CreatorSocialOAuthTests CODE_SIGNING_ALLOWED=NO > ${home}/.cache/reconnect-test.log 2>&1; echo "exit $?" >> ${home}/.cache/reconnect-test.log`,
+  );
+  assert.equal(r.ok, true, r.reason);
+  assert.deepEqual(r.sims, [UDID]);
+  assert.match(r.script, /^cd \/Users\/s\/hr\/work\/k && xcodebuild/);
+  assert.match(r.script, /-derivedDataPath \/Users\/s\/hr\/dd\/k -only-testing/);
+  assert.deepEqual(r.outputs, [`${home}/.cache/reconnect-test.log`]);
+  assert.deepEqual(r.caches, [[`${home}/.cache/sideshift-reconnect-dd`, '/Users/s/hr/dd/k']]);
+});
+
+for (const [script, reason] of [
+  [`xcodebuild test -scheme S -destination 'platform=iOS,id=00008110-001A2B3C4D5E801E'`, /iOS Simulator/],
+  [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`, /by name/],
+  [`xcodebuild archive -scheme S -destination 'generic/platform=iOS'`, /archives/],
+  [`xcrun simctl boot ${UDID}; xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'`, /device/],
+  ['npm test', /not an xcodebuild job/],
+]) {
+  test(`iOS stays local: ${script.slice(0, 60)}`, () => {
+    const r = iosPlan(script);
+    assert.equal(r.ok, false);
+    assert.match(r.reason, reason);
+  });
+}
+
+test('xcodebuild in the general pool stays local', () => {
+  assert.equal(plan(`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'`).ok, false);
+});
