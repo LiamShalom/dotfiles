@@ -79,7 +79,7 @@ note is stale. Items 1 and 2 below are resolved; the Design section can start.
   output apart from timings, 1 s vs 52 s), exit codes, stdout/stderr, files written to /tmp and
   job dirs, worktree edits/ignored files/deletions copied back, Studio unreachable → local,
   SIGTERM and SIGKILL cancel stop the Studio job, pinned job clears its pinwait.
-- Known differences: the Studio has no `.env.local` (CI-like); output that truncates a Studio
+- The MacBook worktree's `.env.local` is synced to `~/heavy-remote/secrets/env.local` (mode 600, re-sent when it changes) and linked into each Studio worktree. 1Password is not synced: no queued job needs it, and the account is shared. Known differences: output that truncates a Studio
   path cannot be mapped back; remote start costs ~10-20 s (git status of the worktree + push).
 - Studio disk is the limit (10-22 GB free, fluctuating). The Studio's Codex user has 45 GB in
   `~/.codex/tmp/google-ads-4341-e2e` (untouched since 10-05); deleting it is Liam's call.

@@ -36,7 +36,6 @@ const SHELLS = new Set(['/bin/zsh', '/bin/bash', '/bin/sh', 'zsh', 'bash', 'sh']
 const LOCAL_ONLY = [
   [/(^|[^\w/.-])~\//, 'uses ~/'],
   [/\$\{?HOME\b/, 'uses $HOME'],
-  [/\.env\b/, 'reads env files'],
   [/with-test-secrets|\bop\s+(run|read|inject)\b/, 'uses secrets'],
   [/\b(vercel|gcloud|firebase|cloud-sql-proxy|psql|docker|colima|gh|ssh|scp|rsync|curl|wget|open)\b/, 'uses a local tool or account'],
   [/\bgit\s+(push|pull|fetch|worktree|stash|checkout|switch|reset|commit|merge|rebase)\b/, 'changes git state'],
@@ -319,6 +318,14 @@ async function main() {
   if (Number(p.disk_gb) < MIN_DISK_GB) return log(`busy: studio disk ${p.disk_gb} GB`), 0;
   if (Number(p.mem) < 15) return log(`busy: studio memory ${p.mem}%`), 0;
   if (p.install === 'building') return log('busy: studio install building'), 0;
+  // Keep the Studio's copy of this worktree's .env.local current (owner-only).
+  const envFile = path.join(root, '.env.local');
+  const envData = statOrNull(envFile)?.isFile() ? fs.readFileSync(envFile) : null;
+  if (envData && sha256(envData).slice(0, 12) !== p.env) {
+    const up = remoteCall(`umask 077 && mkdir -p ${rhome}/secrets && cat > ${rhome}/secrets/env.local.tmp && mv ${rhome}/secrets/env.local.tmp ${rhome}/secrets/env.local`, envData);
+    if (up.status !== 0) return log('busy: env upload failed'), 0;
+    log('synced .env.local to the studio');
+  }
 
   const tProbe = Date.now();
   // 2. Code: push HEAD (and origin/main, the preflight's base) to the mirror.

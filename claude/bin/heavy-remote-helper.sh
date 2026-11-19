@@ -87,7 +87,8 @@ mkdir -p "$R/slots" "$R/state" "$R/work" "$R/installs" "$R/out"
 
 case "$cmd" in
 probe)
-	echo "slots=$(free_slots) disk_gb=$(disk_free_gb) mem=$(mem_free_pct) install=$(install_state "$1")"
+	envsum=$(shasum -a 256 "$R/secrets/env.local" 2>/dev/null | cut -c1-12)
+	echo "slots=$(free_slots) disk_gb=$(disk_free_gb) mem=$(mem_free_pct) install=$(install_state "$1") env=${envsum:-none}"
 	;;
 
 run)
@@ -134,6 +135,8 @@ run-locked)
 		(cd "$wd" && tr '\n' '\0' <"$out/wd.deleted" | xargs -0 rm -f --)
 		rm -f "$out/wd.deleted"
 	fi
+	# The MacBook's .env.local (owner-only copy), so tests load what they load there.
+	if [ -f "$R/secrets/env.local" ]; then ln -sfn "$R/secrets/env.local" "$wd/.env.local"; else rm -f "$wd/.env.local"; fi
 	t_sync=$((SECONDS - t0 - t_checkout))
 	export PATH="$NODE_BIN:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
 	# Dependencies: clone the cached install for this lockfile.
