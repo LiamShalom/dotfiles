@@ -178,3 +178,18 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
 - Cause before #10843: the grace opener (`utils/firebase/admin-billing.ts`) and the hourly sweep (`lib/api/cron/dunning-sweep.usecase.ts`) only read the client's own Stripe customer. Since #10843 both call `agencyPlanCoversClient` (`lib/billing/agency-plan-coverage.ts`), so this should not recur.
 - Repair: `PG_ALLOW_PRODUCTION=1 npx tsx scripts/restore-false-churn-offboards.ts --company <id>` (dry run), then add `--apply --notify`. It refuses without the env flag before writing anything. Check after: `offboarded_at` null, no campaigns with `archived_reason like 'Grace%'` still archived.
 - Handle approvals refused with "linked contract is declined" after a restore: the creator declined the invite. Not caused by the restore; the brand can reject the requests or re-invite.
+
+## A client paying a SideShift invoice is stuck on "Confirming your payment" (foundable, 2026-11-18)
+
+- A client who pays SideShift (or a brand's customer) pays an **invoice**, not a wallet top-up, so `wallet_ledger` and
+  Stripe show nothing. Find it in Firestore: `invoices` `where customerEmail == <payer email>` (the dashboard
+  `firestore_query_collection` takes `where`; an unknown key such as `filters` is silently ignored and returns random docs).
+  SideShift's own invoices have `companyId 7UwCuR27Byk1E9t7lDAv`.
+- `elementsPaymentAttempt.paymentId` is the latest Whop payment. `invoices/<id>/invoicePaymentFailures` holds one doc per
+  failed Whop payment (written by the `payment.failed` webhook). Read each at `GET https://api.whop.com/api/v1/payments/<pay_id>`
+  with `WHOP_API_KEY` from the monorepo `.env.local`: `substatus failed` + `amount_charged 0.00` = nothing debited.
+  Whop gives only "The payment failed." for these ACH failures; no reason is exposed.
+- Since #11008 (merged 2026-11-19) the public invoice response carries `lastPaymentFailed` and the page shows the pay
+  form with an error. Before it, a failed ACH payment left "Confirming" forever.
+- `allowedPaymentTypes` can list `bank_wire` while Whop's payment form shows only Card and ACH. Check the live page
+  before telling anyone wire is available.
