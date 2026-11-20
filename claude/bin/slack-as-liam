@@ -91,6 +91,15 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
           exit 2
         fi
       fi
+      # A channel with no scope yet: a post that names no account is fine only in an unshared (team) channel.
+      if [ -z "$saved" ] && [ "$ACCOUNTS" = none ]; then
+        itoken=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null || true)
+        info=$( (cd "$HOME" && SLACK_USER_TOKEN="$itoken" env -u SLACK_BOT_TOKEN slack api --skip-update conversations.info channel="$channel") 2>/dev/null | sed -n '/^{/,$p' || true)
+        if [ "$(jq -r 'if .ok == true and (.channel.is_ext_shared | not) and (.channel.is_pending_ext_shared | not) then "internal" else "shared" end' <<<"$info" 2>/dev/null || true)" != internal ]; then
+          echo "slack-as-liam: $channel is shared with another company (or Slack did not say) and has no saved account scope. Name its one company account (proven by team membership) in ACCOUNTS; that saves the scope and its check." >&2
+          exit 2
+        fi
+      fi
       if [ "$ACCOUNTS" != none ] && [ "$saved" != internal ]; then
         if [ -z "$saved" ]; then
           one="${ACCOUNTS// /}"
@@ -138,8 +147,9 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
         while IFS= read -r id; do
           [ -n "$id" ] && case "$body" in *"$id"*) hits="$hits; account id $id" ;; esac
         done < <(jq -r --arg c "$channel" '.[$c].foreign.others // [] | .[]' "$scope_file" 2>/dev/null)
-        brand=$(jq -r --arg c "$channel" '.[$c].foreign.name // empty' "$scope_file" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/ /g; s/^ +| +$//g')
+        brand=$( { jq -r --arg c "$channel" '.[$c].foreign.name // empty' "$scope_file" 2>/dev/null || true; } | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/ /g; s/^ +| +$//g')
         if [ -n "$brand" ] && printf '%s' "$norm" | grep -Eq "(^| )(other|another|second|third|both)( [a-z0-9]+){0,6} $brand( |$)"; then hits="$hits; another \"$brand\" account"; fi
+        if [ -n "$saved" ] && printf '%s' "$norm" | grep -Eq "(^| )(your|the|their|our) other ((brand|company|sideshift|melaxin) )?accounts?( |$)|(^| )sideshift managed( |$)|(^| )managed accounts?( |$)"; then hits="$hits; \"other account\" / \"managed account\" wording"; fi
         if [ -n "$hits" ]; then
           echo "slack-as-liam: this text names another account with the same brand name (${hits#; }). This channel belongs to ${saved:-its own account}; drop the other account's campaigns, settings and creators." >&2
           exit 2

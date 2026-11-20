@@ -987,6 +987,8 @@ export function refreshForeign(channel, file = ACCOUNTS_FILE) {
   map[channel] = { ...entry, foreign }
   writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`)
 }
+// Wording that points at a second account of the brand without naming it (the verifier's 11-20 rewordings).
+export const OTHER_ACCOUNT = /\b(your|the|their|our) other (brand |company |sideshift |melaxin )?accounts?\b|\bsideshift managed\b|\bmanaged accounts?\b/
 const normalized = (text) => ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
 // What in the text names another same-named account: one of its campaign names, its company id, or
 // "the other <brand> account". Checked on the text itself, whatever the run says it used.
@@ -997,6 +999,7 @@ export function foreignHits(text, foreign) {
   hits.push(...(foreign.others ?? []).filter((id) => id && String(text).includes(id)).map((id) => `account id ${id}`))
   const brand = normalized(foreign.name).trim()
   if (brand && new RegExp(`\\b(other|another|second|third|both)\\b.{0,40}\\b${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(norm)) hits.push(`another "${foreign.name}" account`)
+  if (OTHER_ACCOUNT.test(norm)) hits.push('"other account" / "managed account" wording')
   return hits
 }
 const listOf = (value) => (Array.isArray(value) ? value : []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim())
@@ -1538,7 +1541,8 @@ async function runInterim(file) {
     // The notes it read may hold another same-named account's data: the text is checked, not trusted.
     if (!String(job.hit.channel).startsWith('D')) {
       const scope = scopeFor(job.hit.channel)
-      const hits = scope.error ? [scope.error] : scope.saved?.includes('internal') ? [] : scope.saved && !scope.foreign ? ['no lookup of same-named accounts'] : foreignHits(reply, scope.foreign)
+      const hits = scope.error ? [scope.error] : scope.saved?.includes('internal') ? [] : scope.saved && !scope.foreign ? ['no lookup of same-named accounts']
+        : !scope.saved && await extShared(job.hit.channel) ? ['a shared channel with no saved account scope'] : foreignHits(reply, scope.foreign)
       if (hits.length) {
         log('interim_done', { key: job.hit.key, ok: true, posted: false, cost_usd: cost, why: `names another account: ${hits.join('; ').slice(0, 200)}` })
         return

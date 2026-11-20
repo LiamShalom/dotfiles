@@ -49,7 +49,28 @@ export async function foreignTerms(companyId) {
     const words = t.split(' ')
     return words.length >= 3 ? [t, words.slice(0, -1).join(' ')] : [t]
   })
-  const terms = [...new Set(forms)]
+  // Creators on the other accounts' contracts, minus creators the company has too.
+  const creatorsOf = async (ids) => {
+    const out = []
+    for (let i = 0; i < ids.length; i += 30) {
+      const snap = await db.collection('contractsv2').where('companyId', 'in', ids.slice(i, i + 30)).select('contractorName').get()
+      out.push(...snap.docs.map((d) => d.get('contractorName')).filter((n) => typeof n === 'string'))
+    }
+    return out.map(normalize)
+  }
+  const ownCreators = new Set(await creatorsOf([companyId]))
+  const creators = (others.length ? await creatorsOf(others) : []).filter((c) => c.split(' ').length >= 2 && !ownCreators.has(c))
+  // Who owns each other account (an agency): "UGC World Agency". SideShift itself is the platform's name.
+  const owners = []
+  for (const id of others) {
+    const parent = (await db.doc(`users/${id}`).get()).get('parentCompanyId')
+    const owner = parent ? (await db.doc(`users/${parent}`).get()).get('name') : null
+    if (typeof owner === 'string' && normalize(owner) !== 'sideshift') {
+      const words = normalize(owner).split(' ')
+      owners.push(normalize(owner), ...(words.length >= 3 ? [words.slice(0, -1).join(' ')] : []))
+    }
+  }
+  const terms = [...new Set([...forms, ...creators, ...owners])]
     .filter((t) => t.length >= MIN_TERM && t !== brand && !ownNames.some((own) => ` ${own} `.includes(` ${t} `)))
   await app.delete()
   return { companyId, name, others, terms, at: new Date().toISOString() }

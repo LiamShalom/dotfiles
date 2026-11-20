@@ -917,3 +917,16 @@ test('an unreadable scope file holds the reply; a missing one is no scope', () =
   assert.ok(replyPlan(out, 'C0BRMEZRHKP', scopeFor('C0BRMEZRHKP', bad)).blocked)
   assert.deepEqual(scopeFor('C0BRMEZRHKP', joinPath(dir, 'missing.json')), { saved: null, foreign: null })
 })
+
+test('reworded leaks (verifier 11-20) are caught: managed or other account wording, an owner agency, another account\'s creator', () => {
+  const foreign = { ...MELAXIN, terms: [...MELAXIN.terms, 'ugc world agency', 'ugc world', 'angela lanter'] }
+  for (const reply of [
+    'the SideShift-managed account still has it off on its 4 US campaigns',
+    "that one isnt yours, its on UGC World's Melaxin account",
+    'your other account has it off on its 4 US campaigns',
+    'Angela Lanter is also on it',
+  ]) assert.ok(foreignHits(reply, foreign).length, reply)
+  for (const reply of ['its on for your US UGC campaign now', 'ask her to connect her Instagram before she posts']) {
+    assert.deepEqual(foreignHits(reply, foreign), [], reply)
+  }
+})
