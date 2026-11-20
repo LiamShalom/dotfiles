@@ -913,12 +913,12 @@ Prove or disprove each one now with data: a query on the read replica, a log sea
 
 // A claim is checked before the reply goes out, so nobody reads a guess that a correction takes back.
 // Returns what to post, or why not: null when there is nothing to post.
-export function replyPlan(out, channel = null, saved = channel ? savedAccounts(channel) : null) {
+export function replyPlan(out, channel = null, saved = channel ? savedAccounts(channel) : null, shared = true) {
   const text = String(out?.reply ?? '').trim()
   if (!text || !['done', 'needs_reporter', 'needs_liam'].includes(out?.status)) return null
   const claims = unprovenClaims(out)
   if (claims.length) return { text, blocked: claims }
-  const accounts = channel ? accountProblems(out, channel, saved) : []
+  const accounts = channel ? accountProblems(out, channel, saved, shared) : []
   if (accounts.length) return { text, blocked: accounts }
   const images = (Array.isArray(out.reply_images) ? out.reply_images : []).filter((p) => typeof p === 'string' && p.startsWith('/') && p.endsWith('.png'))
   return { text, images }
@@ -956,12 +956,25 @@ export function rememberAccounts(channel, accounts, file = ACCOUNTS_FILE) {
   return ids
 }
 const listOf = (value) => (Array.isArray(value) ? value : []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim())
+// A run may save only one account as a new channel's scope. "internal" or several accounts are set
+// with `--accounts`, and "internal" never for a channel shared with another company.
+export const autoSavable = (accounts) => { const ids = listOf(accounts); return ids.length === 1 && ids[0] !== 'internal' ? ids : null }
+// Whether the channel is shared with another company (Slack Connect). Unknown counts as shared.
+export async function extShared(channel) {
+  if (String(channel).startsWith('D')) return false
+  try {
+    const info = (await slack('conversations.info', { channel })).channel ?? {}
+    return Boolean(info.is_ext_shared || info.is_pending_ext_shared)
+  } catch { return true }
+}
 // What is wrong with the reply's accounts, or [] when nothing. The saved scope wins over the run's own.
-export function accountProblems(out, channel, saved) {
+// `shared`: the channel is (or may be) shared with another company; "internal" does not hold there.
+export function accountProblems(out, channel, saved, shared = true) {
   if (!String(out?.reply ?? '').trim() || String(channel).startsWith('D')) return []
   const scope = saved ?? listOf(out?.accounts?.channel)
   if (!scope.length) return ['`accounts.channel` is empty: name the company account(s) this channel belongs to']
-  if (scope.includes('internal')) return []
+  if (!saved && scope.length > 1 && !scope.includes('internal')) return ['`accounts.channel` names several accounts, and a channel with no saved scope takes one: name the one account its reporter belongs to (Liam sets a several-account scope with `slack-eyes.mjs --accounts`)']
+  if (scope.includes('internal')) return shared ? ['this channel is shared with another company, so it is not "internal": name the one company account it belongs to'] : []
   return listOf(out?.accounts?.used).filter((id) => !scope.includes(id)).map((id) => `the reply states data from account ${id}, which is not this channel's (${scope.join(', ')})`)
 }
 export const accountsPrompt = (problems, saved) => `Your reply has not been posted. ${problems.join('; ')}.
@@ -1088,6 +1101,7 @@ async function runJob(file) {
   let draft = ''
   let unseen = false
   let postFailed = null
+  const shared = await extShared(job.hit.channel)
   for (;;) {
     // Everything up to now is known to the session (it reads the thread); later posts are new.
     let before = job.seenTs ?? '0'
@@ -1120,8 +1134,8 @@ async function runJob(file) {
       } else if (unprovenClaims(out).length && !sent.has('verify')) {
         log('unproven_claims_refused', { key: job.hit.key, model: modelOf(job), claims: unprovenClaims(out) })
         sent.add('verify'); refused.push(...unprovenClaims(out)); next = verifyPrompt(unprovenClaims(out))
-      } else if (replyPlan(out) && accountProblems(out, job.hit.channel, savedAccounts(job.hit.channel)).length && !sent.has('accounts')) {
-        const problems = accountProblems(out, job.hit.channel, savedAccounts(job.hit.channel))
+      } else if (replyPlan(out) && accountProblems(out, job.hit.channel, savedAccounts(job.hit.channel), shared).length && !sent.has('accounts')) {
+        const problems = accountProblems(out, job.hit.channel, savedAccounts(job.hit.channel), shared)
         log('reply_accounts_refused', { key: job.hit.key, problems })
         sent.add('accounts'); refused.push(...problems); next = accountsPrompt(problems, savedAccounts(job.hit.channel))
       } else if (replyPlan(out) && tooLong(out.reply) && !sent.has('short')) {
@@ -1183,10 +1197,10 @@ async function runJob(file) {
     if (turn.out ?? lastOut) draft = String((turn.out ?? lastOut).reply ?? '').trim()
     // Post the reply now that every check passed and the thread has nothing the run has not read.
     // A post that finds new messages first sends them back with the draft, like any new context.
-    const plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel) : null
+    const plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel, savedAccounts(job.hit.channel), shared) : null
     if (plan && !plan.blocked) {
       if (!savedAccounts(job.hit.channel) && !String(job.hit.channel).startsWith('D')) {
-        const saved = rememberAccounts(job.hit.channel, turn.out.accounts?.channel)
+        const saved = rememberAccounts(job.hit.channel, autoSavable(turn.out.accounts?.channel))
         if (saved) log('accounts_saved', { key: job.hit.key, channel: job.hit.channel, accounts: saved })
       }
       try {
@@ -1211,7 +1225,7 @@ async function runJob(file) {
   // its post failed, or the last turn failed after an earlier one wrote it. The board session gets its text.
   let held = null
   if (draft && !turn.raised && !raiseAsked(job)) {
-    const plan = out ? replyPlan(out, job.hit.channel) : null
+    const plan = out ? replyPlan(out, job.hit.channel, savedAccounts(job.hit.channel), shared) : null
     held = plan?.blocked ? { why: `its reply still had claims it could not prove or data from another account (${plan.blocked.join('; ').slice(0, 300)}), so the watcher did not post it`, text: draft }
       : postFailed ? { why: `the watcher could not post its reply (${postFailed})`, text: draft }
       : out && unseen ? { why: `it used all ${MAX_TURNS} turns before it read the latest thread messages, so the watcher did not post its reply`, text: draft }
@@ -2069,12 +2083,13 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
     : args.has('--posted') ? postedFromCli(...argv.slice(argv.indexOf('--posted') + 1, argv.indexOf('--posted') + 4))
     : args.has('--list') ? Promise.resolve(listJobs())
     // `--accounts <channel> [id ...]`: print or set the channel's account scope (ids, or "internal").
-    : args.has('--accounts') ? Promise.resolve((() => {
+    : args.has('--accounts') ? (async () => {
       const [channel, ...ids] = argv.slice(argv.indexOf('--accounts') + 1)
-      if (!channel) throw new Error('usage: --accounts <channel> [companyId ... | internal]')
+      if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal]')
+      if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
       console.log(`${channel}: ${(savedAccounts(channel) ?? ['(none saved)']).join(', ')}`)
-    })())
+    })()
     : main()
   work.catch((error) => {
     log(args.has('--run') ? 'job_failed' : args.has('--set') ? 'set_failed' : args.has('--open') ? 'open_failed' : args.has('--headless') ? 'headless_failed' : args.has('--thread') || args.has('--posted') ? 'thread_add_failed' : 'run_failed', { job, error: String(error.message ?? error) })

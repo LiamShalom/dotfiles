@@ -817,7 +817,7 @@ test('the reporter is tagged once per thread: a later reply drops the tag', () =
   assert.equal(dropRepeatTag(thread, '100.0', 'no tag here'), 'no tag here')
 })
 
-import { accountProblems, accountsPrompt, rememberAccounts, savedAccounts, loadAccounts } from './slack-eyes.mjs'
+import { accountProblems, accountsPrompt, rememberAccounts, savedAccounts, loadAccounts, autoSavable } from './slack-eyes.mjs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
@@ -838,10 +838,18 @@ test('a reply stating another account\'s data is refused and never posted', () =
   assert.match(accountsPrompt(problems, [J2]), /team membership/)
 })
 
-test('the saved scope wins over the run\'s own claim about the channel', () => {
+test('the saved scope wins over the run\'s own claim, and a run cannot claim several accounts or "internal" for a shared channel', () => {
   const claimsAll = { ...leaked, accounts: { channel: [J2, '5dVaH8c7gty7nhDoxczU'], used: [J2, '5dVaH8c7gty7nhDoxczU'] } }
-  assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', null).length, 0)
+  assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', null).length, 1)
   assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', [J2]).length, 1)
+  const claimsInternal = { ...leaked, accounts: { channel: ['internal'], used: ['5dVaH8c7gty7nhDoxczU'] } }
+  assert.equal(accountProblems(claimsInternal, 'C0BRMEZRHKP', null, true).length, 1)
+  assert.equal(accountProblems(claimsInternal, 'C0BRMEZRHKP', null).length, 1, 'unknown sharing counts as shared')
+  assert.ok(replyPlan(claimsInternal, 'C0BRMEZRHKP', null, true).blocked)
+  assert.deepEqual(autoSavable([J2]), [J2])
+  assert.equal(autoSavable([J2, 'x']), null)
+  assert.equal(autoSavable(['internal']), null)
+  assert.equal(autoSavable([]), null)
 })
 
 test('a reply with only the channel\'s account, no account data, an internal channel or a DM passes', () => {
@@ -849,7 +857,7 @@ test('a reply with only the channel\'s account, no account data, an internal cha
   assert.deepEqual(accountProblems(fixed, 'C0BRMEZRHKP', [J2]), [])
   assert.deepEqual(replyPlan(fixed, 'C0BRMEZRHKP', [J2]), { text: fixed.reply, images: [] })
   assert.deepEqual(accountProblems({ ...leaked, accounts: { channel: [J2], used: [] } }, 'C0BRMEZRHKP', [J2]), [])
-  assert.deepEqual(accountProblems(leaked, 'C0INTERNAL', ['internal']), [])
+  assert.deepEqual(accountProblems(leaked, 'C0INTERNAL', ['internal'], false), [])
   assert.deepEqual(accountProblems(leaked, 'D0B70K2EB9R', null), [])
   assert.deepEqual(accountProblems({ ...leaked, reply: '' }, 'C0BRMEZRHKP', [J2]), [])
 })
