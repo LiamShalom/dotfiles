@@ -298,6 +298,11 @@ when the only safe next step is his. Do everything up to that point first: write
 reply (step 5; in a headless run it goes in `reply`), and have the PR ready or the repair dry-run done. Then return `needs_liam`
 (step 7) with the one question he must answer. Do not wait or poll for him.
 
+When the customer stays blocked until a teammate acts (a hold they set, access only they hold),
+ask the teammate AND return `needs_liam` in the same turn, with your pick and what clearing it
+does. Never return `done` with a "waiting on the team" reply while the customer cannot work:
+Mangolabs (11-20) waited hours on payday for Jadon's silent hold before Liam saw it.
+
 After you return, the watcher moves this session onto the board and sends you one more turn.
 In it, give Liam, in a few lines, the message link, what you found, the PR link or the repair
 command, and the reply you posted. End that turn on the question: the board shows the session
