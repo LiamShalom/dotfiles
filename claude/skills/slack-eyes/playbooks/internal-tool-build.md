@@ -45,6 +45,26 @@ except `agents-billing`, and only a human can create a restricted key in the Str
 customer emails leaves the company. Return `needs_liam` with `hold_reason=only_liam_can`, ask which one
 he wants, and reply only with the facts above (the answer to the other question).
 
+## Source per paying customer (checked 2026-11-20)
+
+- Stripe customer metadata `userId` = the app user id = `persons.id` on the read replica. `persons.utms`,
+  `attribution_first`, `attribution_last` hold the signup source. Join on that, not on email.
+- The app's signup record had a source for 459 of 4,439 subscriptions since Aug 15 (Stripe metadata: 336);
+  for payers 95 of 1,116.
+- PostHog does not fill the rest. Project 633691 "SideShift App" is app.sideshift.app, identified by the
+  28-char user id: its `$initial_utm_*` added 14 rows. Project 267410 "SideShift Web" is sideshift.app (the ad
+  landing pages): its visitors are anonymous and never linked to an app account (0 user-id distinct ids, a few
+  hundred with an email). HogQL has no SHA256, execute-sql returns at most 500 rows (page with
+  `distinct_id > '<last>' ORDER BY` and copy each saved tool-result file), and HogQL file exports are off.
+- "Coverage fell in November" in Stripe data: 434 free SideShift Ads subscriptions started in November with
+  no checkout (2 carry a UTM). Leave the free plans out before you compare weeks.
+- Paid invoices: `billing_reason` subscription_cycle = renewal, subscription_update = upgrade or proration.
+  A trial's first payment is a subscription_cycle invoice.
+- The export ran as a tsx script from the main checkout (`--conditions=sideshift-src`, both env files
+  sourced, `env -u STRIPE_SECRET_KEY`), with `getReplicaSql()` from `@sideshiftapp/data-repos`.
+- slack-as-liam refuses posts and uploads in C09BUS9AGRZ (shared channel, no account scope, "internal"
+  refused): Liam posts the files himself.
+
 ## An admin or dashboard tool
 
 Use the `paired-admin-tab` skill: a dashboard capability route plus use case in the monorepo, and a tab
