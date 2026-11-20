@@ -9,8 +9,18 @@ set -euo pipefail
 
 # Only the methods needed to send as Liam; anything else (admin calls) is refused.
 case "${1:-}" in
-  chat.postMessage|chat.scheduleMessage|chat.update|chat.delete|reactions.add|reactions.remove|conversations.open|conversations.create|conversations.invite|users.lookupByEmail|auth.test|files.delete|upload) ;;
+  chat.postMessage|chat.scheduleMessage|chat.update|chat.delete|reactions.add|reactions.remove|conversations.open|conversations.create|conversations.invite|conversations.kick|users.lookupByEmail|auth.test|files.delete|upload) ;;
   *) echo "slack-as-liam: method '${1:-}' is not allowed" >&2; exit 2 ;;
+esac
+
+# Creating a channel and adding or removing its members changes who sees what. CHANNEL_OK=1 only when
+# Liam asked for that channel change in this chat.
+case "$1" in
+  conversations.create|conversations.invite|conversations.kick)
+    if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ "${CHANNEL_OK:-}" != 1 ]; then
+      echo "slack-as-liam: $1 changes channel membership. Set CHANNEL_OK=1 only when Liam asked for this channel change." >&2
+      exit 2
+    fi ;;
 esac
 
 # An agent post must not promise vendor contact that Liam has not asked for (coldtrace 11-17,
