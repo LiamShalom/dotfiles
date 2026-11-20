@@ -2163,14 +2163,12 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
       if (ids.includes('internal') && ids.length > 1) throw new Error('"internal" stands alone')
       if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
       // A first, single-account scope may be saved by anyone. Replacing one, "internal" and several accounts
-      // are Liam's call: he types the channel id at an interactive terminal, which an agent's shell is not.
+      // are Liam's call: never from an agent session, and only after he clicks Allow in a macOS dialog.
       if (ids.length && (scopeFor(channel).saved || scopeFor(channel).error || !autoSavable(ids))) {
-        if (!process.stdin.isTTY) throw new Error(`replacing ${channel}'s scope, "internal" or several accounts is Liam's call: he runs this in his own terminal. Tell him what is wrong with the scope`)
-        const { createInterface } = await import('node:readline/promises')
-        const rl = createInterface({ input: process.stdin, output: process.stdout })
-        const typed = (await rl.question(`Set ${channel} to ${ids.join(', ')}? Type the channel id to confirm: `)).trim()
-        rl.close()
-        if (typed !== channel) throw new Error('not confirmed')
+        const refuse = () => new Error(`replacing ${channel}'s scope, "internal" or several accounts is Liam's call: he runs this in his own terminal and confirms a dialog. Tell him what is wrong with the scope`)
+        if (process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDECODE || !process.stdin.isTTY) throw refuse()
+        const asked = spawnSync('osascript', ['-e', `display dialog "Set the Slack channel ${channel} account scope to: ${ids.join(', ')}?" buttons {"Cancel", "Allow"} default button "Cancel" with title "slack-eyes account scope" with icon caution`], { encoding: 'utf8', timeout: 120_000 })
+        if (asked.status !== 0 || !/button returned:Allow/.test(asked.stdout ?? '')) throw new Error('not confirmed')
       }
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
       console.log(`${channel}: ${(savedAccounts(channel) ?? ['(none saved)']).join(', ')}`)
