@@ -196,3 +196,8 @@ while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: 
 - Since #10036 (11-13) a creator can accept before adding accounts. That writes a `handle_requests` row with `platform`/`handle` null: a join request. The chat profile panel on the right shows it as a "Join request" card with Approve/Reject while `status='pending'` (`dm-creator-context.usecase.ts`). No card means nothing is pending: check `handle_requests.reviewed_at` against the screenshot time.
 - The header's "Handles Awaiting Review" was cached per page and did not clear after an approval until reload. Fixed in #11102: `use-creator-status.ts` re-reads on the `refreshPendingRequests` window event. Sidekick decisions still fire no such event, and the inbox rail dot refreshes only every 2 min or on focus.
 - `reviewed_by` = `invite_<40 hex>` is a team member uid from `team-invite-claim.ts`, not a campaign invite.
+
+## "Can we stop non-US creators before they post?" (melaxin, 2026-11-20)
+
+- Answer: campaign setting "Require a verified country" (`components/campaigns/wizard/residence-requirement-field.tsx`). When it is on, apply (`creator-apply.usecase.ts:117`), invite accept (`accept-invite.usecase.ts:442`) and brand add (`contracts/create-batch.usecase.ts:740`) refuse a creator whose Whop KYC is not verified in a listed country.
+- State per campaign: Firestore `programs/<campaignId>.requirements.verifiedResidenceCountries` (empty or absent = off). Read it with `select_fields: ["requirements"]`. A dotted `requirements.verifiedResidenceCountries` select silently returns nothing, which looked like "off" and led to a wrong reply and a correction.
