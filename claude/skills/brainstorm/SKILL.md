@@ -95,6 +95,16 @@ What each party sees and can do, step by step. Include empty, loading, error sta
 ## Party matrix
 | Party | Can | Must not | Acceptance check |
 
+## Tracking plan
+| Step | Event | Fired where | Key properties |
+| 0 exposure | `<feature>_viewed` | client, on first render of the entry point | ... |
+| n success | `<feature>_completed` | server, after the write commits | ... |
+
+**Target:** <x>% of exposed users reach step n within 7 days (baseline: <query and number>).
+**Guardrail:** `<existing event>` <metric> stays within <y>% of its 14-day pre-launch value.
+**Minimum users:** <n> (default 30).
+**Postgres outcome (optional):** <table/row that proves the real result>.
+
 ## Data and backend
 Tables, fields, writers, readers, migrations (a migration is its own PR first), jobs.
 
@@ -108,6 +118,12 @@ Only items the operator agreed to leave open, each with an owner.
 
 ## Rules
 
+- A feature that adds or changes a user flow (web, iOS or Android) has a **Tracking plan**.
+  Step 0 is an exposure event (who could use it); the success step fires on the server after
+  the write when there is one. Reuse an existing event when it already means the step. Measure
+  the baseline in PostHog (web project 633691, app project 202481) and propose the target and
+  guardrail from it; the operator approves them with the spec. The plan becomes the feature's
+  launch watch, which posts day 1/3/7/14 readouts in #feature-launches (`docs/watches.md`).
 - No implementation code in this skill. A spike to answer a feasibility question is
   allowed; delete it after and record the answer in the spec.
 - No feature flags in the spec unless the operator gives a specific reason.

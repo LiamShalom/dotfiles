@@ -294,6 +294,12 @@ gets said in chat or filed with a concrete `Why not now:` line.
 Add a regression test when the logic can be pinned down by one. Skip it when a test would
 just restate the fix.
 
+**A change that adds or changes a user flow** (not a pure bug fix, copy or backend-only
+change) also gets a tracking plan and a launch watch in the same PR: write the plan (exposure
+event, steps, target and guardrail proposed from PostHog baseline data, minimum users) in the PR
+description, add the events as catalog constants with a test each, and file the watch with
+`/watch` (`kind: launch`). It posts day 1/3/7/14 readouts in #feature-launches.
+
 ## Phase 6 — Verify locally
 
 **Re-run the exact thing that was broken and read the output.** Same instrument, same

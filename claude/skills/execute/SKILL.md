@@ -55,6 +55,14 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
    each task, review the diff yourself against the spec and the reuse rules before the next
    task starts. UI tasks wire the `design` components to real data; they do not restyle them.
 
+   **Tracking plan.** When the spec has a Tracking plan, the build also: adds each new event as a
+   constant in `lib/posthog/events.ts` (web) or the app catalogs (never a free string) and in
+   `LAUNCH_EVENTS` with its launch date; adds a unit test per event that it fires with its key
+   properties; and files the launch watch in the same PR (`/watch`, `kind: launch`, the plan
+   copied in). `node scripts/watches.mjs lint` and `check <slug>` must pass; before merge
+   `check` says it waits for release. On the preview, fire each event and confirm it arrives in
+   PostHog (`read-data-schema`).
+
 4. **Test as you go.** Run the test files next to changed code after each task. Fix failures
    in that task, not later.
 
@@ -113,6 +121,8 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
    - Failures are handled and logged: a provider error, a timeout, or a partial write leaves
      the user a clear state, not a hang or a blank page.
    - No dev preview routes, fixtures, TODOs, flags, debug logs or placeholder copy left.
+   - A flow change has its launch watch in the PR, and every planned event reached PostHog
+     from the preview.
 
    Then get a second read: give the `skeptical-verifier` agent (Opus, fresh context) the
    spec, `acceptance.json`, the branch and the proof report (not your ledger or your
