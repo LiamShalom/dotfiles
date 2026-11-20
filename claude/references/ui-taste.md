@@ -175,6 +175,8 @@ not a variant of the closest weak pattern.
 
 - 11-03 connect step guide: three connect-sheet directions (a card anchored to Connect, steps in the row, a guide popup) for what he had described as a Wispr-style floating card: "This isnt at all what I was thinking, this is a connect but I was looking for a floating step bey step guide". The options must all be the thing he named (here: floating, free of the page). Three variants of a different thing are not options.
 
+- 11-19 link-in-bio product pick, built as a searchable MultiSelect ("1 selected / 48", the pick as the trigger label) at the foot of the Campaign products modal: "this is unclear. Besides I think this entire campaign products can be redesigned and it doesnt make sense that link in bio sits in here". Picking products for a page followers see is done on the products as they look (picture, price), not a text dropdown with a cap counter; and a feature with its own job (a page per creator) gets its own place, not a section tacked onto a modal that does something else.
+
 **15. Add to an existing control before adding a new row.** Extra things about the selected item
 (other cuts, variants) belong in the control that already switches it, not in a new strip that
 pushes the layout.
