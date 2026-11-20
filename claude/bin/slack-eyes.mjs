@@ -913,12 +913,12 @@ Prove or disprove each one now with data: a query on the read replica, a log sea
 
 // A claim is checked before the reply goes out, so nobody reads a guess that a correction takes back.
 // Returns what to post, or why not: null when there is nothing to post.
-export function replyPlan(out, channel = null, saved = channel ? savedAccounts(channel) : null, shared = true) {
+export function replyPlan(out, channel = null, scope = channel ? scopeFor(channel) : null, shared = true) {
   const text = String(out?.reply ?? '').trim()
   if (!text || !['done', 'needs_reporter', 'needs_liam'].includes(out?.status)) return null
   const claims = unprovenClaims(out)
   if (claims.length) return { text, blocked: claims }
-  const accounts = channel ? accountProblems(out, channel, saved, shared) : []
+  const accounts = channel ? accountProblems(out, channel, scope?.error ? undefined : scope?.saved ?? null, shared, scope?.foreign ?? null) : []
   if (accounts.length) return { text, blocked: accounts }
   const images = (Array.isArray(out.reply_images) ? out.reply_images : []).filter((p) => typeof p === 'string' && p.startsWith('/') && p.endsWith('.png'))
   return { text, images }
@@ -944,16 +944,60 @@ export const postedAlready = (thread, fromTs, text) => thread.some((m) => m.user
 // A reply states only the data of the accounts its channel belongs to. On 11-20 a run in J2's channel
 // for its "Dr. Melaxin" account read two other accounts with the same name (SideShift's managed one,
 // another agency's) and posted their campaigns, settings and creators there.
-export const loadAccounts = (file = ACCOUNTS_FILE) => { try { return JSON.parse(readFileSync(file, 'utf8')) } catch { return {} } }
+// A missing file is "no scopes yet"; an unreadable one throws, so a reply is held instead of unchecked.
+export function loadAccounts(file = ACCOUNTS_FILE) {
+  let raw
+  try { raw = readFileSync(file, 'utf8') } catch (error) { if (error.code === 'ENOENT') return {}; throw error }
+  const map = JSON.parse(raw)
+  if (!map || typeof map !== 'object' || Array.isArray(map)) throw new Error(`${file} is not a JSON object`)
+  return map
+}
 export const savedAccounts = (channel, map = loadAccounts()) => (Array.isArray(map[channel]?.accounts) && map[channel].accounts.length ? map[channel].accounts : null)
-export function rememberAccounts(channel, accounts, file = ACCOUNTS_FILE) {
+// The channel's saved scope and the same-named accounts' terms, or { error } when the file is unreadable.
+export const scopeFor = (channel, file = ACCOUNTS_FILE) => {
+  try { const map = loadAccounts(file); return { saved: savedAccounts(channel, map), foreign: map[channel]?.foreign ?? null } } catch (error) { return { error: String(error.message ?? error) } }
+}
+const FOREIGN = join(dirname(fileURLToPath(import.meta.url)), 'account-foreign-terms.mjs')
+// Other company accounts with the same name as `id`, and their campaign names. Null when it cannot tell.
+export function computeForeign(id) {
+  try { return JSON.parse(execFileSync(process.execPath, [FOREIGN, id], { encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] })) } catch (error) {
+    log('foreign_terms_failed', { id, error: String(error.stderr ?? error.message ?? error).slice(0, 200) })
+    return null
+  }
+}
+export function rememberAccounts(channel, accounts, file = ACCOUNTS_FILE, foreign = undefined) {
   const ids = [...new Set((accounts ?? []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim()))]
   if (!channel || !ids.length) return null
   const map = loadAccounts(file)
-  map[channel] = { accounts: ids, setAt: new Date().toISOString() }
+  const terms = foreign !== undefined ? foreign : ids.length === 1 && ids[0] !== 'internal' ? computeForeign(ids[0]) : null
+  map[channel] = { accounts: ids, setAt: new Date().toISOString(), foreign: terms }
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`)
   return ids
+}
+// New campaigns appear on the other accounts: their terms are read again once a day.
+export function refreshForeign(channel, file = ACCOUNTS_FILE) {
+  let map
+  try { map = loadAccounts(file) } catch { return }
+  const entry = map[channel]
+  if (!entry || entry.accounts?.length !== 1 || entry.accounts[0] === 'internal') return
+  if (entry.foreign?.at && Date.now() - Date.parse(entry.foreign.at) < 86_400_000) return
+  const foreign = computeForeign(entry.accounts[0])
+  if (!foreign) return
+  map[channel] = { ...entry, foreign }
+  writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`)
+}
+const normalized = (text) => ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
+// What in the text names another same-named account: one of its campaign names, its company id, or
+// "the other <brand> account". Checked on the text itself, whatever the run says it used.
+export function foreignHits(text, foreign) {
+  if (!foreign) return []
+  const norm = normalized(text)
+  const hits = (foreign.terms ?? []).filter((t) => t && norm.includes(` ${t} `)).map((t) => `"${t}" (a campaign of another "${foreign.name}" account)`)
+  hits.push(...(foreign.others ?? []).filter((id) => id && String(text).includes(id)).map((id) => `account id ${id}`))
+  const brand = normalized(foreign.name).trim()
+  if (brand && new RegExp(`\\b(other|another|second|third|both)\\b.{0,40}\\b${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(norm)) hits.push(`another "${foreign.name}" account`)
+  return hits
 }
 const listOf = (value) => (Array.isArray(value) ? value : []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim())
 // A run may save only one account as a new channel's scope. "internal" or several accounts are set
@@ -969,20 +1013,24 @@ export async function extShared(channel) {
 }
 // What is wrong with the reply's accounts, or [] when nothing. The saved scope wins over the run's own.
 // `shared`: the channel is (or may be) shared with another company; "internal" does not hold there.
-export function accountProblems(out, channel, saved, shared = true) {
+export function accountProblems(out, channel, saved, shared = true, foreign = null) {
   if (!String(out?.reply ?? '').trim() || String(channel).startsWith('D')) return []
+  if (saved === undefined) return ['the channel scope file cannot be read, so the reply cannot be checked: tell Liam']
   const scope = saved ?? listOf(out?.accounts?.channel)
+  const named = scope.includes('internal') ? [] : foreignHits(out.reply, foreign)
+  if (named.length) return named.map((hit) => `the reply names ${hit}, which is not this channel's account`)
   if (!scope.length) return ['`accounts.channel` is empty: name the company account(s) this channel belongs to']
   if (!saved && scope.length > 1 && !scope.includes('internal')) return ['`accounts.channel` names several accounts, and a channel with no saved scope takes one: name the one account its reporter belongs to (Liam sets a several-account scope with `slack-eyes.mjs --accounts`)']
   if (scope.includes('internal')) return shared ? ['this channel is shared with another company, so it is not "internal": name the one company account it belongs to'] : []
   return listOf(out?.accounts?.used).filter((id) => !scope.includes(id)).map((id) => `the reply states data from account ${id}, which is not this channel's (${scope.join(', ')})`)
 }
+export const channelProblems = (out, channel, shared, scope = scopeFor(channel)) => accountProblems(out, channel, scope.error ? undefined : scope.saved ?? null, shared, scope.foreign ?? null)
 export const accountsPrompt = (problems, saved) => `Your reply has not been posted. ${problems.join('; ')}.
 
 This channel belongs to ${saved ? `account(s) ${saved.join(', ')} (saved scope)` : 'the account(s) you name in `accounts.channel`'}. Other accounts with the same brand name belong to other customers or to SideShift's own managed work, and nobody in this channel may see their campaigns, settings, creators or counts. Find the channel's account by team membership (users/<companyId>/members emails of the reporter), not by name. Rewrite \`reply\` with only that account's data, list in \`accounts.used\` every company id it states, and return the result again. If the saved scope is wrong, say so in summary; do not post around it.`
 export const accountsNote = (channel) => {
   if (String(channel).startsWith('D')) return ''
-  const saved = savedAccounts(channel)
+  const { saved = null } = scopeFor(channel)
   return saved
     ? `\n\nAccount scope: this channel belongs to SideShift company account(s) ${saved.join(', ')}. Read and state only their data. Same-named accounts (another agency's, SideShift's managed one) are other customers: never post their campaigns, settings or creators here.`
     : `\n\nAccount scope: none saved for this channel yet. Before your first query, find the one SideShift company account this channel's brand uses, by team membership (users/<companyId>/members emails of the reporter), not by name: brands often have several accounts with the same name. Return it in \`accounts.channel\`; it is saved as this channel's scope.`
@@ -1102,6 +1150,7 @@ async function runJob(file) {
   let unseen = false
   let postFailed = null
   const shared = await extShared(job.hit.channel)
+  refreshForeign(job.hit.channel)
   for (;;) {
     // Everything up to now is known to the session (it reads the thread); later posts are new.
     let before = job.seenTs ?? '0'
@@ -1134,10 +1183,10 @@ async function runJob(file) {
       } else if (unprovenClaims(out).length && !sent.has('verify')) {
         log('unproven_claims_refused', { key: job.hit.key, model: modelOf(job), claims: unprovenClaims(out) })
         sent.add('verify'); refused.push(...unprovenClaims(out)); next = verifyPrompt(unprovenClaims(out))
-      } else if (replyPlan(out) && accountProblems(out, job.hit.channel, savedAccounts(job.hit.channel), shared).length && !sent.has('accounts')) {
-        const problems = accountProblems(out, job.hit.channel, savedAccounts(job.hit.channel), shared)
+      } else if (replyPlan(out) && channelProblems(out, job.hit.channel, shared).length && !sent.has('accounts')) {
+        const problems = channelProblems(out, job.hit.channel, shared)
         log('reply_accounts_refused', { key: job.hit.key, problems })
-        sent.add('accounts'); refused.push(...problems); next = accountsPrompt(problems, savedAccounts(job.hit.channel))
+        sent.add('accounts'); refused.push(...problems); next = accountsPrompt(problems, scopeFor(job.hit.channel).saved ?? null)
       } else if (replyPlan(out) && tooLong(out.reply) && !sent.has('short')) {
         log('reply_too_long', { key: job.hit.key, chars: String(out.reply).length })
         sent.add('short'); next = tooLongPrompt(out.reply)
@@ -1197,9 +1246,9 @@ async function runJob(file) {
     if (turn.out ?? lastOut) draft = String((turn.out ?? lastOut).reply ?? '').trim()
     // Post the reply now that every check passed and the thread has nothing the run has not read.
     // A post that finds new messages first sends them back with the draft, like any new context.
-    const plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel, savedAccounts(job.hit.channel), shared) : null
+    const plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
     if (plan && !plan.blocked) {
-      if (!savedAccounts(job.hit.channel) && !String(job.hit.channel).startsWith('D')) {
+      if (!scopeFor(job.hit.channel).saved && !scopeFor(job.hit.channel).error && !String(job.hit.channel).startsWith('D')) {
         const saved = rememberAccounts(job.hit.channel, autoSavable(turn.out.accounts?.channel))
         if (saved) log('accounts_saved', { key: job.hit.key, channel: job.hit.channel, accounts: saved })
       }
@@ -1225,7 +1274,7 @@ async function runJob(file) {
   // its post failed, or the last turn failed after an earlier one wrote it. The board session gets its text.
   let held = null
   if (draft && !turn.raised && !raiseAsked(job)) {
-    const plan = out ? replyPlan(out, job.hit.channel, savedAccounts(job.hit.channel), shared) : null
+    const plan = out ? replyPlan(out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
     held = plan?.blocked ? { why: `its reply still had claims it could not prove or data from another account (${plan.blocked.join('; ').slice(0, 300)}), so the watcher did not post it`, text: draft }
       : postFailed ? { why: `the watcher could not post its reply (${postFailed})`, text: draft }
       : out && unseen ? { why: `it used all ${MAX_TURNS} turns before it read the latest thread messages, so the watcher did not post its reply`, text: draft }
@@ -1474,6 +1523,15 @@ async function runInterim(file) {
     if (!reply || answered) {
       log('interim_done', { key: job.hit.key, ok: true, posted: false, cost_usd: cost, why: reply ? 'answered meanwhile' : 'no answer needed' })
       return
+    }
+    // The notes it read may hold another same-named account's data: the text is checked, not trusted.
+    if (!String(job.hit.channel).startsWith('D')) {
+      const scope = scopeFor(job.hit.channel)
+      const hits = scope.error ? [scope.error] : scope.saved?.includes('internal') ? [] : foreignHits(reply, scope.foreign)
+      if (hits.length) {
+        log('interim_done', { key: job.hit.key, ok: true, posted: false, cost_usd: cost, why: `names another account: ${hits.join('; ').slice(0, 200)}` })
+        return
+      }
     }
     const ts = (await slack('chat.postMessage', { channel: job.hit.channel, thread_ts: job.hit.threadTs, text: reply })).ts
     updateJob(file, { interimPostTs: [...(readJob(file).interimPostTs ?? []), ts] })
@@ -2089,8 +2147,12 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
       if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal]')
       if (ids.includes('internal') && ids.length > 1) throw new Error('"internal" stands alone')
       if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
-      // Several accounts in one channel is Liam's call (an agency channel for its clients).
-      if (ids.length > 1 && process.env.SCOPE_OK !== '1') throw new Error('several accounts for one channel needs Liam: set SCOPE_OK=1 only when he approved this scope')
+      // From an agent session: only a first, single-account scope. Replacing one, "internal" and several
+      // accounts are Liam's call, run in his own terminal (no CLAUDE_CODE_SESSION_ID there).
+      if (ids.length && process.env.CLAUDE_CODE_SESSION_ID) {
+        if (scopeFor(channel).saved || scopeFor(channel).error) throw new Error(`${channel} already has a scope (or the file is unreadable). Only Liam replaces it, from his own terminal; tell him what is wrong with it`)
+        if (!autoSavable(ids)) throw new Error('an agent session saves one company account; "internal" or several accounts are set by Liam in his own terminal')
+      }
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
       console.log(`${channel}: ${(savedAccounts(channel) ?? ['(none saved)']).join(', ')}`)
     })()

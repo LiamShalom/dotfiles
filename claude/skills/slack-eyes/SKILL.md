@@ -219,7 +219,7 @@ still post step 4's "found it, fixing" update, reactions, and messages in other 
 In a Session Board session, send it (drop the `<@USERID> ` for a status reply):
 
 ```sh
-~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"
+ACCOUNTS=<channel company id | none> ~/.claude/bin/slack-as-liam chat.postMessage channel=<channel> thread_ts=<thread ts> text="<@USERID> <reply>"
 ```
 
 Check that the output has `"ok":true`. Post one final reply, not a running commentary: the only
@@ -258,7 +258,7 @@ Session Board session, post the reply (step 5), then each image in click order, 
 `"ok":true`:
 
 ```sh
-~/.claude/bin/slack-as-liam upload <channel> <png> "" <thread ts>
+ACCOUNTS=<channel company id | none> ~/.claude/bin/slack-as-liam upload <channel> <png> "" <thread ts>
 ```
 
 Refer to the images in the reply by their order ("1st one", "2nd and 3rd"), as the skill says.

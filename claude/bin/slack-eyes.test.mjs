@@ -817,7 +817,8 @@ test('the reporter is tagged once per thread: a later reply drops the tag', () =
   assert.equal(dropRepeatTag(thread, '100.0', 'no tag here'), 'no tag here')
 })
 
-import { accountProblems, accountsPrompt, rememberAccounts, savedAccounts, loadAccounts, autoSavable } from './slack-eyes.mjs'
+import { accountProblems, accountsPrompt, rememberAccounts, savedAccounts, loadAccounts, autoSavable, foreignHits, scopeFor } from './slack-eyes.mjs'
+import { writeFileSync as writeFile } from 'node:fs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
@@ -825,6 +826,9 @@ import { join as joinPath } from 'node:path'
 // 11-20 j2 melaxin: the channel's account is J2's "Dr. Melaxin" (o2bbk3…); the run posted the
 // campaigns of two other same-named accounts (SideShift's managed 5dVaH8…, UGC World's zIpAAE…).
 const J2 = 'o2bbk3uHoMN93EyGWn6s'
+// What account-foreign-terms.mjs returned for J2's account on 11-20 (a subset of its 38 terms).
+const MELAXIN = { name: 'Dr. Melaxin', others: ['5dVaH8c7gty7nhDoxczU', 'zIpAAE56KOqALXzQTPKg'],
+  terms: ['us ugc sideshift', 'us ugc world', 'us influencer sideshift', 'us influencer', 'uk ugc sideshift', 'germany ugc', 'spain ugc', 'us managers'] }
 const leaked = {
   status: 'done', reply: 'nice, its on for USA - Influencer - J2. the other Dr. Melaxin account still has it off on its 4 US campaigns',
   unproven_claims: [], accounts: { channel: [J2], used: [J2, '5dVaH8c7gty7nhDoxczU', 'zIpAAE56KOqALXzQTPKg'] },
@@ -834,7 +838,7 @@ test('a reply stating another account\'s data is refused and never posted', () =
   const problems = accountProblems(leaked, 'C0BRMEZRHKP', [J2])
   assert.equal(problems.length, 2)
   assert.match(problems[0], /5dVaH8c7gty7nhDoxczU/)
-  assert.ok(replyPlan(leaked, 'C0BRMEZRHKP', [J2]).blocked)
+  assert.ok(replyPlan(leaked, 'C0BRMEZRHKP', { saved: [J2] }).blocked)
   assert.match(accountsPrompt(problems, [J2]), /team membership/)
 })
 
@@ -845,7 +849,7 @@ test('the saved scope wins over the run\'s own claim, and a run cannot claim sev
   const claimsInternal = { ...leaked, accounts: { channel: ['internal'], used: ['5dVaH8c7gty7nhDoxczU'] } }
   assert.equal(accountProblems(claimsInternal, 'C0BRMEZRHKP', null, true).length, 1)
   assert.equal(accountProblems(claimsInternal, 'C0BRMEZRHKP', null).length, 1, 'unknown sharing counts as shared')
-  assert.ok(replyPlan(claimsInternal, 'C0BRMEZRHKP', null, true).blocked)
+  assert.ok(replyPlan(claimsInternal, 'C0BRMEZRHKP', { saved: null }, true).blocked)
   assert.deepEqual(autoSavable([J2]), [J2])
   assert.equal(autoSavable([J2, 'x']), null)
   assert.equal(autoSavable(['internal']), null)
@@ -855,7 +859,7 @@ test('the saved scope wins over the run\'s own claim, and a run cannot claim sev
 test('a reply with only the channel\'s account, no account data, an internal channel or a DM passes', () => {
   const fixed = { ...leaked, reply: 'nice, its on for USA - Influencer - J2', accounts: { channel: [J2], used: [J2] } }
   assert.deepEqual(accountProblems(fixed, 'C0BRMEZRHKP', [J2]), [])
-  assert.deepEqual(replyPlan(fixed, 'C0BRMEZRHKP', [J2]), { text: fixed.reply, images: [] })
+  assert.deepEqual(replyPlan(fixed, 'C0BRMEZRHKP', { saved: [J2], foreign: MELAXIN }), { text: fixed.reply, images: [] })
   assert.deepEqual(accountProblems({ ...leaked, accounts: { channel: [J2], used: [] } }, 'C0BRMEZRHKP', [J2]), [])
   assert.deepEqual(accountProblems(leaked, 'C0INTERNAL', ['internal'], false), [])
   assert.deepEqual(accountProblems(leaked, 'D0B70K2EB9R', null), [])
@@ -869,10 +873,10 @@ test('a reply in a channel with no account named is refused', () => {
 
 test('the scope is saved per channel and read back', () => {
   const file = joinPath(mkdtempSync(joinPath(tmpdir(), 'acct-')), 'a.json')
-  assert.deepEqual(rememberAccounts('C1', [' a ', 'a', 'b', ''], file), ['a', 'b'])
+  assert.deepEqual(rememberAccounts('C1', [' a ', 'a', 'b', ''], file, null), ['a', 'b'])
   assert.deepEqual(savedAccounts('C1', loadAccounts(file)), ['a', 'b'])
   assert.equal(savedAccounts('C2', loadAccounts(file)), null)
-  assert.equal(rememberAccounts('C3', [], file), null)
+  assert.equal(rememberAccounts('C3', [], file, null), null)
 })
 
 test('the result schema requires accounts and the first prompt carries the scope rule', () => {
@@ -880,4 +884,33 @@ test('the result schema requires accounts and the first prompt carries the scope
   assert.ok(schema.required.includes('accounts'))
   const p = prompt({ kind: 'eyes', text: 'x', channel: 'C0NOSCOPE', ts: '1.1', threadTs: '1.1', key: 'C0NOSCOPE:1.1', author: 'U1' }, 'https://x')
   assert.match(p, /Account scope: none saved/)
+})
+
+test('the text check catches all five real 11-20 leaks whatever the run says it used', () => {
+  const posts = [
+    'its off on your 3 US campaigns right now, only UK - UGC - SideShift has it on',
+    'small correction, Germany UGC and Spain UGC have it on too. the 3 US ones are the ones without it',
+    'nice, its on for USA - Influencer - J2. the other Dr. Melaxin account still has it off on its 4 US campaigns',
+    'yep those 4 are ours. all 6 creators Canyon listed are on USA - Influencer - J2, and Ana Nachkebia is also on US - Influencer - SideShift',
+    "turned it on (US only) for US - UGC - SideShift. correction, US - UGC - World isnt ours, its on UGC World's Melaxin account",
+  ]
+  for (const reply of posts) {
+    const out = { status: 'done', reply, unproven_claims: [], accounts: { channel: [J2], used: [] } }
+    assert.ok(foreignHits(reply, MELAXIN).length, reply)
+    assert.ok(replyPlan(out, 'C0BRMEZRHKP', { saved: [J2], foreign: MELAXIN }).blocked, reply)
+  }
+  for (const reply of ['nice, its on for USA - Influencer - J2', 'all 6 creators Canyon listed are on USA - Influencer - J2']) {
+    assert.deepEqual(foreignHits(reply, MELAXIN), [], reply)
+  }
+  assert.deepEqual(foreignHits('anything', null), [])
+})
+
+test('an unreadable scope file holds the reply; a missing one is no scope', () => {
+  const dir = mkdtempSync(joinPath(tmpdir(), 'acct-'))
+  const bad = joinPath(dir, 'bad.json')
+  writeFile(bad, 'not json')
+  assert.ok(scopeFor('C0BRMEZRHKP', bad).error)
+  const out = { status: 'done', reply: 'hi', unproven_claims: [], accounts: { channel: [J2], used: [] } }
+  assert.ok(replyPlan(out, 'C0BRMEZRHKP', scopeFor('C0BRMEZRHKP', bad)).blocked)
+  assert.deepEqual(scopeFor('C0BRMEZRHKP', joinPath(dir, 'missing.json')), { saved: null, foreign: null })
 })

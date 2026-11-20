@@ -60,6 +60,10 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
     fi
     if [ "${channel#D}" = "$channel" ]; then
       scope_file="$HOME/.claude/state/slack-eyes-accounts.json"
+      if [ -e "$scope_file" ] && ! jq -e 'type == "object"' "$scope_file" >/dev/null 2>&1; then
+        echo "slack-as-liam: $scope_file cannot be read, so this post cannot be checked. Tell Liam." >&2
+        exit 2
+      fi
       saved=$(jq -r --arg c "$channel" '.[$c].accounts // [] | join(",")' "$scope_file" 2>/dev/null || true)
       if [ -z "${ACCOUNTS:-}" ]; then
         echo "slack-as-liam: name the SideShift company accounts whose data this text states: ACCOUNTS=<companyId,...> (ACCOUNTS=none if it states none).${saved:+ This channel belongs to: $saved.} Find a channel's account by team membership, never by brand name: same-named accounts are other customers." >&2
@@ -70,21 +74,24 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
         itoken=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null || true)
         info=$( (cd "$HOME" && SLACK_USER_TOKEN="$itoken" env -u SLACK_BOT_TOKEN slack api --skip-update conversations.info channel="$channel") 2>/dev/null | sed -n '/^{/,$p' || true)
         if [ "$(jq -r 'if .ok == true and (.channel.is_ext_shared | not) and (.channel.is_pending_ext_shared | not) then "internal" else "shared" end' <<<"$info" 2>/dev/null)" != internal ]; then
-          echo "slack-as-liam: $channel is saved as internal, but it is shared with another company (or Slack did not say). Name only its own account's data, and fix the scope with ~/.claude/bin/slack-eyes.mjs --accounts." >&2
+          echo "slack-as-liam: $channel is saved as internal, but it is shared with another company (or Slack did not say). Name only its own account's data, and tell Liam the scope is wrong." >&2
           exit 2
         fi
       fi
       if [ "$ACCOUNTS" != none ] && [ "$saved" != internal ]; then
         if [ -z "$saved" ]; then
           one="${ACCOUNTS// /}"
-          if [ -z "$one" ] || [ "$one" = internal ] || [ "${one#*,}" != "$one" ]; then
-            echo "slack-as-liam: this channel has no saved account scope. A post can save one company account as its scope; set \"internal\" or several accounts with ~/.claude/bin/slack-eyes.mjs --accounts $channel <ids> after proving them by team membership." >&2
+          if [ -z "$one" ] || [ "$one" = internal ] || [ "${one#*,}" != "$one" ] || ! [[ "$one" =~ ^[A-Za-z0-9_-]{8,}$ ]]; then
+            echo "slack-as-liam: this channel has no saved account scope. A post saves one company id (proven by team membership) as its scope; \"internal\" or several accounts are Liam's to set." >&2
             exit 2
           fi
+          foreign=$(node "$HOME/.claude/bin/account-foreign-terms.mjs" "$one" 2>/dev/null || echo null)
+          jq -e . >/dev/null 2>&1 <<<"$foreign" || foreign=null
           mkdir -p "$(dirname "$scope_file")"
           [ -s "$scope_file" ] || echo '{}' > "$scope_file"
           tmp=$(mktemp)
-          jq --arg c "$channel" --arg a "$one" --arg t "$(date -u +%FT%TZ)" '.[$c] = {accounts: [$a], setAt: $t}' "$scope_file" > "$tmp" && mv "$tmp" "$scope_file"
+          jq --arg c "$channel" --arg a "$one" --arg t "$(date -u +%FT%TZ)" --argjson f "$foreign" '.[$c] = {accounts: [$a], setAt: $t, foreign: $f}' "$scope_file" > "$tmp" && mv "$tmp" "$scope_file"
+          saved="$one"
         else
           outside=""
           IFS=',' read -ra wanted <<<"$ACCOUNTS"
@@ -94,9 +101,28 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
             case ",$saved," in *",$id,"*) ;; *) outside="$outside $id" ;; esac
           done
           if [ -n "$outside" ]; then
-            echo "slack-as-liam: this text states data from account(s)$outside, but this channel belongs to $saved. Same-named accounts are other customers: drop their campaigns, settings and creators. If the saved scope is wrong, fix it with ~/.claude/bin/slack-eyes.mjs --accounts $channel <ids> only after proving it by team membership." >&2
+            echo "slack-as-liam: this text states data from account(s)$outside, but this channel belongs to $saved. Same-named accounts are other customers: drop their campaigns, settings and creators. If the saved scope looks wrong, tell Liam." >&2
             exit 2
           fi
+        fi
+      fi
+      # The text itself, whatever ACCOUNTS says: another same-named account's campaign names, company
+      # ids, or "the other <brand> account" (foreign terms saved with the scope by account-foreign-terms.mjs).
+      if [ "$saved" != internal ]; then
+        if [ "$1" = upload ]; then body="${4:-}"; else body=""; for arg in "$@"; do case "$arg" in text=*) body="${arg#text=}" ;; esac; done; fi
+        norm=" $(printf '%s' "$body" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/ /g; s/^ +| +$//g') "
+        hits=""
+        while IFS= read -r term; do
+          [ -n "$term" ] && case "$norm" in *" $term "*) hits="$hits; \"$term\"" ;; esac
+        done < <(jq -r --arg c "$channel" '.[$c].foreign.terms // [] | .[]' "$scope_file" 2>/dev/null)
+        while IFS= read -r id; do
+          [ -n "$id" ] && case "$body" in *"$id"*) hits="$hits; account id $id" ;; esac
+        done < <(jq -r --arg c "$channel" '.[$c].foreign.others // [] | .[]' "$scope_file" 2>/dev/null)
+        brand=$(jq -r --arg c "$channel" '.[$c].foreign.name // empty' "$scope_file" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/ /g; s/^ +| +$//g')
+        if [ -n "$brand" ] && printf '%s' "$norm" | grep -Eq "(^| )(other|another|second|third|both)( [a-z0-9]+){0,6} $brand( |$)"; then hits="$hits; another \"$brand\" account"; fi
+        if [ -n "$hits" ]; then
+          echo "slack-as-liam: this text names another account with the same brand name (${hits#; }). This channel belongs to ${saved:-its own account}; drop the other account's campaigns, settings and creators." >&2
+          exit 2
         fi
       fi
     fi
