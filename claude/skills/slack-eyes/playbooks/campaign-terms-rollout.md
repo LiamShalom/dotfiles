@@ -21,6 +21,21 @@ and needed two corrections. Read the files below first.
 - The bulk terms dialog is `components/campaigns/campaign-terms-modal.tsx` (pay, requirements,
   deliverables). Check that file before you say a platform can be dropped there.
 
+## Terms vs contract document: separate edits, separate start rules (checked 2026-11-20)
+
+- Customize on a creator row (`components/campaigns/contract-customize-flow.tsx`) is a fork: Campaign
+  terms OR Contract, one at a time. Neither screen links to the other.
+- Both in one go: "Send new contract" (row menu, active contracts only, `agreement-menu-items.tsx`)
+  opens a draft with Edit terms + Edit document (`agreement-sheet.tsx` DraftCard), sent once.
+- When pay starts: a terms save (`lib/api/contracts/update-regen.usecase.ts` ~L407) records the terms
+  version at save time ('now') or for all unpaid work ('unpaid'); it does not wait for the creator, it
+  only sets `contractAccepted=false` to ask for a re-accept. A sent new contract starts at the creator's
+  signature (`sign-staged.usecase.ts` `effectiveFrom: signedAt`). So terms-only is the faster path.
+- A shared-contract (template) sync (`id-contracts/apply-campaign-contract.ts` L274-281) changes only the
+  document (`pendingCreatorContractUpdateKind='document'`), leaves pay untouched, records no terms
+  version, and skips creators with a custom contract. Order of terms vs template edit does not affect pay.
+- Not proven: what payouts do for a creator who never re-accepts. Do not claim it.
+
 ## Trial: how the automatic messages work
 
 - A trial is stored per contract in `contractsv2.creatorTrial` (terms such as `{days:14, posts:6}`,
