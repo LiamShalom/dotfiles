@@ -10,7 +10,7 @@ confidence, because I'll go check it myself.
 ## #2 Rule: keep going until it's done
 
 Keep working until everything I asked for is done. Stop to ask only when you can't go on
-without me, or before a step this file reserves for me: real money, destructive or irreversible
+without me, or before a step this file reserves for me: real money over $10 (see "Testing"), destructive or irreversible
 changes to real (non-test) data, messages to real people, merging a large PR. Settle everything
 else yourself. When a choice has a sensible default (a clearer name, where a file goes, a
 format), pick it, do it, and say what you picked. A question your own tools can answer is not
@@ -232,10 +232,10 @@ the criteria in the monorepo's `.claude/commands/approve-deploy.md`, then approv
 `scripts/approve-deploy.sh <run-id> --agent-confirmed --agent=claude-code/<session>` and
 post the evidence and commit list in chat as the record. Never use `--human-confirmed` for
 an approval I did not give in this chat. Deploy only what is merged to `main` and green,
-then check the new revision serves. Stop and ask only when the deploy would spend real
-money, ships a change that is not merged, or the script refuses `--agent-confirmed`.
+then check the new revision serves. Stop and ask only when the deploy would spend more than
+$10 of real money, ships a change that is not merged, or the script refuses `--agent-confirmed`.
 
-## Testing: no permission needed, except for real money
+## Testing: no permission needed, except for real money over $10
 
 Everything you do for testing is OK without asking me first. That includes creating and
 changing test data in production (test brands, test creators, campaigns, contracts, posts,
@@ -249,10 +249,18 @@ on): never connect one to a test user or post, message or publish through one. W
 needs a real third-party app, create a test account there (or reuse one, like the
 @sideshiftadsqa-liam YouTube channel), so nothing lands on mine. If you can't make one, ask.
 
-The one exception: **ask me before anything that spends real money**, such as live payments,
-payouts or withdrawals, ad spend on a real ad account, live Stripe charges, purchases, or a
-paid plan or API tier. Test-mode and sandbox money is fine, and so are Vercel preview builds
-(`npm run vercel:preview` in the monorepo): build one whenever a check needs it.
+The one exception: **real money over $10.** You may spend up to **$10 in total per task**
+without asking, when it moves the task forward: a live Stripe charge on a test account, a
+small purchase, a few dollars of ad spend on a test campaign, API credits, a cheap paid tier.
+Count every charge in the task together, and count a recurring charge at its first full
+billing period (cancel it before it renews unless I asked to keep it). List each spend in
+your final report: what, how much, on which account or card, and how to refund or cancel it.
+
+Ask me first, whatever the amount, when the spend would go over $10 in total, move money
+to someone else (payouts, withdrawals, transfers, refunds or credits to real people), touch
+a real customer's money or payment method, or charge a card or account that is not
+SideShift's or mine. Test-mode and sandbox money is always fine, and so are Vercel preview
+builds (`npm run vercel:preview` in the monorepo): build one whenever a check needs it.
 
 This covers testing only. Shipping still follows the rules above: merging is not testing.
 
@@ -523,7 +531,7 @@ emulator handoffs. This section takes precedence over the shared agent Chrome to
   to record an approved flow, with the same app, account, Page and access scope. Ask for manual
   input only when it is needed, such as a password or sign-in code that is not available.
   Keep confirmations required for new or broader access and legal commitments, except for
-  testing (see "Testing" above: only real money needs my OK).
+  testing (see "Testing" above: only real money over $10 needs my OK).
 
 ## SideShift test credentials
 

@@ -11,7 +11,7 @@ no open rows except steps only the operator can do, and a proof link. "Productio
 means the operator could merge it today and real users would hit no missing state, broken
 path or manual setup. Do not stop early, and do not ask the operator questions the spec,
 code or data can answer. Ask only when a real product decision is missing from the spec, or
-before anything that spends real money.
+before anything that spends more than $10 of real money or moves money to real people.
 
 The operator's rules stay in force and win over this skill: the repo `CLAUDE.md`,
 `~/.claude/CLAUDE.md` (worktrees, one-command Bash, testing permissions), and agent memory.
@@ -122,7 +122,7 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
 
    Close every open row: fix it, prove it, and update its evidence. Go back to step 3 as
    often as needed. A row can stay open only when the operator alone can close it (a product
-   decision the spec does not make, real money, a sign-in on their own account, an approval).
+   decision the spec does not make, real money over $10, a sign-in on their own account, an approval).
    Write it as that ask, with your pick. Never leave "other gaps", "follow-ups" or
    "nice to have" items: if you can name it, it is in scope.
 
@@ -140,7 +140,7 @@ Lead with the proof link (published REPORT.html), then:
   findings and what you did about them.
 - Decisions you made that the spec did not cover, and why.
 - Each row still open, on its own line: what is missing, why only the operator can close it,
-  and what you need (a decision with your pick, a step in their browser, or real money).
+  and what you need (a decision with your pick, a step in their browser, or real money over $10).
 - Where to look: PR link, preview URL, the pages to click through first.
 
 If the operator corrected you during the build, or a task needed a redo the next agent would

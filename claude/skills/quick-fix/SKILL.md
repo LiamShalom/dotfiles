@@ -25,7 +25,8 @@ needs any of these:
 - A **large feature**: a new feature, integration or product area, or a diff across many
   files in several areas.
 - A Postgres schema migration (its own PR first, through `/ship-migration`).
-- Anything that spends real money.
+- Anything that spends more than $10 of real money, or moves money to real people (see
+  `~/.claude/CLAUDE.md`, "Testing").
 
 **Before you tell the operator the fix "needs a feature" or offer to build one,** search for
 it as already built: `gh pr list --state open --search "<feature terms>"` and
