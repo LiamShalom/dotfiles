@@ -817,6 +817,7 @@ test('the reporter is tagged once per thread: a later reply drops the tag', () =
   assert.equal(dropRepeatTag(thread, '100.0', 'no tag here'), 'no tag here')
 })
 
+import { heldPlan } from './slack-eyes.mjs'
 import { accountProblems, accountsPrompt, rememberAccounts, savedAccounts, loadAccounts, autoSavable, foreignHits, scopeFor } from './slack-eyes.mjs'
 import { writeFileSync as writeFile } from 'node:fs'
 import { mkdtempSync } from 'node:fs'
@@ -928,5 +929,15 @@ test('reworded leaks (verifier 11-20) are caught: managed or other account wordi
   ]) assert.ok(foreignHits(reply, foreign).length, reply)
   for (const reply of ['its on for your US UGC campaign now', 'ask her to connect her Instagram before she posts']) {
     assert.deepEqual(foreignHits(reply, foreign), [], reply)
+  }
+})
+
+test('a reply held for a failed lookup on a new channel stays held at hand-off, not closed as done (verifier 11-20)', () => {
+  const checked = { text: 'its on now', images: [] }
+  assert.deepEqual(heldPlan(checked, ['could not look up the accounts that share its name']).blocked, ['could not look up the accounts that share its name'])
+  assert.equal(heldPlan(checked, null), checked)
+  assert.equal(heldPlan(null, ['x']), null)
+  for (const reply of ['the one we manage still has it off on its 4 US campaigns', 'the second account has 4 US campaigns with it off']) {
+    assert.ok(foreignHits(reply, MELAXIN).length, reply)
   }
 })

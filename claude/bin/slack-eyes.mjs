@@ -988,7 +988,7 @@ export function refreshForeign(channel, file = ACCOUNTS_FILE) {
   writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`)
 }
 // Wording that points at a second account of the brand without naming it (the verifier's 11-20 rewordings).
-export const OTHER_ACCOUNT = /\b(your|the|their|our) other (brand |company |sideshift |melaxin )?accounts?\b|\bsideshift managed\b|\bmanaged accounts?\b/
+export const OTHER_ACCOUNT = /\b(your|the|their|our) (other|second|third) (brand |company |sideshift |melaxin )?accounts?\b|\b(the )?(one|account) we manage\b|\bsideshift managed\b|\bmanaged accounts?\b/
 const normalized = (text) => ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
 // What in the text names another same-named account: one of its campaign names, its company id, or
 // "the other <brand> account". Checked on the text itself, whatever the run says it used.
@@ -1028,6 +1028,8 @@ export function accountProblems(out, channel, saved, shared = true, foreign = nu
   if (scope.includes('internal')) return shared ? ['this channel is shared with another company, so it is not "internal": name the one company account it belongs to'] : []
   return listOf(out?.accounts?.used).filter((id) => !scope.includes(id)).map((id) => `the reply states data from account ${id}, which is not this channel's (${scope.join(', ')})`)
 }
+// A reply the account check held at post time stays held at hand-off, even when the check passes later.
+export const heldPlan = (checked, blocked) => (checked && !checked.blocked && blocked ? { ...checked, blocked } : checked)
 export const channelProblems = (out, channel, shared, scope = scopeFor(channel)) => accountProblems(out, channel, scope.error ? undefined : scope.saved ?? null, shared, scope.foreign ?? null)
 export const accountsPrompt = (problems, saved) => `Your reply has not been posted. ${problems.join('; ')}.
 
@@ -1153,6 +1155,8 @@ async function runJob(file) {
   let draft = ''
   let unseen = false
   let postFailed = null
+  // Why the account check held the reply at post time (a failed lookup on a new channel), kept for the hand-off.
+  let accountsBlocked = null
   const shared = await extShared(job.hit.channel)
   refreshForeign(job.hit.channel)
   for (;;) {
@@ -1250,6 +1254,7 @@ async function runJob(file) {
     if (turn.out ?? lastOut) draft = String((turn.out ?? lastOut).reply ?? '').trim()
     // Post the reply now that every check passed and the thread has nothing the run has not read.
     // A post that finds new messages first sends them back with the draft, like any new context.
+    accountsBlocked = null
     let plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
     // A channel with no scope yet: save the run's one account with its same-named-account lookup, then
     // check the reply again against it. No lookup = nothing saved and the reply is held.
@@ -1262,6 +1267,7 @@ async function runJob(file) {
         plan = replyPlan(turn.out, job.hit.channel, scopeFor(job.hit.channel), shared)
       } else if (!(listOf(turn.out.accounts?.channel).includes('internal') && !shared)) {
         plan = { ...plan, blocked: [one ? 'could not look up the accounts that share its name, so the reply cannot be checked' : 'no single account to save as this channel\'s scope'] }
+        accountsBlocked = plan.blocked
         log('reply_accounts_refused', { key: job.hit.key, problems: plan.blocked })
       }
     }
@@ -1288,7 +1294,8 @@ async function runJob(file) {
   // its post failed, or the last turn failed after an earlier one wrote it. The board session gets its text.
   let held = null
   if (draft && !turn.raised && !raiseAsked(job)) {
-    const plan = out ? replyPlan(out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
+    const checked = out ? replyPlan(out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
+    const plan = heldPlan(checked, accountsBlocked)
     held = plan?.blocked ? { why: `its reply still had claims it could not prove or data from another account (${plan.blocked.join('; ').slice(0, 300)}), so the watcher did not post it`, text: draft }
       : postFailed ? { why: `the watcher could not post its reply (${postFailed})`, text: draft }
       : out && unseen ? { why: `it used all ${MAX_TURNS} turns before it read the latest thread messages, so the watcher did not post its reply`, text: draft }
