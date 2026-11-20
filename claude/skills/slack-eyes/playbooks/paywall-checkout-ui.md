@@ -48,3 +48,11 @@ pending deposits) reaches $500; a sub-account without the lock field can be ente
 Trial checkout is `components/billing/trial-checkout.tsx` (`CheckoutSplitView`, aside first on phones); paywall
 cards are `launch-paywall.tsx` (`PricingPlanCard` `footerNote`). Prove a fold change on the Vercel preview, not a
 local `next dev` under load. Run a new vitest file alone, not in a multi-file run.
+
+## Plan card look (checked 2026-11-20, #11308)
+
+One card component serves /pricing, the onboarding paywall and settings: `components/pricing/pricing-plan-card.tsx`,
+styled by `components/pricing/pricing-plans.module.css`. The featured (dark) card is `.cardFeatured`; the trial side
+of the checkout is `.darkGround` in `components/billing/trial-checkout.module.css`. Since #11308 both are flat black
+(the blue glow / shine `--ds-hero-surface-image` was removed on feedback "no shine / blue"). A CSS-only look change
+here merges as a small UI change; prove it on the preview's /pricing as the test brand.
