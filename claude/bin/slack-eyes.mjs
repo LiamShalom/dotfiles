@@ -2176,7 +2176,7 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
         const refuse = () => new Error(`replacing ${channel}'s scope, "internal" or several accounts is Liam's call: he runs this in his own terminal and confirms a dialog. Tell him what is wrong with the scope`)
         if (process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDECODE || !process.stdin.isTTY) throw refuse()
         // The values reach AppleScript as an argument, never as script source.
-        const asked = spawnSync('/usr/bin/osascript', ['-e', 'on run argv', '-e', 'display dialog (item 1 of argv) buttons {"Cancel", "Allow"} default button "Cancel" with title "slack-eyes account scope" with icon caution', '-e', 'end run', '--', `Set the Slack channel ${channel} account scope to: ${ids.join(', ')}?`], { encoding: 'utf8', timeout: 120_000, env: { PATH: '/usr/bin:/bin', HOME } })
+        const asked = spawnSync('/usr/bin/osascript', ['-e', 'on run argv', '-e', 'display dialog (item 1 of argv) buttons {"Cancel", "Allow"} default button "Cancel" with title "slack-eyes account scope" with icon caution', '-e', 'end run', '--', `Change the Slack channel ${channel} account scope\n\nfrom: ${(scopeFor(channel).saved ?? ['(none)']).join(', ')}\nto: ${ids.join(', ')}\n\nAn automated process may have started this request. Allow only if you ran it yourself.`], { encoding: 'utf8', timeout: 120_000, env: { PATH: '/usr/bin:/bin', HOME } })
         if (asked.status !== 0 || asked.stdout !== 'button returned:Allow\n') throw new Error('not confirmed')
       }
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
