@@ -1,0 +1,261 @@
+diff --git a/src/launcher.rs b/src/launcher.rs
+index 4e6537e..ea338f1 100644
+--- a/src/launcher.rs
++++ b/src/launcher.rs
+@@ -1503,6 +1503,18 @@ pub fn on_stop(input: &Value) -> Option<Value> {
+ 
+ pub fn on_stop_in(shell: Option<Shell>, input: &Value) -> Option<Value> {
+     if truthy(input, "stop_hook_active") {
++        // A Stop hook sent the turn back and it ended again: only the idle deadline moves.
++        if let (Some(shell), Some(session), Some(transcript)) =
++            (shell, hook_session(input), hook_transcript(input))
++        {
++            if shell.tracks(session) && auto_on(&shell.config, Some(session)) {
++                if let Some((live, model)) = live_status(&transcript) {
++                    if live < thresholds(&shell, session, &model, live).0 {
++                        arm_idle(&shell, session, &transcript, live);
++                    }
++                }
++            }
++        }
+         return None;
+     }
+     let session = hook_session(input)?;
+@@ -1544,6 +1556,7 @@ pub fn on_stop_in(shell: Option<Shell>, input: &Value) -> Option<Value> {
+         if shell.config.get("summarize") == Some(&json!(true)) && live * 2 >= at && live > target {
+             maybe_prewarm(&shell, session, &transcript, live, target);
+         }
++        arm_idle(&shell, session, &transcript, live);
+         return None;
+     }
+     // A restart stops background work: wakeups and open-ended monitors are restarted after it,
+@@ -1733,6 +1746,200 @@ fn stop_prewarm(state: &Path) {
+     let _ = fs::remove_file(marker);
+ }
+ 
++// ------------------------------------------------------------------------------- idle handoff
++
++/// An idle-handoff setting: the session's own (`~/.claude/recompact/sessions/<id>.json`), then
++/// the user's (`~/.claude/recompact/settings.json`), then the environment. A background job
++/// starts from a spare process, so a variable given to `claude --bg` never reaches its hooks.
++fn idle_setting(session: &str, key: &str, env: &str) -> Option<u64> {
++    let read = |v: Value| v.get(key).and_then(|x| x.as_u64());
++    read(session_setting(session))
++        .or_else(|| read(user_settings()))
++        .or_else(|| std::env::var(env).ok().and_then(|s| s.parse::<u64>().ok()))
++}
++
++/// The smallest session an idle handoff compacts (`idle_min`, 0 turns it off). Below it,
++/// re-reading the whole context after the cache expires costs less than compacting it. Claude
++/// Code's own idle compaction uses the same floor.
++fn idle_min(session: &str) -> usize {
++    idle_setting(session, "idle_min", "RECOMPACT_IDLE_MIN").unwrap_or(200_000) as usize
++}
++
++/// How long after a turn ends an idle session is compacted: 90% of the prompt cache's lifetime
++/// (`cache_ttl_min`, 60 by default), as Claude Code's own idle compaction does. That compaction
++/// never fires for a background job (Claude Code counts it unattended), and recompact blocks it
++/// elsewhere, so this timer does the same job with a recompact handoff.
++fn idle_due_ms(session: &str) -> u64 {
++    idle_setting(session, "cache_ttl_min", "RECOMPACT_CACHE_TTL_MIN").unwrap_or(60) * 60_000 * 9
++        / 10
++}
++
++fn epoch_ms() -> u64 {
++    std::time::SystemTime::now()
++        .duration_since(std::time::UNIX_EPOCH)
++        .map(|d| d.as_millis() as u64)
++        .unwrap_or(0)
++}
++
++/// Stop, under the auto size: (re)start the idle timer. `idle.json` holds the latest turn end;
++/// one `recompact idle-wait` per session state reads it, so a new turn moves the deadline
++/// instead of starting another process.
++fn arm_idle(shell: &Shell, session: &str, transcript: &Path, live: usize) {
++    let marker = shell.dir.join("idle.json");
++    let min = idle_min(session);
++    if min == 0 || live < min || idle_due_ms(session) == 0 {
++        let _ = fs::remove_file(&marker);
++        return;
++    }
++    let now = epoch_ms();
++    write_json(
++        &marker,
++        &json!({"session": session, "transcript": transcript, "armed": now / 1000,
++                "due": now + idle_due_ms(session)}),
++    );
++    let timer = shell.dir.join("idle-timer.json");
++    if marked_process(&timer, " idle-wait ").is_some() {
++        return;
++    }
++    let Ok(exe) = std::env::current_exe() else {
++        return;
++    };
++    let mut cmd = Command::new(exe);
++    cmd.arg("idle-wait")
++        .arg(&shell.dir)
++        .stdin(Stdio::null())
++        .stdout(Stdio::null())
++        .stderr(Stdio::null());
++    unsafe {
++        use std::os::unix::process::CommandExt;
++        cmd.pre_exec(|| {
++            setsid();
++            Ok(())
++        });
++    }
++    if let Ok(child) = cmd.spawn() {
++        write_json(&timer, &json!({"pid": child.id()}));
++    }
++}
++
++/// When the transcript's latest user or assistant message was written (epoch seconds).
++fn last_message_secs(path: &Path) -> Option<i64> {
++    let mut f = fs::File::open(path).ok()?;
++    let len = f.metadata().ok()?.len();
++    f.seek(SeekFrom::Start(len.saturating_sub(4 << 20))).ok()?;
++    let mut buf = Vec::new();
++    f.read_to_end(&mut buf).ok()?;
++    String::from_utf8_lossy(&buf).lines().rev().find_map(|line| {
++        let r = serde_json::from_str::<Value>(line).ok()?;
++        if !matches!(rec_type(&r), "user" | "assistant") || truthy(&r, "isSidechain") {
++            return None;
++        }
++        crate::brief::parse_ts(get_s(&r, "timestamp")?)
++    })
++}
++
++/// Why an idle handoff that came due must not run now, if it must not.
++fn idle_refusal(shell: &Shell, arm: &Value) -> Option<&'static str> {
++    let session = get_s(arm, "session")?;
++    let transcript = PathBuf::from(get_s(arm, "transcript")?);
++    if !shell.tracks(session) {
++        return Some("session_switched");
++    }
++    if !auto_on(&shell.config, Some(session)) {
++        return Some("auto_off");
++    }
++    // A message since the turn ended (a prompt, a task notification, a reply) is activity: the
++    // cache was used again, and that turn's own end arms a new timer. Claude Code writes the
++    // turn's last reply and its bookkeeping records just after the Stop hook, hence the grace.
++    let armed = get_u(arm, "armed").unwrap_or(0) as i64;
++    if last_message_secs(&transcript).is_none_or(|t| t > armed + 15) {
++        return Some("active");
++    }
++    if read_json(&shell.dir.join("request.json")).is_some_and(|r| get_s(&r, "session") == Some(session))
++        || in_flight(shell, session)
++    {
++        return Some("handoff_pending");
++    }
++    // A handoff can restart claude (outside a switch in place, or when a job's switch does not
++    // take), which stops running work: never compact over it.
++    if !carry_items(&carry_for(shell, Some(session))).is_empty() {
++        return Some("background_work");
++    }
++    match live_status(&transcript) {
++        Some((live, _)) if live >= idle_min(session) => None,
++        _ => Some("small"),
++    }
++}
++
++/// `recompact idle-wait <state dir>`: the idle timer `arm_idle` starts. It sleeps until the
++/// latest turn end's deadline, then queues a handoff unless the session was used meanwhile.
++pub fn cmd_idle_wait(args: &[String]) -> i32 {
++    let Some(dir) = args.first().map(PathBuf::from) else {
++        eprintln!("usage: recompact idle-wait <state dir>");
++        return 2;
++    };
++    let marker = dir.join("idle.json");
++    let timer = dir.join("idle-timer.json");
++    let log = |msg: &str| {
++        if let Ok(mut f) = fs::OpenOptions::new()
++            .create(true)
++            .append(true)
++            .open(dir.join("idle.log"))
++        {
++            let _ = writeln!(f, "{} {msg}", epoch_ms() / 1000);
++        }
++    };
++    loop {
++        let Some(arm) = read_json(&marker) else {
++            if marker.exists() {
++                // Unreadable: drop it; the next turn end writes a new one.
++                let _ = fs::remove_file(&marker);
++            }
++            let _ = fs::remove_file(&timer);
++            // A turn that ended just now may have seen this timer alive and left its deadline
++            // to it; take it back unless that turn started a timer of its own.
++            if read_json(&marker).is_some() && marked_process(&timer, " idle-wait ").is_none() {
++                write_json(&timer, &json!({"pid": std::process::id()}));
++                continue;
++            }
++            return 0;
++        };
++        // The claude this timer belongs to is gone: nothing to switch.
++        let Some(shell) = Shell::from_env() else {
++            log("exit: session process gone");
++            break;
++        };
++        let due = get_u(&arm, "due").unwrap_or(0) as u64;
++        let now = epoch_ms();
++        if now < due {
++            std::thread::sleep(Duration::from_millis((due - now).min(60_000)));
++            continue;
++        }
++        let session = get_s(&arm, "session").unwrap_or("").to_string();
++        match idle_refusal(&shell, &arm) {
++            Some(why) => log(&format!("skip {}: {why}", short_id(&session))),
++            None => {
++                write_json(
++                    &shell.dir.join("request.json"),
++                    &json!({"session": session, "transcript": get_s(&arm, "transcript"),
++                            "reason": "idle", "kick": false, "force": true, "ready": true,
++                            "carry": carry_for(&shell, Some(&session))}),
++                );
++                wake(&shell);
++                log(&format!("handoff {}: idle before the cache expires", short_id(&session)));
++            }
++        }
++        // Only remove the deadline this pass judged; a turn that ended meanwhile wrote a new one.
++        if read_json(&marker).is_some_and(|m| m == arm) {
++            let _ = fs::remove_file(&marker);
++        }
++    }
++    if read_json(&timer).and_then(|t| get_u(&t, "pid")) == Some(std::process::id() as usize) {
++        let _ = fs::remove_file(&timer);
++    }
++    0
++}
++
+ // ------------------------------------------------------------------------------------ prewarm
+ 
+ /// `recompact prewarm <session>`: summarize, into the cache, what compacting now would
+@@ -3186,6 +3393,7 @@ fn run_handoff(req: &Value, copts: &ContinueOpts, at: usize) -> Option<(String,
+     let why = match get_s(req, "reason") {
+         Some("auto") => format!("context {} ≥ {}", fmt_k(live), fmt_k(at)),
+         Some("agent") => "the agent asked for a checkpoint".into(),
++        Some("idle") => "idle; the prompt cache is about to expire".into(),
+         _ => "requested".into(),
+     };
+     say(&format!(
+diff --git a/src/main.rs b/src/main.rs
+index ac615a0..e5cb4c6 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -4,7 +4,7 @@ use std::env;
+ use std::process::exit;
+ 
+ use recompact::{
+-    cmd_assemble, cmd_auto, cmd_continue, cmd_doctor, cmd_eval, cmd_extract, cmd_gateway, cmd_handoff, cmd_hook, cmd_install, cmd_job_handoff, cmd_mcp, cmd_prewarm, cmd_probe, cmd_recall,
++    cmd_assemble, cmd_auto, cmd_continue, cmd_doctor, cmd_eval, cmd_extract, cmd_gateway, cmd_handoff, cmd_hook, cmd_idle_wait, cmd_install, cmd_job_handoff, cmd_mcp, cmd_prewarm, cmd_probe, cmd_recall,
+     cmd_pty_leader, cmd_rehydrate, cmd_resume, cmd_scan, cmd_shell, cmd_statusline, cmd_uninstall, cmd_update, cmd_verify, USAGE,
+ };
+ 
+@@ -26,6 +26,7 @@ fn main() {
+         "handoff" => cmd_handoff(&args[2..]),
+         "prewarm" => cmd_prewarm(&args[2..]),
+         "job-handoff" => cmd_job_handoff(&args[2..]),
++        "idle-wait" => cmd_idle_wait(&args[2..]),
+         "gateway" => cmd_gateway(&args[2..]),
+         "install" => cmd_install(&args[2..]),
+         "auto" => cmd_auto(&args[2..]),

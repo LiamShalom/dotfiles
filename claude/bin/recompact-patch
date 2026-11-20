@@ -1,9 +1,13 @@
 #!/bin/bash
 # Keep Liam's local patch on the segment-recompact plugin across its auto-updates.
 #
-# The patch (../recompact/quiet-twins.patch) makes a compacted session keep its exact title
-# (no " (recompact N)" suffix) and writes the long orientation note and ledger as hidden
-# records: the model still reads them, the screen does not show them.
+# The patches, applied in order:
+# - ../recompact/quiet-twins.patch makes a compacted session keep its exact title (no
+#   " (recompact N)" suffix) and writes the long orientation note and ledger as hidden
+#   records: the model still reads them, the screen does not show them.
+# - ../recompact/idle-handoff.patch compacts a session of 200k+ tokens that sat idle for 54 min
+#   (90% of the 1-hour prompt cache), so the next prompt re-reads the compacted twin, not the
+#   whole context. Claude Code's own idle compaction never runs in background jobs.
 #
 # The plugin's launcher runs `<plugin root>/target/release/recompact` when it exists, so this
 # builds the patched binary there for the installed plugin version. Until it is built, the
@@ -15,16 +19,17 @@
 set -u
 
 DOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-PATCH="$DOT/recompact/quiet-twins.patch"
+PATCHES=("$DOT/recompact/quiet-twins.patch" "$DOT/recompact/idle-handoff.patch")
 WORK="$HOME/.claude/recompact/patched"
 LOG="$HOME/.claude/logs/recompact-patch.log"
 mode="${1:-}"
 
 root="$(sed -n 's/.*"installPath": *"\([^"]*segment-recompact[^"]*\)".*/\1/p' \
   "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null | head -n 1)"
-[ -n "$root" ] && [ -d "$root/src" ] && [ -f "$PATCH" ] || exit 0
+[ -n "$root" ] && [ -d "$root/src" ] || exit 0
+for p in "${PATCHES[@]}"; do [ -f "$p" ] || exit 0; done
 
-stamp="$(shasum -a 256 "$PATCH" | cut -c1-16)"
+stamp="$(cat "${PATCHES[@]}" | shasum -a 256 | cut -c1-16)"
 bin="$root/target/release/recompact"
 version="$(basename "$root")"
 failed="$WORK/failed-$version-$stamp"
@@ -38,7 +43,7 @@ if [ "$mode" = "--hook" ]; then
     # Say it once per version, then stay quiet.
     if [ ! -e "$failed.told" ]; then
       touch "$failed.told"
-      printf '{"systemMessage":"recompact %s: the local quiet-twins patch did not apply, so compacted sessions are renamed and show the orientation note again. See %s"}\n' \
+      printf '{"systemMessage":"recompact %s: the local patches did not apply, so compacted sessions are renamed, show the orientation note again, and idle sessions are not compacted before the cache expires. See %s"}\n' \
         "$version" "$LOG"
     fi
     exit 0
@@ -67,14 +72,18 @@ rm -rf "$tree"
 mkdir -p "$tree"
 cp -R "$root/src" "$root/Cargo.toml" "$root/Cargo.lock" "$tree/"
 
-if ! patch -d "$tree" -p1 -F2 --no-backup-if-mismatch --forward -s <"$PATCH"; then
-  echo "patch did not apply to $version"
-  touch "$failed"
-  exit 1
-fi
-# A fuzzy apply can land in the wrong place: check the three changes are where they belong.
+for p in "${PATCHES[@]}"; do
+  if ! patch -d "$tree" -p1 -F2 --no-backup-if-mismatch --forward -s <"$p"; then
+    echo "$(basename "$p") did not apply to $version"
+    touch "$failed"
+    exit 1
+  fi
+done
+# A fuzzy apply can land in the wrong place: check the changes are where they belong.
 if ! grep -q '"customTitle": base,' "$tree/src/lib.rs" ||
-  [ "$(grep -c '"isMeta": true,' "$tree/src/lib.rs")" -lt 2 ]; then
+  [ "$(grep -c '"isMeta": true,' "$tree/src/lib.rs")" -lt 2 ] ||
+  ! grep -q 'arm_idle(&shell, session, &transcript, live);' "$tree/src/launcher.rs" ||
+  ! grep -q '"idle-wait" => cmd_idle_wait' "$tree/src/main.rs"; then
   echo "patch applied to $version but the result is not the expected code"
   touch "$failed"
   exit 1
