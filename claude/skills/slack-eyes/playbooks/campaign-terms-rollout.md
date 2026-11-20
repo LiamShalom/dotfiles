@@ -34,9 +34,22 @@ and needed two corrections. Read the files below first.
 - The goals count from `firstPostAt` (first-post rule). A contract with no `firstPostAt` and an old
   `signedAt` uses the activation window (`resolveCreatorTrialWindow`), so posts made right after joining
   can pass it quickly.
-- Passing keeps the creator in the campaign. A brand that treats the trial as a one-off job and then ends
-  the contract by hand still sent the "You're in" message when the post goal was met. That is the feature
-  working, not a defect.
+- Passing keeps the creator in the campaign (only `removed` expires the contract). Until PR #11304 the
+  passed DM said "You're in. Keep posting!", which creators of brands that use the trial as a one-off job
+  read as an offer of more paid work (youmeal, 2026-11-20). #11304 changed it to "the trial won't remove
+  you. Anything beyond your current contract is up to the brand." There is no brand switch to turn the
+  passed DM off.
+
+## "SideShift approved a request on its own"
+
+A creator DM "Your request to join <campaign> was approved. Add your accounts to start." with no brand
+action that day comes from `lib/handle-requests/approval-side-effects.ts` `buildApprovalMessage`. When the
+brand earlier accepted the creator's job application, that created a brand-sent contract
+(`contractsv2.openApplicationJobId` set). When the creator signs it, `accept.usecase.ts`
+(`isBrandSentInvite`) auto-approves the campaign-join request: `handle_requests` row with
+`reviewed_by` null, `reviewed_at` 3 s after `requested_at`. Proof: `job_applications` row for the
+creator and job, `status` Accepted, `contract_id` = that contract, and the contract `createdAt` = the
+"accepted your application" DM time. Handles still wait for the brand (`requestedHandles` pending).
 
 ## Symptom to cause to proof
 
