@@ -126,7 +126,8 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
    `source`: the file does not source cleanly) can read
    `GET /v1/customers/<cus>/cash_balance` and `GET /v1/events?type=customer_cash_balance_transaction.created&limit=50`
    (all customers, with sender name, reference and amount). No `funded` event for the amount on any customer means
-   Stripe has not received it: ask for the bank's trace (Fed IMAD/OMAD or SWIFT MT103/UETR). Every `funded` event is
+   Stripe has not received it YET (mangolabs' $28k landed 3 h after that check, and nobody told her): say "not
+   arrived yet", re-check `wallet_ledger` before the job closes, and only then ask for the bank's trace (Fed IMAD/OMAD or SWIFT MT103/UETR). Every `funded` event is
    followed seconds later by `applied_to_payment`, so the credit path works. The key cannot read funding instructions
    (POST needs `funding_instruction_write`).
 12. Connect payouts fail `PAYMENT_BLOCKED` (mangolabs, 11-20): read `users/<company>` fields
