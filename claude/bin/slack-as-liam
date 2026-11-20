@@ -54,6 +54,19 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
     upload) scoped=1; channel="${2:-}" ;;
   esac
   if [ -n "$scoped" ]; then
+    # The check reads text= (or an upload's comment) only, so text must not ride in other fields.
+    if [ "$1" != upload ]; then
+      ntext=0
+      for arg in "$@"; do
+        case "$arg" in
+          text=*) ntext=$((ntext + 1)) ;;
+          blocks=*|attachments=*|markdown_text=*) echo "slack-as-liam: post plain text= only; blocks, attachments and markdown_text are not checked." >&2; exit 2 ;;
+        esac
+      done
+      if [ "$1" != chat.update ] || [ "$ntext" -gt 0 ]; then
+        if [ "$ntext" -ne 1 ]; then echo "slack-as-liam: give text= exactly once." >&2; exit 2; fi
+      fi
+    fi
     if ! [[ "$channel" =~ ^[CGD][A-Z0-9]{6,}$ ]]; then
       echo "slack-as-liam: give the channel by its ID (C…, G… or D…), not '$channel'." >&2
       exit 2
@@ -85,8 +98,11 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
             echo "slack-as-liam: this channel has no saved account scope. A post saves one company id (proven by team membership) as its scope; \"internal\" or several accounts are Liam's to set." >&2
             exit 2
           fi
-          foreign=$(node "$HOME/.claude/bin/account-foreign-terms.mjs" "$one" 2>/dev/null || echo null)
-          jq -e . >/dev/null 2>&1 <<<"$foreign" || foreign=null
+          foreign=$(node "$HOME/.claude/bin/account-foreign-terms.mjs" "$one" 2>/dev/null || true)
+          if ! jq -e 'type == "object" and (.others | type == "array") and (.terms | type == "array")' >/dev/null 2>&1 <<<"$foreign"; then
+            echo "slack-as-liam: could not look up the accounts that share $one's name, so this post cannot be checked. Try again; if it keeps failing, tell Liam." >&2
+            exit 2
+          fi
           mkdir -p "$(dirname "$scope_file")"
           [ -s "$scope_file" ] || echo '{}' > "$scope_file"
           tmp=$(mktemp)
@@ -108,6 +124,10 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
       fi
       # The text itself, whatever ACCOUNTS says: another same-named account's campaign names, company
       # ids, or "the other <brand> account" (foreign terms saved with the scope by account-foreign-terms.mjs).
+      if [ -n "$saved" ] && [ "$saved" != internal ] && ! jq -e --arg c "$channel" '.[$c].foreign | type == "object"' "$scope_file" >/dev/null 2>&1; then
+        echo "slack-as-liam: $channel's scope has no lookup of same-named accounts, so this post cannot be checked. Tell Liam." >&2
+        exit 2
+      fi
       if [ "$saved" != internal ]; then
         if [ "$1" = upload ]; then body="${4:-}"; else body=""; for arg in "$@"; do case "$arg" in text=*) body="${arg#text=}" ;; esac; done; fi
         norm=" $(printf '%s' "$body" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/ /g; s/^ +| +$//g') "

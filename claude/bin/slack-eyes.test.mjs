@@ -829,15 +829,18 @@ const J2 = 'o2bbk3uHoMN93EyGWn6s'
 // What account-foreign-terms.mjs returned for J2's account on 11-20 (a subset of its 38 terms).
 const MELAXIN = { name: 'Dr. Melaxin', others: ['5dVaH8c7gty7nhDoxczU', 'zIpAAE56KOqALXzQTPKg'],
   terms: ['us ugc sideshift', 'us ugc world', 'us influencer sideshift', 'us influencer', 'uk ugc sideshift', 'germany ugc', 'spain ugc', 'us managers'] }
+const NO_TWINS = { name: 'Dr. Melaxin', others: [], terms: [] }
 const leaked = {
   status: 'done', reply: 'nice, its on for USA - Influencer - J2. the other Dr. Melaxin account still has it off on its 4 US campaigns',
   unproven_claims: [], accounts: { channel: [J2], used: [J2, '5dVaH8c7gty7nhDoxczU', 'zIpAAE56KOqALXzQTPKg'] },
 }
 
 test('a reply stating another account\'s data is refused and never posted', () => {
-  const problems = accountProblems(leaked, 'C0BRMEZRHKP', [J2])
+  assert.match(accountProblems(leaked, 'C0BRMEZRHKP', [J2], true, NO_TWINS)[0], /another "Dr. Melaxin" account/)
+  const problems = accountProblems({ ...leaked, reply: 'its still off on 4 US campaigns' }, 'C0BRMEZRHKP', [J2], true, NO_TWINS)
   assert.equal(problems.length, 2)
   assert.match(problems[0], /5dVaH8c7gty7nhDoxczU/)
+  assert.match(accountProblems(leaked, 'C0BRMEZRHKP', [J2], true, null)[0], /no lookup/)
   assert.ok(replyPlan(leaked, 'C0BRMEZRHKP', { saved: [J2] }).blocked)
   assert.match(accountsPrompt(problems, [J2]), /team membership/)
 })
@@ -845,7 +848,7 @@ test('a reply stating another account\'s data is refused and never posted', () =
 test('the saved scope wins over the run\'s own claim, and a run cannot claim several accounts or "internal" for a shared channel', () => {
   const claimsAll = { ...leaked, accounts: { channel: [J2, '5dVaH8c7gty7nhDoxczU'], used: [J2, '5dVaH8c7gty7nhDoxczU'] } }
   assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', null).length, 1)
-  assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', [J2]).length, 1)
+  assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', [J2], true, NO_TWINS).length, 1)
   const claimsInternal = { ...leaked, accounts: { channel: ['internal'], used: ['5dVaH8c7gty7nhDoxczU'] } }
   assert.equal(accountProblems(claimsInternal, 'C0BRMEZRHKP', null, true).length, 1)
   assert.equal(accountProblems(claimsInternal, 'C0BRMEZRHKP', null).length, 1, 'unknown sharing counts as shared')
@@ -858,12 +861,12 @@ test('the saved scope wins over the run\'s own claim, and a run cannot claim sev
 
 test('a reply with only the channel\'s account, no account data, an internal channel or a DM passes', () => {
   const fixed = { ...leaked, reply: 'nice, its on for USA - Influencer - J2', accounts: { channel: [J2], used: [J2] } }
-  assert.deepEqual(accountProblems(fixed, 'C0BRMEZRHKP', [J2]), [])
+  assert.deepEqual(accountProblems(fixed, 'C0BRMEZRHKP', [J2], true, MELAXIN), [])
   assert.deepEqual(replyPlan(fixed, 'C0BRMEZRHKP', { saved: [J2], foreign: MELAXIN }), { text: fixed.reply, images: [] })
-  assert.deepEqual(accountProblems({ ...leaked, accounts: { channel: [J2], used: [] } }, 'C0BRMEZRHKP', [J2]), [])
+  assert.deepEqual(accountProblems({ ...leaked, reply: 'its on now', accounts: { channel: [J2], used: [] } }, 'C0BRMEZRHKP', [J2], true, MELAXIN), [])
   assert.deepEqual(accountProblems(leaked, 'C0INTERNAL', ['internal'], false), [])
   assert.deepEqual(accountProblems(leaked, 'D0B70K2EB9R', null), [])
-  assert.deepEqual(accountProblems({ ...leaked, reply: '' }, 'C0BRMEZRHKP', [J2]), [])
+  assert.deepEqual(accountProblems({ ...leaked, reply: '' }, 'C0BRMEZRHKP', [J2], true, MELAXIN), [])
 })
 
 test('a reply in a channel with no account named is refused', () => {

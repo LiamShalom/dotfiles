@@ -1017,6 +1017,7 @@ export function accountProblems(out, channel, saved, shared = true, foreign = nu
   if (!String(out?.reply ?? '').trim() || String(channel).startsWith('D')) return []
   if (saved === undefined) return ['the channel scope file cannot be read, so the reply cannot be checked: tell Liam']
   const scope = saved ?? listOf(out?.accounts?.channel)
+  if (saved && !saved.includes('internal') && !foreign) return ['this channel\'s scope has no lookup of same-named accounts, so the reply cannot be checked: tell Liam']
   const named = scope.includes('internal') ? [] : foreignHits(out.reply, foreign)
   if (named.length) return named.map((hit) => `the reply names ${hit}, which is not this channel's account`)
   if (!scope.length) return ['`accounts.channel` is empty: name the company account(s) this channel belongs to']
@@ -1246,12 +1247,22 @@ async function runJob(file) {
     if (turn.out ?? lastOut) draft = String((turn.out ?? lastOut).reply ?? '').trim()
     // Post the reply now that every check passed and the thread has nothing the run has not read.
     // A post that finds new messages first sends them back with the draft, like any new context.
-    const plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
-    if (plan && !plan.blocked) {
-      if (!scopeFor(job.hit.channel).saved && !scopeFor(job.hit.channel).error && !String(job.hit.channel).startsWith('D')) {
-        const saved = rememberAccounts(job.hit.channel, autoSavable(turn.out.accounts?.channel))
-        if (saved) log('accounts_saved', { key: job.hit.key, channel: job.hit.channel, accounts: saved })
+    let plan = !turn.raised && !turn.failure && !fresh.length && turn.out && !raiseAsked(job) ? replyPlan(turn.out, job.hit.channel, scopeFor(job.hit.channel), shared) : null
+    // A channel with no scope yet: save the run's one account with its same-named-account lookup, then
+    // check the reply again against it. No lookup = nothing saved and the reply is held.
+    if (plan && !plan.blocked && !scopeFor(job.hit.channel).saved && !String(job.hit.channel).startsWith('D')) {
+      const one = autoSavable(turn.out.accounts?.channel)
+      const foreign = one ? computeForeign(one[0]) : null
+      if (one && foreign) {
+        rememberAccounts(job.hit.channel, one, ACCOUNTS_FILE, foreign)
+        log('accounts_saved', { key: job.hit.key, channel: job.hit.channel, accounts: one })
+        plan = replyPlan(turn.out, job.hit.channel, scopeFor(job.hit.channel), shared)
+      } else if (!(listOf(turn.out.accounts?.channel).includes('internal') && !shared)) {
+        plan = { ...plan, blocked: [one ? 'could not look up the accounts that share its name, so the reply cannot be checked' : 'no single account to save as this channel\'s scope'] }
+        log('reply_accounts_refused', { key: job.hit.key, problems: plan.blocked })
       }
+    }
+    if (plan && !plan.blocked) {
       try {
         const sent = await postReply(job, plan)
         if (sent.fresh) {
@@ -1527,7 +1538,7 @@ async function runInterim(file) {
     // The notes it read may hold another same-named account's data: the text is checked, not trusted.
     if (!String(job.hit.channel).startsWith('D')) {
       const scope = scopeFor(job.hit.channel)
-      const hits = scope.error ? [scope.error] : scope.saved?.includes('internal') ? [] : foreignHits(reply, scope.foreign)
+      const hits = scope.error ? [scope.error] : scope.saved?.includes('internal') ? [] : scope.saved && !scope.foreign ? ['no lookup of same-named accounts'] : foreignHits(reply, scope.foreign)
       if (hits.length) {
         log('interim_done', { key: job.hit.key, ok: true, posted: false, cost_usd: cost, why: `names another account: ${hits.join('; ').slice(0, 200)}` })
         return
@@ -2147,11 +2158,15 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
       if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal]')
       if (ids.includes('internal') && ids.length > 1) throw new Error('"internal" stands alone')
       if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
-      // From an agent session: only a first, single-account scope. Replacing one, "internal" and several
-      // accounts are Liam's call, run in his own terminal (no CLAUDE_CODE_SESSION_ID there).
-      if (ids.length && process.env.CLAUDE_CODE_SESSION_ID) {
-        if (scopeFor(channel).saved || scopeFor(channel).error) throw new Error(`${channel} already has a scope (or the file is unreadable). Only Liam replaces it, from his own terminal; tell him what is wrong with it`)
-        if (!autoSavable(ids)) throw new Error('an agent session saves one company account; "internal" or several accounts are set by Liam in his own terminal')
+      // A first, single-account scope may be saved by anyone. Replacing one, "internal" and several accounts
+      // are Liam's call: he types the channel id at an interactive terminal, which an agent's shell is not.
+      if (ids.length && (scopeFor(channel).saved || scopeFor(channel).error || !autoSavable(ids))) {
+        if (!process.stdin.isTTY) throw new Error(`replacing ${channel}'s scope, "internal" or several accounts is Liam's call: he runs this in his own terminal. Tell him what is wrong with the scope`)
+        const { createInterface } = await import('node:readline/promises')
+        const rl = createInterface({ input: process.stdin, output: process.stdout })
+        const typed = (await rl.question(`Set ${channel} to ${ids.join(', ')}? Type the channel id to confirm: `)).trim()
+        rl.close()
+        if (typed !== channel) throw new Error('not confirmed')
       }
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
       console.log(`${channel}: ${(savedAccounts(channel) ?? ['(none saved)']).join(', ')}`)
