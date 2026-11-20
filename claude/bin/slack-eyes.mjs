@@ -2167,6 +2167,7 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
       const [channel, ...raw] = argv.slice(argv.indexOf('--accounts') + 1)
       const ids = [...new Set(raw.flatMap((a) => a.split(',')).map((a) => a.trim()).filter(Boolean))]
       if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal]')
+      if (ids.some((id) => !/^(internal|[A-Za-z0-9_-]{8,64})$/.test(id))) throw new Error('an account id is letters, digits, _ or - (8 to 64), or "internal"')
       if (ids.includes('internal') && ids.length > 1) throw new Error('"internal" stands alone')
       if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
       // A first, single-account scope may be saved by anyone. Replacing one, "internal" and several accounts
@@ -2174,8 +2175,9 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
       if (ids.length && (scopeFor(channel).saved || scopeFor(channel).error || !autoSavable(ids))) {
         const refuse = () => new Error(`replacing ${channel}'s scope, "internal" or several accounts is Liam's call: he runs this in his own terminal and confirms a dialog. Tell him what is wrong with the scope`)
         if (process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDECODE || !process.stdin.isTTY) throw refuse()
-        const asked = spawnSync('osascript', ['-e', `display dialog "Set the Slack channel ${channel} account scope to: ${ids.join(', ')}?" buttons {"Cancel", "Allow"} default button "Cancel" with title "slack-eyes account scope" with icon caution`], { encoding: 'utf8', timeout: 120_000 })
-        if (asked.status !== 0 || !/button returned:Allow/.test(asked.stdout ?? '')) throw new Error('not confirmed')
+        // The values reach AppleScript as an argument, never as script source.
+        const asked = spawnSync('/usr/bin/osascript', ['-e', 'on run argv', '-e', 'display dialog (item 1 of argv) buttons {"Cancel", "Allow"} default button "Cancel" with title "slack-eyes account scope" with icon caution', '-e', 'end run', '--', `Set the Slack channel ${channel} account scope to: ${ids.join(', ')}?`], { encoding: 'utf8', timeout: 120_000, env: { PATH: '/usr/bin:/bin', HOME } })
+        if (asked.status !== 0 || asked.stdout !== 'button returned:Allow\n') throw new Error('not confirmed')
       }
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
       console.log(`${channel}: ${(savedAccounts(channel) ?? ['(none saved)']).join(', ')}`)
