@@ -2084,9 +2084,13 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
     : args.has('--list') ? Promise.resolve(listJobs())
     // `--accounts <channel> [id ...]`: print or set the channel's account scope (ids, or "internal").
     : args.has('--accounts') ? (async () => {
-      const [channel, ...ids] = argv.slice(argv.indexOf('--accounts') + 1)
+      const [channel, ...raw] = argv.slice(argv.indexOf('--accounts') + 1)
+      const ids = [...new Set(raw.flatMap((a) => a.split(',')).map((a) => a.trim()).filter(Boolean))]
       if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal]')
+      if (ids.includes('internal') && ids.length > 1) throw new Error('"internal" stands alone')
       if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
+      // Several accounts in one channel is Liam's call (an agency channel for its clients).
+      if (ids.length > 1 && process.env.SCOPE_OK !== '1') throw new Error('several accounts for one channel needs Liam: set SCOPE_OK=1 only when he approved this scope')
       if (ids.length) log('accounts_set', { channel, accounts: rememberAccounts(channel, ids) })
       console.log(`${channel}: ${(savedAccounts(channel) ?? ['(none saved)']).join(', ')}`)
     })()

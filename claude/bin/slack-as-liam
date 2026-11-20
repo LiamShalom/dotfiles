@@ -44,7 +44,13 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
   case "$1" in
     chat.postMessage|chat.update|chat.scheduleMessage)
       scoped=1
-      for arg in "$@"; do case "$arg" in channel=*) channel="${arg#channel=}" ;; esac; done ;;
+      for arg in "$@"; do
+        case "$arg" in
+          channel=*)
+            if [ -n "$channel" ]; then echo "slack-as-liam: give channel= once." >&2; exit 2; fi
+            channel="${arg#channel=}" ;;
+        esac
+      done ;;
     upload) scoped=1; channel="${2:-}" ;;
   esac
   if [ -n "$scoped" ]; then
@@ -58,6 +64,15 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
       if [ -z "${ACCOUNTS:-}" ]; then
         echo "slack-as-liam: name the SideShift company accounts whose data this text states: ACCOUNTS=<companyId,...> (ACCOUNTS=none if it states none).${saved:+ This channel belongs to: $saved.} Find a channel's account by team membership, never by brand name: same-named accounts are other customers." >&2
         exit 2
+      fi
+      # "internal" holds only while the channel is not shared with another company; unknown counts as shared.
+      if [ "$saved" = internal ] && [ "$ACCOUNTS" != none ]; then
+        itoken=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null || true)
+        info=$( (cd "$HOME" && SLACK_USER_TOKEN="$itoken" env -u SLACK_BOT_TOKEN slack api --skip-update conversations.info channel="$channel") 2>/dev/null | sed -n '/^{/,$p' || true)
+        if [ "$(jq -r 'if .ok == true and (.channel.is_ext_shared | not) and (.channel.is_pending_ext_shared | not) then "internal" else "shared" end' <<<"$info" 2>/dev/null)" != internal ]; then
+          echo "slack-as-liam: $channel is saved as internal, but it is shared with another company (or Slack did not say). Name only its own account's data, and fix the scope with ~/.claude/bin/slack-eyes.mjs --accounts." >&2
+          exit 2
+        fi
       fi
       if [ "$ACCOUNTS" != none ] && [ "$saved" != internal ]; then
         if [ -z "$saved" ]; then
