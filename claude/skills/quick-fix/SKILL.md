@@ -341,7 +341,12 @@ ticket for it, or "one-off" with the reason>
 
 ## Verification
 <what you ran and what you observed — actual output, not "tested and works">
+
+## Prod change
+<one or two sentences on what users see change, for #prod-changelog — or "none – <what changed>">
 ```
+
+Every SideShift repo's `Prod change` CI check fails a PR without that last section.
 
 Link the Jam report or `SID-###` when there is one. Add `[no-deploy]` to the title if
 every changed file is docs/tests/CI/scripts. A fix that writes a cone-declared Firestore

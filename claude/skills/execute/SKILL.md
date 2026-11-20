@@ -85,7 +85,9 @@ Continue on the branch `design` used. If there is no approved spec, stop and run
    the addition is too big: shrink it before you go on.
 
 7. **Open one PR** (not draft) with the final behavior, rollout order and links. Follow
-   `docs/agents/vercel-deployments.md` for title markers.
+   `docs/agents/vercel-deployments.md` for title markers. Include a `## Prod change` section
+   (what users see change, for #prod-changelog, with the `Launch watch:` line); the `Prod change`
+   CI check fails without it.
 
 8. **Test the whole feature end to end on the preview.** A push builds no preview: run
    `npm run vercel:preview` (no permission needed; again after each commit you must check).
