@@ -62,6 +62,17 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
 - **A proven handle is approved with no brand review** once the brand chose the creator and the
   creator signs in to the account: `reviewed_by` is empty and it is approved in the same second
   (`lib/handle-requests/creator-proven-approval.ts`, #9845).
+- **Typed handles after Accept (rule in `createHandleRequest`, `lib/handle-request-utils.ts`):** from
+  11-18 (#10483) to 11-20 12:40 ET (#11315), every typed handle of an accepted creator auto-approved.
+  Since #11315, typed handles on invite-link sign-ups, accepted applications and live contracts go to
+  the brand again. Only proven accounts (OAuth or ad grant) and typed handles on a direct invite the
+  brand sent still auto-approve. A typed handle on a direct invite is approved before the background
+  existence check runs (`verifyHandleInBackground`), so a handle that does not exist can still pass.
+  Answer "is this new" from `git log -L` on that block and the live prod commit (mise, 11-20).
+- **Invite-link sign-ups are decided on Applicants, not Requests** (#10964, 11-19): a pending join from
+  an invite link is left out of Requests (`isPendingInviteLinkApplication`,
+  `lib/api/applications/handle-requests-applicants.ts`) and listed under "Via invite link" on
+  `/campaigns?tab=applicants`.
 - **`reviewed_by` like `invite_<hash>` is a brand team member's account**, made from a team invite
   (`inviteProvisioningUid`, `lib/api/team/team-invite-claim.ts`). It is not a creator invite.
 - **Handle removal.** Approval retires the handle (`retired_at` on `contract_social_profiles`); an
