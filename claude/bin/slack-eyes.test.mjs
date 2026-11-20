@@ -347,7 +347,7 @@ test('a new job sees the outage another job already traced (11-16 replay)', () =
   assert.match(note, /connect: postgres pool saturated \(on_board, started 00:04Z\): The Connect alert is a symptom/)
   assert.doesNotMatch(note, /old: thing/)
   assert.doesNotMatch(note, /campaign writes paused/)
-  assert.match(prompt(self.hit, 'https://x', true, note), /Job key: C0CESKD6CV6:1794876795\.492009\n\nOther :eyes: jobs/)
+  assert.match(prompt(self.hit, 'https://x', true, note), /Job key: C0CESKD6CV6:1794876795\.492009\n\nAccount scope: [^\n]*\n\nOther :eyes: jobs/)
   assert.equal(otherJobsNote([self], self.hit.key, now), '')
 })
 
@@ -815,4 +815,61 @@ test('the reporter is tagged once per thread: a later reply drops the tag', () =
   assert.equal(dropRepeatTag(thread, '100.0', `<@${REPORTER}> $498.68 so far`), '$498.68 so far')
   assert.equal(dropRepeatTag([eyes, agent('101.0', 'taking a look')], '100.0', `<@${REPORTER}> fixed`), `<@${REPORTER}> fixed`)
   assert.equal(dropRepeatTag(thread, '100.0', 'no tag here'), 'no tag here')
+})
+
+import { accountProblems, accountsPrompt, rememberAccounts, savedAccounts, loadAccounts } from './slack-eyes.mjs'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as joinPath } from 'node:path'
+
+// 11-20 j2 melaxin: the channel's account is J2's "Dr. Melaxin" (o2bbk3…); the run posted the
+// campaigns of two other same-named accounts (SideShift's managed 5dVaH8…, UGC World's zIpAAE…).
+const J2 = 'o2bbk3uHoMN93EyGWn6s'
+const leaked = {
+  status: 'done', reply: 'nice, its on for USA - Influencer - J2. the other Dr. Melaxin account still has it off on its 4 US campaigns',
+  unproven_claims: [], accounts: { channel: [J2], used: [J2, '5dVaH8c7gty7nhDoxczU', 'zIpAAE56KOqALXzQTPKg'] },
+}
+
+test('a reply stating another account\'s data is refused and never posted', () => {
+  const problems = accountProblems(leaked, 'C0BRMEZRHKP', [J2])
+  assert.equal(problems.length, 2)
+  assert.match(problems[0], /5dVaH8c7gty7nhDoxczU/)
+  assert.ok(replyPlan(leaked, 'C0BRMEZRHKP', [J2]).blocked)
+  assert.match(accountsPrompt(problems, [J2]), /team membership/)
+})
+
+test('the saved scope wins over the run\'s own claim about the channel', () => {
+  const claimsAll = { ...leaked, accounts: { channel: [J2, '5dVaH8c7gty7nhDoxczU'], used: [J2, '5dVaH8c7gty7nhDoxczU'] } }
+  assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', null).length, 0)
+  assert.equal(accountProblems(claimsAll, 'C0BRMEZRHKP', [J2]).length, 1)
+})
+
+test('a reply with only the channel\'s account, no account data, an internal channel or a DM passes', () => {
+  const fixed = { ...leaked, reply: 'nice, its on for USA - Influencer - J2', accounts: { channel: [J2], used: [J2] } }
+  assert.deepEqual(accountProblems(fixed, 'C0BRMEZRHKP', [J2]), [])
+  assert.deepEqual(replyPlan(fixed, 'C0BRMEZRHKP', [J2]), { text: fixed.reply, images: [] })
+  assert.deepEqual(accountProblems({ ...leaked, accounts: { channel: [J2], used: [] } }, 'C0BRMEZRHKP', [J2]), [])
+  assert.deepEqual(accountProblems(leaked, 'C0INTERNAL', ['internal']), [])
+  assert.deepEqual(accountProblems(leaked, 'D0B70K2EB9R', null), [])
+  assert.deepEqual(accountProblems({ ...leaked, reply: '' }, 'C0BRMEZRHKP', [J2]), [])
+})
+
+test('a reply in a channel with no account named is refused', () => {
+  assert.equal(accountProblems({ ...leaked, accounts: { channel: [], used: [] } }, 'C0NEW', null).length, 1)
+  assert.equal(accountProblems({ ...leaked, accounts: undefined }, 'C0NEW', null).length, 1)
+})
+
+test('the scope is saved per channel and read back', () => {
+  const file = joinPath(mkdtempSync(joinPath(tmpdir(), 'acct-')), 'a.json')
+  assert.deepEqual(rememberAccounts('C1', [' a ', 'a', 'b', ''], file), ['a', 'b'])
+  assert.deepEqual(savedAccounts('C1', loadAccounts(file)), ['a', 'b'])
+  assert.equal(savedAccounts('C2', loadAccounts(file)), null)
+  assert.equal(rememberAccounts('C3', [], file), null)
+})
+
+test('the result schema requires accounts and the first prompt carries the scope rule', () => {
+  const schema = JSON.parse(resultSchema('opus'))
+  assert.ok(schema.required.includes('accounts'))
+  const p = prompt({ kind: 'eyes', text: 'x', channel: 'C0NOSCOPE', ts: '1.1', threadTs: '1.1', key: 'C0NOSCOPE:1.1', author: 'U1' }, 'https://x')
+  assert.match(p, /Account scope: none saved/)
 })

@@ -73,6 +73,17 @@ its whole thread, the channel around it, and every file. Read with the Slack MCP
 Write down who asked, whether they are internal or external (Slack Connect), and what they
 actually need.
 
+**Pin the account before your first query.** The first prompt says the channel's saved account
+scope, or that none is saved. With none saved, find the one SideShift company this channel's
+brand uses by team membership (`users/<companyId>/members` holds the reporter's email). Never
+find it by brand name: a brand often has several accounts with the same name (its own, an
+agency's, SideShift's managed one). Read and state only that account's data. Another account
+with the same name is another customer, even when the thread asks about "the other one". Its
+campaigns, settings and creators never go in this channel. The watcher checks `accounts` in your
+result, and `slack-as-liam` refuses a post without `ACCOUNTS=<companyId,...>` (or `none`) that
+is outside the channel's scope. (2026-11-20: a run read two other "Dr. Melaxin" accounts and
+posted their campaigns and creators in J2's channel.)
+
 **The thread keeps moving while you work.** People add context, answer each other, or post a
 new detail. Read the thread again before each big step: before you settle on a cause, before
 you fix, before you merge, and before you reply. Use what is new. If a later turn starts with

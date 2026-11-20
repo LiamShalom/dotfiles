@@ -33,6 +33,44 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && [ "${VENDOR_CONTACT_OK:-}" != 1 ] && 
   fi
 fi
 
+# An agent post states only the data of the SideShift accounts its channel belongs to (j2 melaxin 11-20:
+# a run read two other "Dr. Melaxin" accounts by name and posted their campaigns and creators in J2's
+# channel). ACCOUNTS=<companyId,...> names the accounts the text's facts come from; ACCOUNTS=none when
+# it states no account data. The first named set is saved as the channel's scope in
+# ~/.claude/state/slack-eyes-accounts.json (shared with slack-eyes.mjs; "internal" = SideShift-only channel).
+if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && { [ "$1" = chat.postMessage ] || [ "$1" = chat.update ]; }; then
+  channel=""
+  for arg in "$@"; do case "$arg" in channel=*) channel="${arg#channel=}" ;; esac; done
+  if [ -n "$channel" ] && [ "${channel#D}" = "$channel" ]; then
+    scope_file="$HOME/.claude/state/slack-eyes-accounts.json"
+    saved=$(jq -r --arg c "$channel" '.[$c].accounts // [] | join(",")' "$scope_file" 2>/dev/null || true)
+    if [ -z "${ACCOUNTS:-}" ]; then
+      echo "slack-as-liam: name the SideShift company accounts whose data this text states: ACCOUNTS=<companyId,...> (ACCOUNTS=none if it states none).${saved:+ This channel belongs to: $saved.} Find a channel's account by team membership, never by brand name: same-named accounts are other customers." >&2
+      exit 2
+    fi
+    if [ "$ACCOUNTS" != none ] && [ "$saved" != internal ]; then
+      if [ -z "$saved" ]; then
+        mkdir -p "$(dirname "$scope_file")"
+        [ -s "$scope_file" ] || echo '{}' > "$scope_file"
+        tmp=$(mktemp)
+        jq --arg c "$channel" --arg a "$ACCOUNTS" --arg t "$(date -u +%FT%TZ)" '.[$c] = {accounts: ($a | split(",") | map(gsub("^ +| +$"; "")) | map(select(length > 0))), setAt: $t}' "$scope_file" > "$tmp" && mv "$tmp" "$scope_file"
+      else
+        outside=""
+        IFS=',' read -ra wanted <<<"$ACCOUNTS"
+        for id in "${wanted[@]}"; do
+          id="${id// /}"
+          [ -z "$id" ] && continue
+          case ",$saved," in *",$id,"*) ;; *) outside="$outside $id" ;; esac
+        done
+        if [ -n "$outside" ]; then
+          echo "slack-as-liam: this text states data from account(s)$outside, but this channel belongs to $saved. Same-named accounts are other customers: drop their campaigns, settings and creators. If the saved scope is wrong, fix it with ~/.claude/bin/slack-eyes.mjs --accounts $channel <ids> only after proving it by team membership." >&2
+          exit 2
+        fi
+      fi
+    fi
+  fi
+fi
+
 # An agent's thread reply stays short and tags a person once per thread (olive 11-18: six replies of
 # 300-450 characters, each tagging the reporter). LONG_OK=1 / RETAG_OK=1 when Liam asked for it.
 tag_mark=""
