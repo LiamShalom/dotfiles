@@ -129,6 +129,11 @@ campaign that owes. Prepare it, dry-run it, then hold. Do not promise the outcom
    Stripe has not received it: ask for the bank's trace (Fed IMAD/OMAD or SWIFT MT103/UETR). Every `funded` event is
    followed seconds later by `applied_to_payment`, so the credit path works. The key cannot read funding instructions
    (POST needs `funding_instruction_write`).
+12. Connect payouts fail `PAYMENT_BLOCKED` (mangolabs, 11-20): read `users/<company>` fields
+   `whopMoveMoneyOutManualBlock*` (dashboard `firestore_get_document`; `fraudPaymentBlocks/*` is out of its scope). A
+   teammate's manual hold is theirs: ask them, and lift it only on Liam's yes. To lift: mint liam@'s ID token
+   (memory `internal-dashboard-url`), then from a script `POST https://sideshifters.vercel.app/api/users/<id>/whop-withdrawals`
+   `{"blocked":false,"notes":"…"}`. The response `sync.ok` true = Whop confirmed; re-read the users doc.
 10. Top-up fees (ACH, card) and caps. `FeeConfig` is `percentFee` + `fixedFeeCents` + optional `maxFeeCents`
    (a per-top-up cap, #10765, 11-17). The cap lives only on a `customFees` doc, must be a number, and is never applied
    to wires. The dashboard fee API cannot set it yet: write it with firebase-admin (`ref.update({maxFeeCents})`). Prove
