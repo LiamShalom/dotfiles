@@ -108,6 +108,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Artifact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/no-claude-artifacts.sh"
+          }
+        ]
       }
     ],
     "Stop": [
