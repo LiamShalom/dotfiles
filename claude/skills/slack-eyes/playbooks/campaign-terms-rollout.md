@@ -90,3 +90,20 @@ name; ask for an email or handle if you must pin one contract.
 Say what triggers the message (the trial goal met), when it was sent (the `decidedAt` date) and that the
 text did not change in the recent updates. Do not say who set the trial, and do not promise a change of
 wording. If the brand did not want "You're in", the cause is the trial terms on the contracts, not a bug.
+
+## A creator missed a campaign-wide contract update
+
+Find the run and its jobs first: `contract_update_runs` (by `campaign_id`) and `contract_update_jobs`
+(by `run_id`, `contract_id`). A contract left out of the run was dropped before the queue. Check
+the open-agreement guard with `agreement_states` (`state` `awaiting_recipient`/`awaiting_sender` skips;
+`signed` does not). Before #11588 (11-21), on a per-creator campaign `campaignRegenerationTargets`
+(lib/api/campaigns/campaign-edit-plan.ts) also skipped any contract with custom pay OR a stored
+`requirements` object (even just `{postFrequency}` from creation) unless its own pay or requirements
+changed, so settings/type/name/date edits never reached it. Since #11588 that only happens when the same
+save also changes pay, requirements or pro-rata. Contract docs live in Firestore `contractsv2`; the
+campaign doc is `programs/<id>`; the PG `contracts` table keys on `campaign_id`.
+
+To re-send one contract's update: queue a one-job run with `enqueueContractUpdateRun` and flag the
+contract as regenerate.usecase.ts does (`pendingCreatorContractUpdate` etc. via
+`defaultContractsDocsPorts.commitContractUpdates`), run with `PG_ALLOW_PRODUCTION=1`. The every-minute
+cron renders and DMs; check the job's `status='done'` and `notified_at`.
