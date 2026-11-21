@@ -1,15 +1,20 @@
 #!/bin/bash
 #
 # heavy-remote-helper.sh — the Mac Studio side of heavy-remote.mjs. The MacBook
-# copies this file to ~/heavy-remote/bin/helper-<hash>.sh on the Studio and runs
-# it over SSH. Nothing here runs on the MacBook.
+# copies this file to ~/heavy-remote.noindex/bin/helper-<hash>.sh on the Studio and
+# runs it over SSH. Nothing here runs on the MacBook.
 #
-# Layout under ~/heavy-remote (R):
+# Layout under ~/heavy-remote.noindex (R). Spotlight skips a folder named *.noindex;
+# indexing every checkout and DerivedData kept the Studio busy. ~/heavy-remote is a
+# symlink to it, but jobs use the real path: Xcode prints real paths, and the
+# MacBook maps only R back to its own paths.
+#
 #   node24/             official Node 24 build (the monorepo's version); the
 #                       Studio's own Homebrew node stays untouched
 #   mirror.git          bare repo the MacBook pushes monorepo job commits into
 #   mirrors/<repo>.git  the same for other repos (sideshift-mobile)
 #   dd/<key>/           Xcode DerivedData per MacBook worktree (iOS jobs), kept here
+#   gradle-home/        the Gradle home for jobs that set GRADLE_USER_HOME (Android)
 #   work/<key>/         one worktree per MacBook worktree, reused between jobs
 #   state/<key>/        markers for that worktree (deps key, packages hash, pgid)
 #   installs/<depkey>/  cached node_modules per package-lock.json, APFS-cloned
@@ -27,7 +32,7 @@
 #   kill <key>              stop the job running in <key>
 set -uo pipefail
 
-R="$HOME/heavy-remote"
+R="$HOME/heavy-remote.noindex"
 NODE_BIN="$R/node24/bin"
 POOL="${HEAVY_REMOTE_POOL:-slot}"
 MIRROR="$R/${HEAVY_REMOTE_MIRROR:-mirror.git}"
@@ -152,6 +157,18 @@ run-locked)
 	if [ "$depkey" != none ] && [ -f "$R/secrets/env.local" ]; then ln -sfn "$R/secrets/env.local" "$wd/.env.local"; else rm -f "$wd/.env.local"; fi
 	t_sync=$((SECONDS - t0 - t_checkout))
 	export PATH="$NODE_BIN:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+	# Gradle finds Java and the Android SDK the way it does on the MacBook (same paths), where a
+	# git-ignored android/local.properties and the default Java do it.
+	export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
+	export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
+	if [ -f "$wd/android/settings.gradle.kts" ] && [ ! -f "$wd/android/local.properties" ]; then
+		echo "sdk.dir=$ANDROID_HOME" >"$wd/android/local.properties"
+	fi
+	# A Gradle daemon outlives its job (6+ GB): stop it after 10 idle minutes, not 3 hours.
+	for gh in "$HOME/.gradle" "$R/gradle-home"; do
+		grep -qs '^org.gradle.daemon.idletimeout=' "$gh/gradle.properties" ||
+			{ mkdir -p "$gh" && echo 'org.gradle.daemon.idletimeout=600000' >>"$gh/gradle.properties"; }
+	done
 	# Dependencies: clone the cached install for this lockfile (none for the mobile repo).
 	if [ "$depkey" != none ] && [ "$(cat "$st/deps" 2>/dev/null)" != "$depkey" ]; then
 		case "$(install_state "$depkey")" in
@@ -247,9 +264,11 @@ run-locked)
 	echo "$rc" >"$out/.rc"
 	# What the job changed in the worktree (snapshots, --fix, coverage/, deletions):
 	# copy it out before the lock is released, so a later job cannot change it first.
-	# Dependency installs and caches are left out.
+	# Dependency installs and caches (Gradle's .gradle and .kotlin too) are left out,
+	# and so is Gradle build output (a module's build/ is 1 GB+), except test reports.
 	cd "$wd" || exit "$rc"
-	find . \( -name node_modules -o -name .git -o -name .next -o -name .turbo \) -prune -o -type f -newer "$stamp" -print0 2>/dev/null |
+	find . \( -name node_modules -o -name .git -o -name .next -o -name .turbo -o -name .gradle -o -name .kotlin \) -prune -o -type f -newer "$stamp" \
+		! \( -path '*/build/*' ! -path '*/build/reports/*' ! -path '*/build/test-results/*' ! -path '*/build/outputs/roborazzi/*' \) -print0 2>/dev/null |
 		while IFS= read -r -d '' f; do
 			f=${f#./}
 			mkdir -p "$out/wd-changed/$(dirname "$f")"

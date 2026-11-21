@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// heavy-remote.mjs — run one queued heavy job on the Mac Studio instead of
-// waiting for a MacBook slot. bin/heavy calls it while every local slot is busy
-// (pools `slot` and `xcode`); the agent sees the same output, exit code and files.
+// heavy-remote.mjs — run one queued heavy job on the Mac Studio instead of on
+// the MacBook. bin/heavy calls it before it takes a local slot, and again while
+// it waits for one (pools `slot` and `xcode`); the agent sees the same output,
+// exit code and files.
 //
 //   node heavy-remote.mjs --started F --queued F --skip F --max-secs N -- <command...>
 //
@@ -23,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 const HOME = os.homedir();
 const HERE = path.dirname(fs.realpathSync(fileURLToPath(import.meta.url)));
 const HELPER = path.join(HERE, 'heavy-remote-helper.sh');
-const NODE_VERSION = 'v24.22.1'; // the Studio's ~/heavy-remote/node24
+const NODE_VERSION = 'v24.22.1'; // the Studio's ~/heavy-remote.noindex/node24
 const START_MARK = '\x01HEAVY-REMOTE-START';
 const LOG = path.join(HOME, '.claude', 'logs', 'heavy-remote.log');
 const MAX_UPLOAD = 200 * 1024 * 1024;
@@ -41,6 +42,8 @@ const LOCAL_ONLY = [
   [/\bgit\s+(push|pull|fetch|worktree|stash|checkout|switch|reset|commit|merge|rebase)\b/, 'changes git state'],
   [/\b(simctl|devicectl|adb|emulator|playwright)\b/, 'needs a device or browser'],
   [/\bnext\s+(dev|build|start)\b|\bnpm\s+(run\s+)?(dev|start)\b/, 'starts a server or build'],
+  // Gradle tests, lint and screenshot records run there; an app this Mac installs, or a device run, does not.
+  [/\bgradlew?\b(?:[^;&|]|>&|&>)*\s:?([\w-]+:)*(assemble|install|bundle|package|publish|build|uninstall|connected|deviceCheck|run)\w*\b/, 'builds or installs an app this Mac needs'],
   [/\bnpm\s+(ci|install|i|add|uninstall|update)\b|sideshift-setup/, 'installs packages'],
   // Build output is git-ignored, so it would stay on the Studio; the job exists to make it here.
   [/\bbuild:packages\b|\bnpm\s+run\s+(-s\s+)?build\b|\btsup\b|\btsc\b[^|;&]*\s(-b|--build)\b/, 'builds files this Mac needs'],
@@ -55,7 +58,12 @@ const LOCAL_ONLY = [
 // CLAUDECODE). Any other variable of this shell that the job names keeps it local.
 export const ENV_PASS = ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'AI_AGENT', 'CODEX_SANDBOX', 'CI', 'TZ', 'NO_COLOR', 'FORCE_COLOR', 'TERM', 'COLUMNS', 'LANG', 'LC_ALL'];
 const SHELL_VARS = new Set(['PWD', 'OLDPWD', 'SHLVL', '_']);
-const SYSTEM_PATHS = ['/bin/', '/usr/bin/', '/usr/sbin/', '/sbin/', '/dev/null', '/dev/stdout', '/dev/stderr', '/dev/fd/'];
+// Also at the same path on the Studio: Xcode (DEVELOPER_DIR=... xcodebuild), Java 21
+// and the Android SDK (JAVA_HOME=..., ANDROID_HOME=... ./gradlew).
+const SYSTEM_PATHS = [
+  '/bin/', '/usr/bin/', '/usr/sbin/', '/sbin/', '/dev/null', '/dev/stdout', '/dev/stderr', '/dev/fd/',
+  '/Applications/Xcode.app/', '/opt/homebrew/opt/openjdk@21/', '/opt/homebrew/share/android-commandlinetools/',
+];
 const NODE24 = '/opt/homebrew/opt/node@24/bin/';
 // An absolute path token: starts after a shell separator, quote, = or redirect.
 const PATH_TOKEN = /(?<=^|[\s'"=<>(:,;|&])\/[^\s'"`;|&<>(),]*/g;
@@ -87,10 +95,11 @@ export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = s
       return { ok: false, reason: 'archives, signs or writes a result bundle' };
     }
     const platforms = [...script.matchAll(/platform=([^,'"]*)/g)].map((m) => m[1]);
-    if (!platforms.length || platforms.some((p) => p !== 'iOS Simulator')) return { ok: false, reason: 'not an iOS Simulator destination' };
     const ids = [...script.matchAll(/\bid=([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/g)].map((m) => m[1]);
+    // `-destination id=<udid>` alone is fine: main() checks it is an iOS simulator on this Mac.
+    if ((!platforms.length && !ids.length) || platforms.some((p) => p !== 'iOS Simulator')) return { ok: false, reason: 'not an iOS Simulator destination' };
     // A destination by name (name=iPhone 17) would need that simulator on the Studio.
-    if (ids.length < platforms.length) return { ok: false, reason: 'names a simulator by name, not id' };
+    if (ids.length < platforms.length || /-destination\s+['"]?[^'"\s]*\bname=/.test(script)) return { ok: false, reason: 'names a simulator by name, not id' };
     sims = [...new Set(ids)];
     // A relative DerivedData folder would sit in the Studio worktree and come back as worktree files.
     if (/-(derivedDataPath|clonedSourcePackagesDirPath)\s+['"]?[^/\s'"]/.test(script)) return { ok: false, reason: 'uses a relative build folder' };
@@ -101,6 +110,9 @@ export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = s
     const m = script.match(new RegExp(`${flag}\\s+['"]?(/[^\\s'";&|<>()]+)`));
     if (m && remote.dd) caches.push([m[1].replace(/\/+$/, ''), remote.dd + sub]);
   }
+  // A job's own Gradle home becomes one shared Gradle home there (Gradle locks it for concurrent builds).
+  const gh = script.match(/\bGRADLE_USER_HOME=['"]?(\/[^\s'";&|<>()]+)/);
+  if (gh && remote.gradle) caches.push([gh[1].replace(/\/+$/, ''), remote.gradle]);
   for (const [, name] of script.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) {
     if (env[name] !== undefined && !ENV_PASS.includes(name) && !SHELL_VARS.has(name)) {
       return { ok: false, reason: `uses $${name} from this Mac's environment` };
@@ -214,11 +226,16 @@ export function copyDestination(kind, rel, { root, outputs, home, mkdir = true }
   if (path.isAbsolute(rel) || rel.split('/').includes('..')) return null;
   if (kind === 'abs') {
     const to = '/' + rel;
-    if (!outputs.includes(to)) return null;
-    const parent = real(path.dirname(to));
+    // A named path, or a file inside one (a folder the job created, such as a proof dir).
+    if (!outputs.some((o) => to === o || to.startsWith(o + '/'))) return null;
+    // The deepest folder that exists must resolve under an output root.
+    let existing = path.dirname(to);
+    while (!lst(existing)) existing = path.dirname(existing);
+    const parent = real(existing);
     const roots = ['/private/tmp', real(path.join(home, '.claude', 'jobs')), real(path.join(home, '.cache'))].filter(Boolean);
     if (!parent || !roots.some((r) => parent === r || parent.startsWith(r + '/'))) return null;
     if (lst(to)?.isSymbolicLink()) return null;
+    if (mkdir) fs.mkdirSync(path.dirname(to), { recursive: true });
     return to;
   }
   // macOS names are case- and normalization-insensitive: .GIT is .git.
@@ -331,8 +348,9 @@ async function main() {
   const c = connection();
   const job = `${Date.now()}-${process.pid}`;
   const key = `${path.basename(root).replace(/[^\w.-]/g, '_').slice(0, 40)}-${sha256(root).slice(0, 8)}`;
-  const rhome = `/Users/${c.user}/heavy-remote`;
-  const remote = { wd: `${rhome}/work/${key}`, out: `${rhome}/out/${job}/abs`, node: `${rhome}/node24/bin`, dd: `${rhome}/dd/${key}` };
+  // The real path, not the ~/heavy-remote symlink: Xcode prints real paths (see the helper).
+  const rhome = `/Users/${c.user}/heavy-remote.noindex`;
+  const remote = { wd: `${rhome}/work/${key}`, out: `${rhome}/out/${job}/abs`, node: `${rhome}/node24/bin`, dd: `${rhome}/dd/${key}`, gradle: `${rhome}/gradle-home` };
   const plan = planJob(command, { cwd, root, home: HOME, remote, pool });
   if (!plan.ok) return skip(plan.reason);
   // Each MacBook simulator the job names: its device type and runtime, so the
@@ -344,6 +362,7 @@ async function main() {
     for (const udid of plan.sims) {
       const found = Object.entries(list.devices ?? {}).flatMap(([rt, ds]) => ds.map((d) => ({ ...d, rt }))).find((d) => d.udid === udid);
       if (!found) return skip(`simulator ${udid} is not on this Mac`);
+      if (!/\.iOS-/.test(found.rt)) return skip(`simulator ${udid} is not an iOS simulator`);
       specs.push([udid, found.name, found.deviceTypeIdentifier, found.rt].join('|'));
     }
     sims = specs.join(';');
@@ -403,7 +422,7 @@ async function main() {
       refspecs.push(`+${commit}:refs/heavy-base/${key}`);
     }
   }
-  const push = spawnSync('git', ['-C', root, 'push', '-q', '--no-verify', `${target}:heavy-remote/${mirror}`, ...refspecs], {
+  const push = spawnSync('git', ['-C', root, 'push', '-q', '--no-verify', `${target}:heavy-remote.noindex/${mirror}`, ...refspecs], {
     encoding: 'utf8',
     env: { ...process.env, GIT_SSH_COMMAND: sshCmd },
     timeout: 300_000,

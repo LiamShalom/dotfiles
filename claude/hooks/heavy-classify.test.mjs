@@ -64,6 +64,18 @@ test("the shared-package build is queued", () => {
 	assert.ok(!refused("npm run build:packages"));
 });
 
+test("Gradle builds and tests are queued; info tasks are not", () => {
+	assert.ok(queued("cd android && JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:test --tests '*X*'", OTHER));
+	assert.ok(queued("./gradlew assembleDebug", OTHER));
+	assert.ok(queued("gradle recordRoborazziDebug", OTHER));
+	for (const cmd of [
+		"./gradlew --version", "./gradlew --stop", "./gradlew tasks", "./gradlew :app:dependencies",
+		"cat > /tmp/x.sh <<'EOF'\n./gradlew test\nxcodebuild test -scheme S\nEOF",
+	]) {
+		assert.ok(!queued(cmd, OTHER), cmd);
+	}
+});
+
 test("other repos keep the queue", () => {
 	assert.ok(queued("npm run typecheck", OTHER));
 	assert.ok(queued("npx tsc --noEmit", OTHER));

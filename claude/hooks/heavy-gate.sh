@@ -68,7 +68,7 @@ esac
 
 new=""
 case "$cmd" in
-	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint* | *xcodebuild* | *agent-preflight*)
+	*vitest* | *npm\ test* | *npm\ t\ * | *"npm run"* | *pnpm* | *yarn* | *next\ build* | *tsc* | *eslint* | *xcodebuild* | *agent-preflight* | *gradle*)
 		cwd=$(jq -r '.cwd // empty' <<<"$input")
 		new=$(node "$HOME/.claude/hooks/heavy-classify.mjs" "$cmd" "${cwd:-$PWD}" 2>/dev/null)
 		rc=$?

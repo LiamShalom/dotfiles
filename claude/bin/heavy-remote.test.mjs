@@ -19,6 +19,10 @@ test('copy-back writes only where the job was meant to', () => {
   try {
     assert.equal(copyDestination('abs', log.slice(1), o), log);
     assert.equal(copyDestination('abs', 'Users/x/.zshrc', o), null, 'not a named output');
+    const proof = path.join(home2, '.claude', 'jobs', 'j', 'tmp', 'proof');
+    assert.equal(copyDestination('abs', `${proof.slice(1)}/shots/a.png`, { ...o, outputs: [proof] }), `${proof}/shots/a.png`, 'inside a folder the job created');
+    assert.ok(fs.statSync(`${proof}/shots`).isDirectory());
+    assert.equal(copyDestination('abs', `${proof.slice(1)}-x/a.png`, { ...o, outputs: [proof] }), null, 'a sibling of a named folder');
     assert.equal(copyDestination('abs', 'etc/hosts', { ...o, outputs: ['/etc/hosts'] }), null, 'outside the output roots');
     assert.equal(copyDestination('wd-changed', 'lib/a.ts', o), path.join(wt, 'lib/a.ts'));
     assert.equal(copyDestination('wd-changed', '.git/hooks/pre-commit', o), null);
@@ -190,8 +194,20 @@ test('an iOS simulator test maps its project, DerivedData, simulator and log', (
   assert.deepEqual(r.caches, [[`${home}/.cache/sideshift-reconnect-dd`, '/Users/s/hr/dd/k']]);
 });
 
+test('an id-only destination with DEVELOPER_DIR runs on the Studio', () => {
+  const r = iosPlan(
+    `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild build-for-testing -quiet -project ${mob}/SideShift.xcodeproj -scheme SideShiftTests -destination id=${UDID} -derivedDataPath ${home}/.claude/jobs/abc/tmp/dd`,
+  );
+  assert.equal(r.ok, true, r.reason);
+  assert.deepEqual(r.sims, [UDID]);
+  assert.match(r.script, /^DEVELOPER_DIR=\/Applications\/Xcode\.app\/Contents\/Developer xcodebuild/);
+  assert.match(r.script, /-project \/Users\/s\/hr\/work\/k\/SideShift\.xcodeproj/);
+});
+
 for (const [script, reason] of [
   [`xcodebuild test -scheme S -destination 'platform=iOS,id=00008110-001A2B3C4D5E801E'`, /iOS Simulator/],
+  ['xcodebuild test -scheme S', /iOS Simulator/],
+  [`xcodebuild test -scheme S -destination id=${UDID} -destination 'name=iPhone 17'`, /by name/],
   [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`, /by name/],
   [`xcodebuild archive -scheme S -destination 'generic/platform=iOS'`, /archives/],
   [`xcrun simctl boot ${UDID}; xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'`, /device/],
@@ -201,6 +217,32 @@ for (const [script, reason] of [
     const r = iosPlan(script);
     assert.equal(r.ok, false);
     assert.match(r.reason, reason);
+  });
+}
+
+test('a Gradle test or screenshot record runs on the Studio with the same JDK and SDK and a shared Gradle home', () => {
+  const r = planJob(
+    [
+      '/bin/zsh',
+      '-c',
+      `cd ${mob}/android && JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools GRADLE_USER_HOME=${home}/.claude/jobs/abc/tmp/gradle-home ./gradlew --continue :core:designsystem:recordRoborazziDebug --tests '*X*' > /tmp/rec.log 2>&1`,
+    ],
+    { cwd: mob, root: mob, home, remote: { ...remote, gradle: '/Users/s/hr/gradle-home' }, stat, env: {} },
+  );
+  assert.equal(r.ok, true, r.reason);
+  assert.match(r.script, /^cd \/Users\/s\/hr\/work\/k\/android && JAVA_HOME=\/opt\/homebrew\/opt\/openjdk@21\/libexec/);
+  assert.match(r.script, /ANDROID_HOME=\/opt\/homebrew\/share\/android-commandlinetools GRADLE_USER_HOME=\/Users\/s\/hr\/gradle-home \.\/gradlew/);
+  assert.deepEqual(r.outputs, ['/tmp/rec.log']);
+});
+
+for (const script of [
+  './gradlew :app:assembleDebug', './gradlew installDebug', 'cd android && ./gradlew connectedDebugAndroidTest', './gradlew :app:bundleRelease',
+  './gradlew build', './gradlew :app:packageDebug', './gradlew :app:publishListing', 'gradlew -p android 2>&1 assembleDebug',
+]) {
+  test(`Gradle stays local: ${script}`, () => {
+    const r = plan(script);
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /app this Mac needs/);
   });
 }
 

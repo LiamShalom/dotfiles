@@ -107,9 +107,9 @@ case "$POOL" in
 	*) MAX_SECS="${HEAVY_MAX_SECS:-2700}" ;;
 esac
 
-# While this job would wait here, run it on the Mac Studio instead
-# (bin/heavy-remote.mjs; pools `slot` and `xcode`, at most one attempt per
-# HEAVY_REMOTE_RETRY_SECS). Exits with the job's code when it ran there.
+# Run the job on the Mac Studio when it can run there: first, and again while
+# it waits here (bin/heavy-remote.mjs; pools `slot` and `xcode`, at most one
+# attempt per HEAVY_REMOTE_RETRY_SECS). Exits with the job's code when it ran there.
 REMOTE="$(dirname "$(readlink -f "$0")")/heavy-remote.mjs"
 remote_next=0
 try_remote() {
@@ -127,8 +127,10 @@ try_remote() {
 	fi
 	return 1
 }
-# HEAVY_REMOTE_FORCE=1: try the Studio first, even with a local slot free.
-[ "${HEAVY_REMOTE_FORCE:-0}" = 1 ] && remote_next=0 && try_remote "$@"
+# The Studio goes first, even with a local slot free: the MacBook also runs
+# Session Board, every agent session and the simulators. HEAVY_REMOTE_FIRST=0
+# uses it only while the job would wait here.
+[ "${HEAVY_REMOTE_FIRST:-${HEAVY_REMOTE_FORCE:-1}}" = 1 ] && remote_next=0 && try_remote "$@"
 
 # Wait for free memory, at most MEM_WAIT seconds; after that run anyway, so a
 # machine that stays full never blocks every agent for good.

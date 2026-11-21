@@ -15,6 +15,7 @@
 //    parallelizable, so each run otherwise boots one simulator clone per
 //    worker ("Clone 1..5 of x-ads-202", 1.5-3 GB each). Runs that choose their
 //    own parallel-testing flags are left alone.
+//  - Gradle (`./gradlew`) builds and tests queue with the other heavy jobs.
 //
 //  - A whole-repo type check in the SideShift monorepo is refused: PR CI runs
 //    the app, tests and scripts checks on every push, and on this Mac each one
@@ -207,6 +208,14 @@ function analyse(cmd, seg, cwd, hasCd) {
 
 	if (base === "next" && args[0]?.text === "build") return { heavy: true, pool: "build", insert: [] };
 
+	// Android Gradle builds and tests: a Gradle daemon plus a Kotlin daemon, 6-9 GB.
+	if (base === "gradlew" || base === "gradle") {
+		if (flag(/^(--version|-v|--help|-h|-\?|--stop|--status)$/)) return none;
+		const tasks = args.filter((a) => !a.text.startsWith("-")).map((a) => a.text);
+		if (tasks.length && tasks.every((t) => /^(:?[\w-]+:)*(tasks|help|projects|properties|dependencies)$/.test(t))) return none;
+		return { heavy: true, insert: [] };
+	}
+
 	// The monorepo preflight runs the test typecheck, ESLint and Vitest itself,
 	// out of the hook's sight.
 	if (base === "node" && /(^|\/)agent-preflight\.mjs$/.test(args[0]?.text ?? "")) return { heavy: true, insert: [] };
@@ -245,10 +254,10 @@ export function classify(cmd, cwd = process.cwd()) {
 		.map((m) => ({ from: m.index + m[0].indexOf("\n"), to: m.index + m[0].length }));
 	let dir = cwd;
 	for (const s of segs) {
+		if (bodies.some((b) => s.start >= b.from && s.start < b.to)) continue;
 		const cd = cmd.slice(s.start, s.end).match(/^[\s(]*cd\s+(?:--\s+)?["']?([^\s"';)]+)/);
 		if (cd) dir = /^[/~]/.test(cd[1]) ? cd[1] : join(dir, cd[1]);
 		const r = analyse(cmd, s, dir, hasCd);
-		if (r.ciOnly && bodies.some((b) => s.start >= b.from && s.start < b.to)) continue;
 		if (r.ciOnly) return { refuse: CI_ONLY_REASON };
 		heavy ||= r.heavy;
 		if (r.heavy && r.pool) pool = r.pool;
