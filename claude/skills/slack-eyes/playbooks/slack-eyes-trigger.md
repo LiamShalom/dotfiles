@@ -46,8 +46,10 @@ be there" as the cause.
 ## "Set us up with SideChat / the internal ManyChat" (grant it)
 
 - `campaign_comment_dm` is company-only (`agencyInheritable: false` in `lib/flags/registry.ts`): grant the company
-  that owns the campaign, not only a sub-account. No code change, no admin token: a tsx script calling
-  `setCompanyFlag` (`lib/api/flags/flags-admin.usecase.ts`) with `{ kind: 'manual-script' }` as ctx, run from the
-  monorepo root with `PG_ALLOW_PRODUCTION=1 npx tsx --conditions=react-server --env-file=.env.local <script>`.
+  that owns the campaign, not only a sub-account. No code change, no admin token: from the monorepo root run
+  `env PG_ALLOW_PRODUCTION=1 npx tsx scripts/grant-feature.ts grant campaign_comment_dm <companyId> --reason "..."`
+  (dry run), then again with `--execute` (without the env var it refuses production). Find the company with
+  `find_account` on the reporter's email: the one they are owner of with the live campaign, often an agency
+  sub-account whose parent has the same name (inner circle: sidechat access, 2026-11-21).
 - `canAccessFeature` caches per process: an "after" read in the same run still says false. Check with a second run
   or `feature_grants` on the replica (hardlaunch: sidechat setup, 2026-11-19).
