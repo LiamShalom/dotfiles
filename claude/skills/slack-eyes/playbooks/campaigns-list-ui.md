@@ -40,6 +40,13 @@ line here no longer matches, fix this file (step 7 of the skill).
   background agent-Chrome tab cannot show a GPU or paint glitch. Get the reporter's video before you
   name a cause.
 
+- **Job menu opens twice, a second copy stuck top-left (2026-11-21, canyon):** the Applicants toolbar
+  renders twice (pinned copy and a CSS-hidden phone copy). Before #11386 (merged 2026-11-20 13:11 ET)
+  both copies shared one `open` state, so the hidden copy's menu opened at 0,0. Now each copy has its
+  own state (`wideJobSelectOpen` / `phoneJobSelectOpen` in `components/applicants/applicants-view.tsx`).
+  Proof on prod: open the visible `button[aria-label="Job role"]` and count `[role=listbox]` (1 = fixed).
+  Not reproduced on prod at 2000 and 2280 wide, with or without a search typed.
+
 ## Checks
 
 1. Read the reporter's clip. Ergo links (`share.joinergo.com/c/<id>`) need an email code:
