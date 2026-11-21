@@ -53,6 +53,7 @@ local `next dev` under load. Run a new vitest file alone, not in a multi-file ru
 
 One card component serves /pricing, the onboarding paywall and settings: `components/pricing/pricing-plan-card.tsx`,
 styled by `components/pricing/pricing-plans.module.css`. The featured (dark) card is `.cardFeatured`; the trial side
-of the checkout is `.darkGround` in `components/billing/trial-checkout.module.css`. Since #11308 both are flat black
-(the blue glow / shine `--ds-hero-surface-image` was removed on feedback "no shine / blue"). A CSS-only look change
-here merges as a small UI change; prove it on the preview's /pricing as the test brand.
+of the checkout is `.darkGround` in `components/billing/trial-checkout.module.css`. Both carry the blue glow gradient
+(`--ds-hero-surface-image`). #11308 made them flat on a customer's "no shine / blue" ask; Liam reverted it in #11545
+("the one thats solid looks worse"). Do not flatten them again without Liam's say. A CSS-only look change here
+merges as a small UI change; prove it on the preview's /pricing as the test brand.
