@@ -149,6 +149,8 @@ platforms inline, not wrapped to two rows; on mobile the action stays in view.
 - 10-22 "all the ad platforms appear inline right now they fall into 2 rows"
 - 10-27 Billing plan card at 390 px, four buttons wrapping as 1 + 2 + 1 (Cancel Plan alone, Change Plan alone on a third row): "This UI should be fixed". Check every button row at 390 before showing it; uneven wraps read as broken
 
+- 11-21 brand portfolio page for creators, first build on the creator portfolio shell (680px centred column on the cloud background, centred About paragraph, six equal stat tiles in one card, one job card inside a wide empty card): "This design is going to need to be heavily improved". A brand's public page is an app-width page (white, 1120px), not the narrow portfolio column, and it leads with the brand's real creator content (top posts with views) and one big figure; a stat card of six equal tiles reads as a template. Round 1 offered A showcase (video wall + paid figure + jobs first), B company page (sticky card + tabs), C profile grid (counters + Videos/Jobs/Reviews tabs).
+
 **11. Setup lives in settings, not in the main flow.**
 - 11-19/20 brand v4 navbar: the queues brands clear weekly (Applicants, Submissions, Disputes) and Analytics' Posts and Creators tabs become top-level navbar items ("No I like having them as top level navbars", when I nested them under their parent pages); grouping from Trybe's sidebar (Overview / Manage / Business), "I think trybe and launchpont do a good job" for design and grouping. Workflows, Affiliates and Learn leave the navbar for Settings sections; Sidekick leaves it for the bottom-right support entry
 - 10-26 "I dont like having Business name and Logo in the build ad flow… in ad settings -> accounts"
