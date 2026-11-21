@@ -70,6 +70,11 @@ docs/features/YYYY-MM-DD-<slug>/
 
 6. **Get approval.** Show the operator the spec path and a short summary of the decisions.
    Change it until they approve. Commit it on the feature branch.
+   Before you show it, tag every decision with its source: `(operator: "<his words>")` only
+   when his own message answered it, else `(my pick, unconfirmed)`. A question he skipped or
+   answered with "ignore point 2" is unconfirmed, not agreed. List the unconfirmed picks
+   first in the approval message, one line each. (11-20 Spotlight pool: "tiers stay" was my
+   pick, written as "(Liam, 2026-11-20)" and built → "this is not what we agreed tho".)
 
 7. **Hand off.** Say what comes next:
    - The feature has new or changed UI: run `design` next.
