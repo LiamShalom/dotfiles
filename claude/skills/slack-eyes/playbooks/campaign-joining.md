@@ -29,6 +29,14 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   `components/campaign-details/contract-lifecycle.ts`) until each required platform that has a
   sign-in has a live account (`resolveAccountsRequirement`, `lib/campaign-join/accounts-gate.ts`,
   #10411, live 2026-11-16).
+- **Any one platform or every platform** (#11502, live 2026-11-20 20:03 ET): `requirements.accountPlatformsRule`,
+  unset = `any` (one approved account on a listed sign-in platform clears the hold). Between #10411 and
+  #11502 the gate needed every listed platform. A held contract is re-checked only on an account link
+  or handle approval, so contracts held under the old rule stay "Adding accounts" / Invited even with
+  approved accounts. Release: workflow `release-accounts-holds.yml` (`gh workflow run ... -f
+  execute=false -f company=<id>`, read the log, then `execute=true`). Run log greps: `clears:`,
+  `started=`. On 11-21 it had run for one company only; couponbirds: creators stuck invited found 380
+  more held contracts and ran it for everyone.
 - **Required platforms** are the campaign's `requirements.platforms`, or the contract's own list when
   Customize set `platformsOverride` (`resolveRequirements`, `lib/payment-structure-utils.ts`). A
   creator can add only listed platforms: others fail with "Platform X is not required for this
