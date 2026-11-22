@@ -21,6 +21,19 @@ and needed two corrections. Read the files below first.
 - The bulk terms dialog is `components/campaigns/campaign-terms-modal.tsx` (pay, requirements,
   deliverables). Check that file before you say a platform can be dropped there.
 
+## Off statements: a rate cut or a move reprices old unpaid videos (checked 2026-11-21)
+
+- Only companies with an enabled `feature_grants` row for `payouts_v2` pay from statements (3 on
+  2026-11-21). Elsewhere `update-regen.usecase.ts` ~L405 records the terms version with no
+  `effectiveFrom` (`terms_versions.effective_from` null), and the engine prices every unpaid video at the
+  contract's current rate (`lib/payouts/terms-versions/terms-start.ts` header). A move keeps the same
+  contract id and swaps its terms (`move-creator.usecase.ts`); the move dialog's payout date defaults to
+  today ("Posts before this date are tracked but not paid").
+- Proof query: `terms_versions` with `lag(terms->'paymentStructure'->>'perPostRate')` per `contract_id`,
+  source `update-with-regeneration` / `move-creator`, and `effective_from` null.
+- Reply: off statements, pay out what is owed before the rate change or move. "From now on" exists only
+  on statements; whether to move a company there is Liam's call.
+
 ## Terms vs contract document: separate edits, separate start rules (checked 2026-11-20)
 
 - Customize on a creator row (`components/campaigns/contract-customize-flow.tsx`) is a fork: Campaign
