@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { carryNudged, chatStatuses, nudgeText, stalledChats } from './agent-reaper.mjs'
+import { carryNudged, chatStatuses, nudgeText, paneTabIds, stalledChats } from './agent-reaper.mjs'
 
 const MIN = 60e3
 const now = Date.parse('2026-11-19T22:30:00Z')
@@ -61,4 +61,14 @@ test('the nudge names the minutes and the conflicted-PR trap', () => {
   const t = nudgeText(50)
   assert.match(t, /50 min ago/)
   assert.match(t, /mergeStateStatus/)
+})
+
+test('the pane tabs are read from Session Board pane.json; a missing or broken file spares nothing', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'reaper-pane-'))
+	const file = join(dir, 'pane.json')
+	writeFileSync(file, JSON.stringify({ open: true, tabs: [{ id: 'AAA', owner: 'c1' }, { id: 'BBB', owner: null }, { owner: 'x' }] }))
+	assert.deepEqual([...paneTabIds(file)], ['AAA', 'BBB'])
+	writeFileSync(file, 'not json')
+	assert.equal(paneTabIds(file).size, 0)
+	assert.equal(paneTabIds(join(dir, 'missing.json')).size, 0)
 })

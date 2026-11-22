@@ -20,7 +20,10 @@
 //                never touched, and neither is a Next server outside a git
 //                checkout (the shiftpool gateway every session talks through).
 //   Chrome tabs  Close tabs in the shared agent Chrome whose page has not
-//                loaded or changed URL for TAB_IDLE_HOURS (2).
+//                loaded or changed URL for TAB_IDLE_HOURS (2). A tab in
+//                Session Board's pane is left to the board: it is a page
+//                handed to Liam, which the board closes when its chat sleeps
+//                and opens again when he goes back to the chat.
 //   orphans      Kill a Claude Code background-task shell whose session is
 //                gone (its parent is launchd: `claude stop`, a recompact
 //                handoff or a crash leaves it running), and a node-pty helper
@@ -129,6 +132,16 @@ function etimeSeconds(s) {
 	const p = rest.split(":").map(Number);
 	while (p.length < 3) p.unshift(0);
 	return Number(days) * 86400 + p[0] * 3600 + p[1] * 60 + p[2];
+}
+
+// The tabs in Session Board's pane (its saved pane.json), which the board closes itself.
+export function paneTabIds(file = join(HOME, "Library/Application Support/Session Board/pane.json")) {
+	try {
+		const tabs = JSON.parse(readFileSync(file, "utf8")).tabs;
+		return new Set(Array.isArray(tabs) ? tabs.map((t) => t?.id).filter((id) => typeof id === "string") : []);
+	} catch {
+		return new Set();
+	}
 }
 
 export function processes() {
@@ -862,7 +875,12 @@ async function main() {
 	if (!cons) next.containers = state.containers ?? {};
 
 	const chrome = await chromeTabs();
+	const pane = paneTabIds();
 	for (const t of chrome?.tabs ?? []) {
+		if (pane.has(t.id)) {
+			if (dry) say(`keep agent Chrome tab "${t.title.slice(0, 60)}": in Session Board's pane`);
+			continue;
+		}
 		const prev = state.tabs?.[t.id];
 		// A tab first seen now counts from its page load, so old tabs are not
 		// granted a fresh idle limit. A URL change (client-side navigation) is use.
