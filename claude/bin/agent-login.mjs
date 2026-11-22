@@ -150,9 +150,14 @@ try {
   }
 
   const { sessionId } = await send("Target.attachToTarget", { targetId: pages[0].targetId, flatten: true });
+  // The sign-in form can sit in a frame from another site (Apple's App Store Connect login is an
+  // idmsa.apple.com frame). Everything below then runs in that frame: its origin is the one the
+  // saved login has to match and the one every typed field is checked against.
+  let contextId;
   const evaluate = async (fn, ...params) => {
     const r = await send("Runtime.evaluate", {
       expression: `(${fn})(${params.map((p) => JSON.stringify(p)).join(",")})`, returnByValue: true, awaitPromise: true,
+      ...(contextId && { contextId }),
     }, sessionId);
     if (r.exceptionDetails) throw new Error(`page script failed: ${r.exceptionDetails.text}`);
     return r.result.value;
@@ -165,13 +170,28 @@ try {
     return r.result.value;
   };
   const element = async (marker) => {
-    const r = await send("Runtime.evaluate", { expression: `(${findMarked})(${JSON.stringify(marker)})` }, sessionId);
+    const r = await send("Runtime.evaluate", { expression: `(${findMarked})(${JSON.stringify(marker)})`, ...(contextId && { contextId }) }, sessionId);
     return r.result.objectId;
   };
 
   const fieldsShowing = (f) => f.user || f.pass || f.otp || f.split;
-  const before = await evaluate(markFields);
+  let before = await evaluate(markFields);
   await evaluate(unmark);
+  if (!fieldsShowing(before)) {
+    const frames = [];
+    const walk = (node) => { for (const child of node.childFrames || []) { frames.push(child.frame); walk(child); } };
+    walk((await send("Page.getFrameTree", {}, sessionId)).frameTree);
+    for (const frame of frames) {
+      if (!/^https?:/.test(frame.url)) continue;
+      const world = await send("Page.createIsolatedWorld", { frameId: frame.id, worldName: "agent-login" }, sessionId).catch(() => null);
+      if (!world) continue;
+      contextId = world.executionContextId;
+      const inFrame = await evaluate(markFields).catch(() => null);
+      await evaluate(unmark).catch(() => {});
+      if (inFrame && fieldsShowing(inFrame)) { before = inFrame; break; }
+      contextId = undefined;
+    }
+  }
   const page = new URL(before.href);
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(page.hostname);
   if (page.protocol !== "https:" && !local) fail(`refusing to type a login into ${page.origin}: the page is not https`);
