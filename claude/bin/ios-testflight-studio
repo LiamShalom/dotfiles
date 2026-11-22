@@ -1,0 +1,84 @@
+#!/bin/bash
+# Put a commit of the iOS app into TestFlight for the internal testers, built on the Mac Studio
+# instead of GitHub's macOS runners (about 30 min instead of 70-90). Run it from a sideshift-mobile
+# checkout:
+#
+#   ios-testflight-studio [<ref>] [--what "What to Test text"] [--no-upload]   (default ref: HEAD)
+#   ios-testflight-studio --follow <run-id>
+#
+# The commit does not need to be pushed: it goes to the Studio's heavy-remote mirror over ssh.
+# The build scripts come from TOOLING_REF (default origin/ci/ios-testflight, the GitHub workflow's
+# branch), so a branch that does not carry them builds too. --no-upload stops after the archive is
+# exported and validated (no TestFlight build, nobody is notified). Prints the Studio's log as it
+# goes and exits with the run's status. If this Mac sleeps or the connection drops, the Studio
+# carries on: `ios-testflight-studio --follow <run-id>` picks the log up again.
+set -euo pipefail
+
+KEY="$HOME/.config/sideshift-pool/macbook_ed25519"
+HOST="sideshift@100.118.88.90"
+SSH=(ssh -i "$KEY" -o UserKnownHostsFile="$HOME/.config/sideshift-pool/known_hosts" -o IdentitiesOnly=yes
+     -o UseKeychain=yes -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
+HERE=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+REMOTE_SCRIPT="$HERE/ios-testflight-studio-remote.sh"
+
+die() { echo "ios-testflight-studio: $*" >&2; exit 1; }
+
+# Stream the run's log until it writes its status, then exit with that status. Exit 3 when the
+# Studio process is gone without a status (a reboot, a kill), so the caller never waits forever.
+follow() {
+  [[ "$1" =~ ^[0-9A-Za-z-]+$ ]] || die "bad run id '$1'"
+  "${SSH[@]}" "$HOST" bash -s -- "$1" <<'REMOTE'
+run="$HOME/testflight/runs/$1"
+[ -d "$run" ] || { echo "no such run: $1" >&2; exit 2; }
+tail -n +1 -f "$run/log" & t=$!
+trap 'kill $t 2>/dev/null' EXIT
+trap 'exit 129' HUP INT TERM
+while [ ! -s "$run/status" ]; do
+  if ! kill -0 "$(cat "$run/pid" 2>/dev/null || echo 0)" 2>/dev/null; then
+    sleep 2
+    [ -s "$run/status" ] && break
+    echo "ios-testflight-studio: the Studio run stopped without a result" >&2
+    exit 3
+  fi
+  sleep 5
+done
+sleep 1
+exit "$(cat "$run/status")"
+REMOTE
+}
+
+ref=HEAD what="" upload=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --what) what="${2:?--what needs text}"; shift 2 ;;
+    --no-upload) upload=0; shift ;;
+    --follow) follow "${2:?--follow needs a run id}"; exit $? ;;
+    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) die "unknown option $1" ;;
+    *) ref="$1"; shift ;;
+  esac
+done
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run it inside a sideshift-mobile checkout"
+git -C "$root" remote get-url origin | grep -q 'SideShiftApp/sideshift-mobile' || die "$root is not sideshift-mobile"
+sha=$(git -C "$root" rev-parse --verify "$ref^{commit}") || die "no commit '$ref'"
+# The label in TestFlight's "What to Test": the branch the ref names, else the commit.
+if [ "$ref" = HEAD ]; then
+  branch=$(git -C "$root" symbolic-ref -q --short HEAD || echo "commit-${sha:0:9}")
+elif git -C "$root" show-ref -q --verify "refs/heads/$ref" || git -C "$root" show-ref -q --verify "refs/remotes/$ref"; then
+  branch="${ref#origin/}"
+else
+  branch="commit-${sha:0:9}"
+fi
+tooling_ref="${TOOLING_REF:-origin/ci/ios-testflight}"
+git -C "$root" fetch -q origin "${tooling_ref#origin/}" 2>/dev/null || true
+tooling=$(git -C "$root" rev-parse --verify "$tooling_ref^{commit}") || die "no tooling commit '$tooling_ref'"
+id="$(date +%Y%m%d-%H%M%S)-${sha:0:8}"
+
+echo "ios-testflight-studio: $branch at ${sha:0:9} (tooling ${tooling:0:9}) -> run $id$([ "$upload" = 1 ] || echo ', no upload')"
+GIT_SSH_COMMAND="${SSH[*]}" git -C "$root" push -q --no-verify "$HOST:heavy-remote.noindex/mirrors/sideshift-mobile.git" \
+  "$sha:refs/testflight/runs/$id/source" "$tooling:refs/testflight/runs/$id/tooling"
+"${SSH[@]}" "$HOST" 'mkdir -p ~/testflight/bin && cat > ~/testflight/bin/run.sh.new && chmod 700 ~/testflight/bin/run.sh.new && mv ~/testflight/bin/run.sh.new ~/testflight/bin/run.sh' <"$REMOTE_SCRIPT"
+printf '%s\0' "$id" "$branch" "$sha" "$tooling" "$what" "$upload" \
+  | "${SSH[@]}" "$HOST" 'bash ~/testflight/bin/run.sh start-stdin' >/dev/null
+follow "$id"
