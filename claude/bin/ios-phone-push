@@ -1,0 +1,248 @@
+#!/bin/bash
+# Build a commit of the iOS app, signed for development, and get it onto the test iPhone without
+# TestFlight (no upload, no Apple processing). Run it from a sideshift-mobile checkout:
+#
+#   ios-phone-push [<ref>] [--release] [--no-deliver]      (default ref: HEAD)
+#   ios-phone-push --helper
+#
+# The commit does not need to be pushed. It is built in a kept checkout and DerivedData
+# (~/.cache/sideshift-phone), so after the first build only what changed is compiled. The default
+# is a Debug build; --release builds Release with file-by-file Swift, for when feel matters more
+# than build time (still not how the App Store build is compiled).
+#
+# Delivery: when the iPhone is paired with this Mac and reachable, the app is installed and opened
+# with devicectl. Otherwise an install page goes up on this Mac's Tailscale address and the person
+# taps Install there (the page stops serving 3 hours after the last build; IOS_PHONE_SERVE_HOURS
+# changes that when the page is first started). --no-deliver stops after the signed build.
+#
+# --helper puts the small "SideShift Dev Mode" app on the install page instead (helper.html). A
+# phone that never had a development build needs it once: opening it makes iOS offer Developer Mode.
+#
+# Signing comes from ~/.config/sideshift-ios-signing: the "Apple Development" identity in its own
+# keychain (keychain.sh) and the development profiles in profiles/ (one per bundle ID, made for the
+# registered test iPhone). IOS_PHONE_PROFILES points at another profile folder.
+set -euo pipefail
+
+SIGN="$HOME/.config/sideshift-ios-signing"
+PROFILES="${IOS_PHONE_PROFILES:-$SIGN/profiles}"
+W="$HOME/.cache/sideshift-phone"
+KC="$HOME/Library/Keychains/sideshift-dev.keychain-db"
+TEAM=95793GC27L
+TAILSCALE=/Applications/Tailscale.app/Contents/MacOS/Tailscale
+HTTP_PORT=47322
+HTTPS_PORT=8443
+SELF=$(readlink -f "$0")
+HERE=$(dirname "$SELF")
+
+die() { echo "ios-phone-push: $*" >&2; exit 1; }
+step() { echo "== $(date '+%H:%M:%S') $*"; }
+
+ref=HEAD release=0 deliver=1 helper=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --release) release=1; shift ;;
+    --no-deliver) deliver=0; shift ;;
+    --helper) helper=1; shift ;;
+    -h|--help) sed -n '2,23p' "$SELF" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) die "unknown option $1" ;;
+    *) ref="$1"; shift ;;
+  esac
+done
+compgen -G "$PROFILES/*.mobileprovision" >/dev/null || die "no development profiles in $PROFILES (Apple has to enable the test iPhone first; see $SIGN/README.md)"
+
+if [ "$helper" = 0 ]; then
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run it inside a sideshift-mobile checkout"
+  git -C "$root" remote get-url origin | grep -q 'SideShiftApp/sideshift-mobile' || die "$root is not sideshift-mobile"
+  sha=$(git -C "$root" rev-parse --verify "$ref^{commit}") || die "no commit '$ref'"
+  if [ -z "${IOS_PHONE_PUSH_LABEL:-}" ]; then
+    IOS_PHONE_PUSH_LABEL="$ref"
+    [ "$ref" != HEAD ] || IOS_PHONE_PUSH_LABEL=$(git -C "$root" symbolic-ref -q --short HEAD || echo commit)
+    [ "$IOS_PHONE_PUSH_LABEL" != "$sha" ] || IOS_PHONE_PUSH_LABEL=commit
+  fi
+  export IOS_PHONE_PUSH_LABEL
+  label="$IOS_PHONE_PUSH_LABEL"
+  subject=$(git -C "$root" log -1 --format=%s "$sha")
+fi
+
+# One push at a time: they share the checkout, DerivedData and the install page.
+mkdir -p "$W"
+if [ -z "${IOS_PHONE_PUSH_LOCKED:-}" ]; then
+  export IOS_PHONE_PUSH_LOCKED=1
+  if [ "$helper" = 1 ]; then exec lockf "$W/lock" "$SELF" --helper; fi
+  cd "$root"
+  exec lockf "$W/lock" "$SELF" "$sha" $([ "$release" = 1 ] && echo --release) $([ "$deliver" = 0 ] && echo --no-deliver)
+fi
+started=$SECONDS
+
+# Signing: unlock the keychain, install the profiles where Xcode looks, and point each target at
+# the profile for its own bundle ID (targets without one, such as packages, get none).
+"$SIGN/keychain.sh" >/dev/null
+identity=$(security find-identity -v -p codesigning "$KC" | grep -oE '\b[A-F0-9]{40}\b' | head -1 || true)
+[ -n "$identity" ] || die "no signing identity in $KC"
+python3 -I - "$PROFILES" "$W/signing.xcconfig" "$identity" "$TEAM" <<'PY'
+import plistlib, re, shutil, subprocess, sys
+from datetime import datetime
+from pathlib import Path
+folder, out, identity, team = sys.argv[1:]
+lines = []
+for path in sorted(Path(folder).glob("*.mobileprovision")):
+    profile = plistlib.loads(subprocess.run(["security", "cms", "-D", "-i", str(path)],
+                                            capture_output=True, check=True).stdout)
+    if profile["ExpirationDate"] < datetime.now():
+        sys.exit(f"ios-phone-push: {path.name} expired on {profile['ExpirationDate'].date()}")
+    bundle = profile["Entitlements"]["application-identifier"].split(".", 1)[1]
+    for home in ("Library/Developer/Xcode/UserData/Provisioning Profiles", "Library/MobileDevice/Provisioning Profiles"):
+        target = Path.home() / home
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target / f"{profile['UUID']}.mobileprovision")
+    lines.append(f"SIDESHIFT_DEV_PROFILE_{re.sub(r'[^A-Za-z0-9]', '_', bundle)} = {profile['UUID']}")
+lines += ["PROVISIONING_PROFILE_SPECIFIER = $(SIDESHIFT_DEV_PROFILE_$(PRODUCT_BUNDLE_IDENTIFIER:identifier))",
+          "CODE_SIGN_STYLE = Manual", f"CODE_SIGN_IDENTITY = {identity}",
+          f"CODE_SIGN_IDENTITY[sdk=iphoneos*] = {identity}", f"DEVELOPMENT_TEAM = {team}"]
+Path(out).write_text("\n".join(lines) + "\n")
+PY
+
+# build <project> <scheme> <configuration> <DerivedData> [build settings...]: through the shared
+# queue for iOS builds; on this Mac, because the signing key is here.
+build() {
+  local project="$1" scheme="$2" configuration="$3" dd="$4" log="$W/build.log"
+  shift 4
+  build_started=$SECONDS
+  HEAVY_REMOTE=0 "$HOME/.claude/bin/heavy" --pool xcode xcodebuild build -quiet \
+      -project "$project" -scheme "$scheme" -configuration "$configuration" \
+      -destination 'generic/platform=iOS' -derivedDataPath "$dd" \
+      -xcconfig "$W/signing.xcconfig" OTHER_CODE_SIGN_FLAGS="--keychain $KC" \
+      -onlyUsePackageVersionsFromResolvedFile -skipPackageUpdates \
+      -skipPackagePluginValidation -skipMacroValidation "$@" >"$log" 2>&1 || {
+    grep -E ' error: |^error: |BUILD FAILED' "$log" | grep -v catchException | head -30 >&2
+    die "build failed after $((SECONDS - build_started)) s; full log: $log"
+  }
+}
+
+# publish <app> <name> <title> <first line> <second line> <note>: put the app on the install page
+# of this Mac's Tailscale address as <name>.ipa, <name>-manifest.plist and <name>.html.
+publish() {
+  local app="$1" name="$2" package_started=$SECONDS host base ota="$W/ota" stage="$W/ota-stage"
+  host=$("$TAILSCALE" status --json --peers=false | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
+  base="https://$host:$HTTPS_PORT"
+  rm -rf "$stage"
+  mkdir -p "$ota" "$stage/Payload"
+  cp -cR "$app" "$stage/Payload/"
+  (cd "$stage" && zip -qry -1 "$ota/$name.ipa.new" Payload)
+  rm -rf "$stage"
+  # The package, its manifest and its page change places together, so a page never names a build
+  # that is not there.
+  python3 -I - "$ota" "$base" "$app" "$@" <<'PY'
+import html, json, plistlib, sys, time, urllib.parse
+from pathlib import Path
+ota, base, app, _, name, title, first, second, note = sys.argv[1:]
+ota = Path(ota)
+info = plistlib.loads((Path(app) / "Info.plist").read_bytes())
+stamp = str(int(time.time()))
+(ota / f"{name}-manifest.plist.new").write_bytes(plistlib.dumps({"items": [{
+    "assets": [{"kind": "software-package", "url": f"{base}/{name}.ipa?b={stamp}"}],
+    "metadata": {"bundle-identifier": info["CFBundleIdentifier"], "kind": "software",
+                 "bundle-version": info["CFBundleShortVersionString"], "title": title}}]}))
+link = "itms-services://?action=download-manifest&url=" + urllib.parse.quote(f"{base}/{name}-manifest.plist?b={stamp}", safe="")
+(ota / f"{name}.html.new").write_text(f"""<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>{html.escape(title)}</title>
+<body style="font:17px -apple-system;margin:32px 20px;line-height:1.45;color:#111;background:#fff">
+<h2 style="margin:0 0 4px">{html.escape(title)}</h2>
+<p style="margin:0;color:#555">{html.escape(first)}</p>
+<p>{html.escape(second)}</p>
+<p><a href="{html.escape(link)}" style="display:inline-block;padding:14px 22px;background:#111;color:#fff;
+border-radius:12px;text-decoration:none">Install on this iPhone</a></p>
+<p style="color:#555">{html.escape(note)}</p>
+""")
+for suffix in ".ipa", "-manifest.plist", ".html":
+    (ota / f"{name}{suffix}.new").replace(ota / f"{name}{suffix}")
+(ota / "build.json").write_text(json.dumps({"published": int(stamp), "name": name, "first": first}) + "\n")
+PY
+  serving() { [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$HTTP_PORT/build.json")" = 200 ]; }
+  if ! serving; then
+    IOS_PHONE_HTTPS_PORT=$HTTPS_PORT nohup python3 -I "$HERE/ios-phone-push-serve.py" "$ota" "$HTTP_PORT" \
+      "${IOS_PHONE_SERVE_HOURS:-3}" >>"$W/serve.log" 2>&1 </dev/null &
+    for _ in 1 2 3 4 5 6 7 8 9 10; do serving && break; sleep 0.5; done
+    serving || die "the install page server did not start on port $HTTP_PORT; see $W/serve.log"
+  fi
+  "$TAILSCALE" serve --bg "--https=$HTTPS_PORT" "http://127.0.0.1:$HTTP_PORT" >/dev/null
+  step "packaged $(du -h "$ota/$name.ipa" | cut -f1) in $((SECONDS - package_started)) s; $((SECONDS - started)) s in total"
+  echo "Install page (open on the iPhone, Tailscale on): $base/$([ "$name" = index ] || echo "$name.html")"
+}
+
+if [ "$helper" = 1 ]; then
+  step "building the Dev Mode helper app"
+  rm -rf "$W/helper"
+  mkdir -p "$W/helper"
+  cp -R "$SIGN/devmode-helper/." "$W/helper/"
+  xcodegen generate --quiet --spec "$W/helper/project.yml" --project "$W/helper" >/dev/null
+  build "$W/helper/DevModeHelper.xcodeproj" DevModeHelper Release "$W/helper-dd"
+  app="$W/helper-dd/Build/Products/Release-iphoneos/DevModeHelper.app"
+  [ -d "$app" ] || die "the build left no app at $app"
+  codesign --verify --deep --strict "$app" || die "the helper app's signature does not verify"
+  step "built and signed the helper in $((SECONDS - build_started)) s"
+  publish "$app" helper "SideShift Dev Mode" "A helper for the first development install on this iPhone." \
+    "It does not touch SideShift. Install it, open it once, then turn on Developer Mode when iOS asks." \
+    "After the phone restarts with Developer Mode on, you can delete this app."
+  exit 0
+fi
+
+# The kept checkout is a worktree of the same repository, so any local commit is already there,
+# and only the files that differ from the last build get a new timestamp.
+common=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)
+if [ ! -e "$W/source/.git" ]; then
+  git --git-dir="$common" worktree prune
+  git --git-dir="$common" worktree add -q --detach "$W/source" "$sha"
+else
+  kept=$(git -C "$W/source" rev-parse --path-format=absolute --git-common-dir)
+  [ "$kept" = "$common" ] || die "the kept checkout belongs to the clone at ${kept%/.git}; run this from a worktree of that clone"
+  git -C "$W/source" checkout -q --detach -f "$sha"
+  git -C "$W/source" clean -qffd
+fi
+step "building ${sha:0:9} ($label): $subject"
+
+config=Debug mode=()
+if [ "$release" = 1 ]; then config=Release mode=(SWIFT_COMPILATION_MODE=singlefile); fi
+app="$W/dd/Build/Products/$config-iphoneos/SideShift.app"
+# A build number from the clock: higher than any TestFlight build on the phone, so the install is
+# never a downgrade, and the install page shows which push it is.
+build "$W/source/SideShift.xcodeproj" SideShift "$config" "$W/dd" \
+  "CURRENT_PROJECT_VERSION=$(date +%y%m%d%H%M)" ${mode[@]+"${mode[@]}"}
+[ -d "$app" ] || die "the build left no app at $app"
+codesign --verify --deep --strict "$app" || die "the built app's signature does not verify"
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")
+number=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")
+step "built and signed $config $version ($number) in $((SECONDS - build_started)) s, $(du -sh "$app" | cut -f1)"
+[ "$deliver" = 1 ] || { echo "ios-phone-push: not delivered (--no-deliver); app at $app"; exit 0; }
+
+# A paired iPhone that this Mac can reach gets the app directly.
+devices=$(mktemp)
+trap 'rm -f "$devices"' EXIT
+xcrun devicectl list devices --json-output "$devices" >/dev/null 2>&1 || true
+udid=$(python3 -I - "$devices" <<'PY'
+import json, sys
+try:
+    rows = json.load(open(sys.argv[1]))["result"]["devices"]
+except Exception:
+    rows = []
+ok = [d for d in rows
+      if d.get("hardwareProperties", {}).get("reality") == "physical"
+      and d.get("hardwareProperties", {}).get("deviceType") == "iPhone"
+      and d.get("connectionProperties", {}).get("tunnelState") == "connected"]
+print(ok[0]["hardwareProperties"]["udid"] if ok else "")
+PY
+)
+if [ -n "$udid" ]; then
+  install_started=$SECONDS
+  if xcrun devicectl device install app --device "$udid" "$app" --quiet; then
+    xcrun devicectl device process launch --device "$udid" --terminate-existing com.SideShift --quiet || true
+    step "installed and opened on the iPhone in $((SECONDS - install_started)) s; $((SECONDS - started)) s in total"
+    exit 0
+  fi
+  echo "ios-phone-push: the direct install failed; putting the build on the install page instead" >&2
+fi
+
+publish "$app" index "SideShift $version ($number)" \
+  "$label at ${sha:0:9}, $config build, $(date '+%b %-d, %-I:%M %p')" "$subject" \
+  "The app appears on the Home Screen when the download ends. It replaces the SideShift that is installed and keeps its data."
