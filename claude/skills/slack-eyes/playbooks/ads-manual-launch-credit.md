@@ -45,3 +45,14 @@ Facts below were proven on 2026-11-19 (pudgy penguins: manual meta ads not credi
   `failedAt`). Remove only the failed jobs you caused, in one Firestore transaction, then run
   `autoLinkExternalAdsForCompany(companyId, { drain: true })` from a script.
 - Link jobs run on production code: running them before the fix deploys fails them again.
+
+## "Ready" but "hasn't approved your brand for partnership ads yet"
+
+- The picker's "Ready" (`components/ads/promote-utils.ts` `isAdReady`) reads the code status of the video's OWN
+  platform (Spark for TikTok, partnership code for Instagram; uploads always ready). On a Meta build it does not
+  mean the video can run as the creator.
+- "Run as the creator" needs the creator's approval of that Meta ad account (`lib/ads/meta-run-as-identity.ts`
+  `metaOwnCreatorIdentity`). Count them: `ad_creator_authorizations` by `status` for the company (read replica;
+  `pending_creator_approval` = Setup's "awaiting approval").
+- Since #11619 (merged 2026-11-22) the picker shows a blue "Partnership" tag on Meta builds for videos whose creator
+  approved the ad account, Ready or not. A saved code alone gets no tag: it allows a boost, not run-as.
