@@ -42,6 +42,17 @@ if [[ $prompt =~ $value_ask ]] && [[ $prompt =~ $value_src ]]; then
   echo "If this asks you to judge which features or gaps are real or worth building: a code read (yours or a subagent's) is not proof that a screen lacks something. Before you report a UI gap, open the live app as a test brand in each state that matters (for example no account, connected but empty, active) and read what it shows. Mark every item as checked on screen, checked in code only, or not checked."
 fi
 
+# A request to redesign a surface built as one direction: on 2026-11-21 "Can we first work on
+# redesigning it" (iOS creator onboarding) got a full one-direction rebuild shipped to TestFlight,
+# and Liam: "This is all awful. I hate this entire new redesign." The Stop check (ask-check.sh)
+# fired only at the end, hours after the build. This note lands when the work starts.
+redesign_ask='(^|[^a-z])(redesign[a-z]*|re-?design[a-z]*|revamp[a-z]*|rework the (look|ui|design|screens?)|make it look|new look|restyle[a-z]*)([^a-z]|$)'
+redesign_undo='(^|[^a-z])(revert|go back to|undo|roll back)([^a-z]|$)'
+if [[ $prompt =~ $redesign_ask ]] && ! [[ $prompt =~ $redesign_undo ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/redesign-ask-nudge.log"
+  echo "If this asks you to redesign a screen or flow: before building it, show two or three different directions (real screens on the canvas or in the pane, side by side, your pick named) and wait for Liam to choose one. Building one direction and asking for approval afterwards is the failure this note exists for (ledger 10-22, 10-23, 11-08, 11-21). Bug fixes inside the redesign request (taps, keyboard, a missing screen) can go ahead."
+fi
+
 # Short design feedback read one way without asking: on 2026-11-19 (brand v4 navbar) "the sort
 # could be a little better" meant section structure, not item order; "instead of the weird logo
 # lets just call it settings" meant the placeholder logo, not the brand row. The visual-companion
