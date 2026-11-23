@@ -84,3 +84,15 @@ first. Proven once (creator screening, monorepo #10971 + dashboard #292).
 One or two lines. Name the PR number only if the reader can use it. Say "shipped and deployed" with the
 merge date; say what is still open ("passing the ad id through is not merged"). Do not promise what
 someone else will do, and do not say a fix "works" without a query on real signups.
+
+## A teammate posts a dashboard PR and Liam says "merge"
+
+- First run `gh pr view <n> -R SideShiftApp/sideshift-internal-dashboard --json state,mergedBy,mergedAt`.
+  Teammates often merge within minutes (#326, 11-23). If it is merged, put review fixes in a new PR off
+  `origin/main`: pushing to the merged PR's branch recreates the deleted branch.
+- Dashboard previews sit behind Vercel SSO. Call an API route with
+  `vercel curl /api/... --deployment <preview url> --scope side-shift -- --request POST -H @<header file>`
+  (minted staff ID token in the header file, never in the command).
+- Dashboard CI fails without a `## Prod change` section in the PR body.
+- Merge with `gh-approve -R SideShiftApp/sideshift-internal-dashboard <pr> --merge`, then check the
+  Production deployment's `ref` equals the merge commit.
