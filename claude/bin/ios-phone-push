@@ -152,9 +152,10 @@ info = plistlib.loads((Path(app) / "Info.plist").read_bytes())
 stamp = str(int(time.time()))
 (ota / f"{name}-manifest.plist.new").write_bytes(plistlib.dumps({"items": [{
     "assets": [{"kind": "software-package", "url": f"{base}/{name}.ipa?b={stamp}"}],
-    # iOS decides "already installed" from this version alone, before it downloads the package: with
-    # the marketing version (2.39, the same as the TestFlight copy on the phone) it refused the
-    # install on 2026-11-23. The build number comes from the clock, so it is new on every push.
+    # The build number comes from the clock, so every push names a version the phone does not have.
+    # It does not get this page past a TestFlight or App Store copy of the app: iOS answers
+    # "already installed" from the manifest, before any download, whatever the version says
+    # (2026-11-23). That copy has to be deleted first, or the build installed by a paired Mac.
     "metadata": {"bundle-identifier": info["CFBundleIdentifier"], "kind": "software",
                  "bundle-version": info["CFBundleVersion"], "title": title}}]}))
 link = "itms-services://?action=download-manifest&url=" + urllib.parse.quote(f"{base}/{name}-manifest.plist?b={stamp}", safe="")
@@ -259,4 +260,4 @@ fi
 
 publish "$app" index "SideShift $version ($number)" \
   "$label at ${sha:0:9}, $config build, $(date '+%b %-d, %-I:%M %p')" "$subject" \
-  "Safari shows nothing after you tap Install in the pop-up. Go to the Home Screen: the SideShift icon shows the download, then the new build. It replaces the SideShift that is installed and keeps its data."
+  "Safari shows nothing after you tap Install in the pop-up. Go to the Home Screen: the SideShift icon shows the download, then the new build. If iOS says SideShift is already installed, the copy on the phone came from TestFlight or the App Store: this page cannot replace that one."
