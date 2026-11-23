@@ -47,6 +47,17 @@ line here no longer matches, fix this file (step 7 of the skill).
   Proof on prod: open the visible `button[aria-label="Job role"]` and count `[role=listbox]` (1 = fixed).
   Not reproduced on prod at 2000 and 2280 wide, with or without a search typed.
 
+- **Applicants list loads forever, then a 500 (2026-11-23, knowt):** `/api/applicants/filtered-v2` or
+  `/counts` threw `Cannot read properties of undefined (reading 'user_id' | 'userId')`. Cause: postgres.js
+  3.4.9 kept its row index after a statement that timed out mid-stream, so the next result on that
+  connection began with empty slots. Proof: in the failing request's logs, one `pg_analytics_query` has
+  `rows` above its `limit`/`creatorCount` (292 from LIMIT 126). The ~35 s per batch was the
+  paid-campaigns read timing out. Fixed in #11774 (`scripts/patch-postgres-driver.mjs` resets `rows` at
+  ReadyForQuery; the paid-campaigns read covers only kept rows).
+  Full logs with stacks and per-request PG events:
+  `vercel logs --project sideshift-web --scope side-shift --environment production --status-code 500 --query filtered-v2 --since <iso> --until <iso> --json --expand`
+  (run outside the repo; the MCP log tool cuts messages at about 500 chars).
+
 ## Checks
 
 1. Read the reporter's clip. Ergo links (`share.joinergo.com/c/<id>`) need an email code:
