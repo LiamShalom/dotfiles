@@ -40,6 +40,14 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    "redesign the screens for the new sign + oauth flow" meant the creator release popup; I rebuilt the
    in-flow Sign and You're in screens → "Im saying the UI for the informational popup".)
 
+   **A feature that is an object the product already has lives on that object's own pages.** If the
+   thing is a job, campaign, contract, chat or payout, its home is the existing job page, feed, campaign
+   screens or inbox, and you design only what the feature adds to them (a chip, a requirement, a gate).
+   Any other host needs the operator's own words naming it; a spec line an agent wrote is not that, so
+   ask before you build there. (11-22 bootcamp: the spec, written by me, put it in Learn; I built three
+   Learn directions, then a Learn lesson that opened the campaign → "No I want bootcamp to be an actual
+   job that they open and apply to like a normal job".)
+
    **Before you pick where a surface lives, check who else is redesigning that page.** Run `ListAgents` and
    `git branch -r --sort=-committerdate | head -30`, and read the `design.md` of any open session or branch that
    touches the same page or flow. Write in `design.md` the host you chose and why. Any peer message about that page
