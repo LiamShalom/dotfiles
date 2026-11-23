@@ -285,7 +285,9 @@ function connection() {
 function sshOptions(c, { shared = true } = {}) {
   fs.mkdirSync(path.join(HOME, '.ssh'), { recursive: true });
   return [
-    '-i', c.identity, '-o', 'IdentitiesOnly=yes', '-o', 'UseKeychain=yes', '-o', 'BatchMode=yes',
+    // The key's passphrase lives in the data-protection keychain, which refuses
+    // reads while the screen is locked; a copy in ssh-agent keeps working.
+    '-i', c.identity, '-o', 'IdentitiesOnly=yes', '-o', 'UseKeychain=yes', '-o', 'AddKeysToAgent=yes', '-o', 'BatchMode=yes',
     '-o', `UserKnownHostsFile=${c.knownHosts}`, '-o', 'ConnectTimeout=4',
     // The job itself runs on a connection of its own: when this side dies, even
     // by SIGKILL, the Studio's session ends and the helper stops the job.

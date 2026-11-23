@@ -17,7 +17,7 @@ set -euo pipefail
 KEY="$HOME/.config/sideshift-pool/macbook_ed25519"
 HOST="sideshift@100.118.88.90"
 SSH=(ssh -i "$KEY" -o UserKnownHostsFile="$HOME/.config/sideshift-pool/known_hosts" -o IdentitiesOnly=yes
-     -o UseKeychain=yes -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
+     -o UseKeychain=yes -o AddKeysToAgent=yes -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
 HERE=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 REMOTE_SCRIPT="$HERE/ios-testflight-studio-remote.sh"
 
