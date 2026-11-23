@@ -22,6 +22,11 @@ longer matches, fix this file (step 7 of the skill).
   covers the page of the locked company only; `canSwitchCompany` shows the "Switch company" button.
 - An admin re-enables the first-time flow by deleting the field (`scripts/release-hire-trigger-wallet-locks.ts`).
   Do not lift a gate for a brand without Liam's say: it is a funding rule, not a bug.
+- To lift it for one company (Liam's :saluting_face: on a teammate's "can we lift the top up" ask is his say):
+  `scripts/override-wallet-readiness-lock.ts --company <id> --reason "<why>"` (dry run), then add `--apply` with
+  `PG_ALLOW_PRODUCTION=1`, run from a `sideshift-setup` worktree off origin/main. It sets `required:false`,
+  `resolutionType:manual_override`; a resolved lock is never re-armed. Without the env var the dry run prints, then
+  hangs on the PG pool: stop it. Check `companies.wallet_readiness_lock` on the replica after (2026-11-23).
 
 ## Symptom to cause to proof
 
