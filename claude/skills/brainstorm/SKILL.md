@@ -63,6 +63,14 @@ docs/features/YYYY-MM-DD-<slug>/
    what they want. (11-03 connect guide: "a floating step by step guide" became a connect
    sheet; desktop Chrome's Document Picture-in-Picture was missed → "this isnt at all what I
    was thinking".)
+   When an approach carries a decision table (rules, recommendations, thresholds, splits),
+   tag every cell with its source before you show it: our data (with N), a named outside
+   source, or my pick. If the question is "what works for which kind of customer", first
+   collect revealed choices at scale: what many real customers chose on competitor platforms
+   (public directories, listing APIs, the creator side of a competitor we hold a test login
+   for). Benchmarks and blog posts alone are not enough. (11-22 onboarding format table: cells
+   mixed our data, benchmarks and my guesses unlabelled → "these arent accurate. Look at trybe
+   launchpoint and all competitors"; Trybe's creator directory then gave 9,293 programs.)
 
 5. **Write the spec** to `docs/features/YYYY-MM-DD-<slug>/spec.md` with the template below.
    Then review it yourself: no TBDs, no contradictions, every requirement has one meaning,
