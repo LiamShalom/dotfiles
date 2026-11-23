@@ -199,5 +199,13 @@ Never fill the gap with a guess in the reply.
   (`createHandleRequest` in `lib/handle-request-utils.ts`, status `added` in `my-gigs/handles.usecase.ts`).
   Facebook is not a per-brand share provider (`BRAND_SHARE_PROVIDERS` in `lib/platforms.ts`), so no new
   brand request is needed. Say "add", not "change": an edit retires the old profile row. (melaxin: fb profile needs a page.)
+- **Add the Page for her when the app loops** (dr. melaxin: facebook connect loops, 2026-11-23): when her
+  grant already holds the Page (`creator_social_oauth_accounts`) but the contract tracks another Facebook ID,
+  a script that calls `submitCreatorHandleRequest({userId}, {action:'add', programId, contractId,
+  platform:'facebook', handle:<page id>, oauthAccountId:<that account id>}, headers)`
+  (`lib/api/internal-creator/my-gigs/handles.usecase.ts`) runs the app's own add path and system-approves
+  it on a contract the brand chose. Run it with the `repair.md` PG flags plus `PG_CONNECT_TIMEOUT_SECONDS=30`
+  (the default 8 s connect timed out from the laptop). The process hangs after the write: confirm on
+  `handle_requests` (status `approved`) and `contract_social_profiles`, then stop it.
 - A brand asks to skip Facebook for one creator: Customize on the held contract and remove the platform
   that is missing (prove which one from step 4 first).
