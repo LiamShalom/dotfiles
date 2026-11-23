@@ -223,6 +223,21 @@ if (newPhone > 0) {
   );
 }
 
+// A new screen for something the product already has as a campaign, job or contract. 11-22: the
+// SideShift School bootcamp built inside Learn twice ("No I want bootcamp to be an actual job");
+// 11-23: a staff "Bootcamp groups" panel for seats, pause, link and stats of what were running
+// campaigns ("Arent these just actively running campaigns?"), while the design skill's rule was loaded.
+if (input.tool_name === 'Write' && kind === 'tsx' && /\b(campaignId|jobId|contractId|programId)\b/.test(ti.content ?? '')) {
+  log('object-screen');
+  notes.push(
+    'Existing object check: this new file works on campaigns, jobs or contracts (it uses campaignId, jobId, ' +
+    'contractId or programId). Those already have their own pages: the campaign workspace (Applicants, On trial, ' +
+    'Video Reviews, listing controls), the job page and the contract screens. For each control in this file, name ' +
+    'the existing page that already does it, and build only what none of them does. A new screen, panel or tab ' +
+    'for these objects needs the operator\'s own words asking for it; a spec line an agent wrote does not count.',
+  );
+}
+
 if (!notes.length) process.exit(0);
 notes.push('Taste file: ~/dotfiles/claude/references/ui-taste.md.');
 process.stdout.write(
