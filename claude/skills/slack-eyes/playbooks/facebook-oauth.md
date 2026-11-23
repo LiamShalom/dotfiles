@@ -159,6 +159,18 @@ Never fill the gap with a guess in the reply.
    connected Page "the wrong one". In melaxin: fb tracking for paige d (2026-11-17), the connected
    Page belonged to her Klover contract, and the thread needed two corrections.
 
+8. **Logs older than ~3 days** (Vercel refuses them): PostHog `call execute-sql` on `events` where
+   `distinct_id` = creator id and `event like 'creator_social_oauth%'`. `oauth_account_discovery` details
+   give `pageCount`; `oauth_permissions` give `pageTargetCount`. Both 0 on every try = the Facebook login
+   shares no Page at all, which is what "she has no option to select" means on Meta's screen (plutus:
+   creators cant connect fb/insta, 2026-11-23). A grant row with zero `creator_social_oauth_accounts` is
+   why Facebook's own screen says "already connected" while nothing is linked.
+9. **Adding another Instagram on a live contract:** the campaign's "Add other handles" opens the handle
+   modal; the Instagram row pre-fills the creator's connected account and shows a + ("Connect another
+   Instagram account", `connect-account.tsx`), which signs Instagram in again (`force_reauth`). A
+   creator who only sees "submit that one" has missed the +. An Instagram linked before the campaign
+   turned on comment-to-DM fails submit with `missing_comment_dm_scope` (`campaign-requirement.ts`).
+
 ### What to reply
 
 - `facebook_page_required`, and they have a Page: sign in with the Facebook account that manages the
