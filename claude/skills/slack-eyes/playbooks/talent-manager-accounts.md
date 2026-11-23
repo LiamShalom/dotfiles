@@ -26,7 +26,11 @@ the finish check bounced it. Prove a manager action from code or a real session 
   (`lib/api/auth/account/data.ts`; plus `hasUGCExperience: USERS_REMOVE_FIELD` if set), run with
   `PG_ALLOW_PRODUCTION=1 NODE_OPTIONS=--conditions=react-server npx tsx`. The PG mirror logs
   "unmapped field talentManagerOnly": harmless, talent code reads it from Firestore (`users.data.ts` FIELDS).
-  No email is sent; the person signs in with their existing login. A brand login (Employer/Member) needs
+  No email is sent; the person signs in with their existing login.
+  An active creator contract on the login does not block it when the teammate asked for this email
+  (gill job 2026-11-23): the creator layout still draws for a manager login
+  (`__tests__/app/creator-layout-manager-only-login.test.tsx`) and nothing reads the flag on existing
+  contracts. Put the script under the worktree's `scripts/` (a file in job tmp cannot resolve `dotenv`). A brand login (Employer/Member) needs
   the longer reset in memory `talent-at-sideshift-is-a-manager`.
 - **The contract belongs to one of the manager's creators**, never the manager. The manager opens the
   campaign invite link signed in, picks or adds the creator it is for, and signs.
