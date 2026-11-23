@@ -21,6 +21,11 @@ Detailed checklists live in ship-it's checklist (`.claude/skills/ship-it/referen
 
 `docs/features/<date>-<slug>/spec.md` (approved), and `design.md` when the feature has UI.
 Continue on the branch `design` used. If there is no approved spec, stop and run `brainstorm`.
+**If the spec adds or redesigns a screen, step, card or modal and there is no `design.md` the
+operator approved, run `design` first** (two or three directions on a preview route, his pick)
+before any UI task; build data and backend tasks meanwhile. Never ship a new surface as your
+one untested layout. (11-23 onboarding plan step, built with no design round: "This design is
+awful and needs to be greatly improved".)
 
 ## Steps
 
