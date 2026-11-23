@@ -79,6 +79,7 @@ started=$SECONDS
 "$SIGN/keychain.sh" >/dev/null
 identity=$(security find-identity -v -p codesigning "$KC" | grep -oE '\b[A-F0-9]{40}\b' | head -1 || true)
 [ -n "$identity" ] || die "no signing identity in $KC"
+install_profiles() {
 python3 -I - "$PROFILES" "$W/signing.xcconfig" "$identity" "$TEAM" <<'PY'
 import plistlib, re, shutil, subprocess, sys
 from datetime import datetime
@@ -101,22 +102,32 @@ lines += ["PROVISIONING_PROFILE_SPECIFIER = $(SIDESHIFT_DEV_PROFILE_$(PRODUCT_BU
           f"CODE_SIGN_IDENTITY[sdk=iphoneos*] = {identity}", f"DEVELOPMENT_TEAM = {team}"]
 Path(out).write_text("\n".join(lines) + "\n")
 PY
+}
+install_profiles
 
 # build <project> <scheme> <configuration> <DerivedData> [build settings...]: through the shared
 # queue for iOS builds; on this Mac, because the signing key is here.
 build() {
-  local project="$1" scheme="$2" configuration="$3" dd="$4" log="$W/build.log"
+  local project="$1" scheme="$2" configuration="$3" dd="$4" log="$W/build.log" attempt
   shift 4
   build_started=$SECONDS
-  HEAVY_REMOTE=0 "$HOME/.claude/bin/heavy" --pool xcode xcodebuild build -quiet \
-      -project "$project" -scheme "$scheme" -configuration "$configuration" \
-      -destination 'generic/platform=iOS' -derivedDataPath "$dd" \
-      -xcconfig "$W/signing.xcconfig" OTHER_CODE_SIGN_FLAGS="--keychain $KC" \
-      -onlyUsePackageVersionsFromResolvedFile -skipPackageUpdates \
-      -skipPackagePluginValidation -skipMacroValidation "$@" >"$log" 2>&1 || {
+  for attempt in 1 2; do
+    HEAVY_REMOTE=0 "$HOME/.claude/bin/heavy" --pool xcode xcodebuild build -quiet \
+        -project "$project" -scheme "$scheme" -configuration "$configuration" \
+        -destination 'generic/platform=iOS' -derivedDataPath "$dd" \
+        -xcconfig "$W/signing.xcconfig" OTHER_CODE_SIGN_FLAGS="--keychain $KC" \
+        -onlyUsePackageVersionsFromResolvedFile -skipPackageUpdates \
+        -skipPackagePluginValidation -skipMacroValidation "$@" >"$log" 2>&1 && return 0
+    # Xcode's profile folder is shared by everything on this Mac, and the installed copies were
+    # once gone by the time the build read them (2026-11-22): put them back and build once more.
+    if [ "$attempt" = 1 ] && grep -q "No profile for team" "$log"; then
+      echo "ios-phone-push: Xcode lost the installed profiles; installing them again" >&2
+      install_profiles
+      continue
+    fi
     grep -E ' error: |^error: |BUILD FAILED' "$log" | grep -v catchException | head -30 >&2
     die "build failed after $((SECONDS - build_started)) s; full log: $log"
-  }
+  done
 }
 
 # publish <app> <name> <title> <first line> <second line> <note>: put the app on the install page
