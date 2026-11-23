@@ -45,6 +45,14 @@ except `agents-billing`, and only a human can create a restricted key in the Str
 customer emails leaves the company. Return `needs_liam` with `hold_reason=only_liam_can`, ask which one
 he wants, and reply only with the facts above (the answer to the other question).
 
+## Google Tag Manager access for the agency (done 2026-11-23)
+
+sideshift.app's container is `GTM-569RM5SR` (`components/privacy/google-tag-manager.tsx`), in GTM account
+"SideShift" 6376030836, container 263689843. The shared agent Chrome is signed in to Google as Liam, who
+is account Administrator. An agent can add a user without Liam: tagmanager.google.com → Admin →
+account User Management → Add users → email, account role User, container sideshift.app → Read (or
+Edit when they must change tags) → Invite. The row shows "Invitation pending" until they accept the email.
+
 ## Source per paying customer (checked 2026-11-20)
 
 - Stripe customer metadata `userId` = the app user id = `persons.id` on the read replica. `persons.utms`,
