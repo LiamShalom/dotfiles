@@ -29,6 +29,11 @@ Checks, in order (internal-dashboard `postgres_query`):
    On 2026-11-17 the Plutus agency and all 13 sub-accounts had `enabled=true`.
 2. Campaign type: `select campaign_type, status, count(*) from campaigns where company_id='<id>' or agency_id='<id>' and archived_at is null group by 1,2`.
    Only `campaign-manager` hides the section. Many older campaigns have `campaign_type` null; null does not hide it.
+   `analytics` hid the whole Settings step (`wizardHiddenSteps` in `components/campaigns/wizard/types.ts`) until
+   PR #11719, which shows it (trial reels + SideChat only) when the company has the grant. Before #11719 merged,
+   "SideChat on campaign A but not B" on one company meant B was analytics (hardlaunch: sidechat, 2026-11-23).
+   The SideChat runtime itself accepts analytics campaigns (`tracksCreatorPosts` excludes only paid-ads and
+   campaign-manager).
 3. A company can have a dead twin with no grants (the "(dead)" company next to the live one in
    `find_account`). Ask which company the person is signed in to.
 
