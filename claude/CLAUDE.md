@@ -199,8 +199,8 @@ in, every style and image inlined); never redraw it by hand. Then add the intera
 fixture state in inline JS. Put the Vercel preview link in it. Open it in Session Board's
 browser pane: `node ~/session-board/scripts/board-browser.mjs <file.html> "<what changed, what
 to look at>"`, and edit the same file each round (the pane reloads it). Your own verification
-still runs on the real preview. For an iOS change,
-show the simulator on the changed screen with `--simulator`. In chat, say what I'm
+still runs on the real preview. For an iOS change, send the build to my phone instead (see
+"iOS changes: send the build to my phone"). In chat, say what I'm
 approving. A link or a screenshot path in chat alone is not enough. If the board is not
 running, open the page or file with `open` instead.
 
@@ -234,6 +234,41 @@ post the evidence and commit list in chat as the record. Never use `--human-conf
 an approval I did not give in this chat. Deploy only what is merged to `main` and green,
 then check the new revision serves. Stop and ask only when the deploy would spend more than
 $10 of real money, ships a change that is not merged, or the script refuses `--agent-confirmed`.
+
+## iOS changes: send the build to my phone
+
+I test the iOS app on my own iPhone. Not in the simulator, and not in TestFlight. Whenever you
+change what the iOS app does or shows (app code in `SideShift/` of sideshift-mobile), send the
+build to my phone before you report, and again after each later round of changes, so the app on
+my phone is the latest one. Do it without asking. Tests-only and docs-only changes need no push.
+
+- **How:** commit, then from the mobile worktree run `~/.claude/bin/ios-phone-push` (it builds
+  the current commit; pass a ref for another one; the commit does not need to be pushed). It
+  builds a Release build signed for my phone on this Mac and puts it on the install page
+  `https://liams-macbook-pro-3.taile3f7ef.ts.net:8443/`. About 2 minutes after a small change,
+  4 to 5 for the first build of a branch far from the last one. It builds a commit, never the
+  working tree, and it runs only on this Mac (the signing key is here).
+- **Check your work first.** Your own verification still runs in the simulator (the mobile
+  repo's `ios-harness` skill). The phone build is for my look, so push when the change works,
+  once per round, not after every edit.
+- **Then tell me in chat:** which branch and build number is on the page (from the command's
+  output), what changed, and which screen to open. I open the page on the phone with Tailscale
+  on and tap Install. This is how you put an iOS change in front of me for approval; do not show
+  me the simulator unless I ask for it.
+- **One build at a time.** The page holds one build and my phone one SideShift, so a later push
+  from any chat replaces yours. Keep your branch current with `main` before you push, so
+  installing it never takes my phone back. If I ask about a build that is no longer on the page,
+  push it again.
+- **TestFlight copies block the page.** The page cannot replace a TestFlight or App Store copy of
+  the app: iOS answers "already installed". If I installed one since the last phone build, tell me
+  to delete SideShift from the phone first. Send a TestFlight build (`ios-testflight-studio`) only
+  when I ask for TestFlight or someone else needs the build.
+- **If the push fails,** fix a build error and push again. For a signing error read
+  `~/.config/sideshift-ios-signing/README.md` (after a Mac restart, run its `keychain.sh`). If you
+  still cannot push, say so plainly with the error; do not hand me the simulator in its place.
+- `--debug` builds Debug instead; use it only when I ask for a Debug build.
+
+Android is unchanged: show me the emulator.
 
 ## Testing: no permission needed, except for real money over $10
 
@@ -408,8 +443,10 @@ window in it: its tabs never mix with another chat's.
   ~/session-board/scripts/artifact.mjs db|comments <file.html>`. Edit the same file each round:
   the pane reloads it. Publish a claude.ai Artifact (the `Artifact` tool) only for a page
   someone else has to open.
-- **To show me an iOS simulator or Android emulator** (a build to try, a flow to check, a sign-in
-  only I can do), run `node ~/session-board/scripts/board-browser.mjs --simulator <udid | name |
+- **An iOS build for me to try goes to my phone** with `ios-phone-push`, not to a simulator (see
+  "iOS changes: send the build to my phone").
+- **To show me an Android emulator, or an iOS simulator when I ask for one** (a build to try, a
+  flow to check, a sign-in only I can do), run `node ~/session-board/scripts/board-browser.mjs --simulator <udid | name |
   adb serial | AVD name> "<what to do>"`. It opens as a tab in Session Board's pane, where I tap,
   scroll and type in it. Keep the simulator or emulator running until I say I'm done. If the board
   is not running, ask me to open Simulator.app (or the emulator's window) instead.
@@ -427,7 +464,8 @@ Board. Wherever this file or a skill says to show me something in Session Board'
   goes up as an Artifact.
 - **A UI design round** (`board-canvas.mjs`): an Artifact with each option's screenshots, your
   pick at the top, and each option's preview link.
-- **An iOS simulator:** `mcp__Claude_Code_iOS_Simulator__control` with `attach`. An Android
+- **An iOS simulator, when I ask for one:** `mcp__Claude_Code_iOS_Simulator__control` with `attach`
+  (an iOS build for me to try still goes to my phone with `ios-phone-push`). An Android
   emulator has no pane there: ask me to use its window.
 - **A SideShift page signed in as a test account, for your own checks:** `node
   ~/.claude/bin/agent-signin.mjs [--as creator] <url>`. It opens the page in your chat's agent
@@ -513,7 +551,9 @@ emulator handoffs. This section takes precedence over the shared agent Chrome to
   earlier rounds, and read my marks back with `board-canvas.mjs read`. Also show that round's screenshots, your pick and
   the preview links as a local page in a native browser tab. When the board is not running, that
   page is the whole round.
-- **Simulators and emulators:** show the changed screen through a supported mirror in a native
+- **iOS builds for me to try:** send them to my phone with `ios-phone-push` (see "iOS changes:
+  send the build to my phone"), not to a simulator.
+- **Android emulators, and an iOS simulator when I ask for one:** show the changed screen through a supported mirror in a native
   browser tab. Keep the device running until I say I am done. If the native browser cannot
   show it, report the blocker; do not use the floating mini screen preview.
 - **Tab ownership and cleanup:** act only on tabs owned by this chat or explicitly handed to

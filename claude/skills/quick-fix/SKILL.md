@@ -399,10 +399,11 @@ the evidence. If anything is unverified, lead with that.
   (captured with `~/.claude/bin/page-snapshot.mjs`, working buttons and states, preview
   link inside; see the global CLAUDE.md UI-approval rule) and open it in Session Board's pane
   with `node ~/session-board/scripts/board-browser.mjs <file.html> "<what to approve>"`,
-  so the operator can approve it at a glance. **iOS change: the live simulator, not screenshots.**
-  Leave the simulator, its build and any proxy running on the changed screen, and open it
-  with `board-browser.mjs --simulator <udid> "<what to tap>"`. Do not clean up until the
-  operator says they are done. Clean up after the approval, not before. End with
+  so the operator can approve it at a glance. **iOS change: the build on the operator's phone,
+  not a simulator or screenshots.** Commit, run `~/.claude/bin/ios-phone-push` from the mobile
+  worktree, and say in chat which branch and build number is on the install page and which
+  screen to open (see "iOS changes: send the build to my phone" in the global CLAUDE.md).
+  Clean up after the approval, not before. End with
   `**Status:** Needs your review · PR #123 <url> · preview <url> · merged: no`.
 
 Before you send the report: if the operator corrected you during this task, or the first

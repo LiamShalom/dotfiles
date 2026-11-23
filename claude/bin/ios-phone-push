@@ -2,17 +2,17 @@
 # Build a commit of the iOS app, signed for development, and get it onto the test iPhone without
 # TestFlight (no upload, no Apple processing). Run it from a sideshift-mobile checkout:
 #
-#   ios-phone-push [<ref>] [--release] [--no-deliver]      (default ref: HEAD)
+#   ios-phone-push [<ref>] [--debug] [--no-deliver]        (default ref: HEAD)
 #   ios-phone-push --helper
 #
 # The commit does not need to be pushed. It is built in a kept checkout and DerivedData
 # (~/.cache/sideshift-phone), so after the first build only what changed is compiled. The default
-# is a Debug build; --release builds Release with file-by-file Swift, for when feel matters more
-# than build time (still not how the App Store build is compiled).
+# is a Release build with file-by-file Swift: it behaves like the build that ships, though it is
+# not compiled the way the App Store build is. --debug builds Debug (debug-only code paths on).
 #
 # Delivery: when the iPhone is paired with this Mac and reachable, the app is installed and opened
 # with devicectl. Otherwise an install page goes up on this Mac's Tailscale address and the person
-# taps Install there (the page stops serving 3 hours after the last build; IOS_PHONE_SERVE_HOURS
+# taps Install there (the page stops serving 72 hours after the last build; IOS_PHONE_SERVE_HOURS
 # changes that when the page is first started). --no-deliver stops after the signed build.
 #
 # --helper puts the small "SideShift Dev Mode" app on the install page instead (helper.html). A
@@ -37,9 +37,10 @@ HERE=$(dirname "$SELF")
 die() { echo "ios-phone-push: $*" >&2; exit 1; }
 step() { echo "== $(date '+%H:%M:%S') $*"; }
 
-ref=HEAD release=0 deliver=1 helper=0
+ref=HEAD release=1 deliver=1 helper=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --debug) release=0; shift ;;
     --release) release=1; shift ;;
     --no-deliver) deliver=0; shift ;;
     --helper) helper=1; shift ;;
@@ -70,7 +71,7 @@ if [ -z "${IOS_PHONE_PUSH_LOCKED:-}" ]; then
   export IOS_PHONE_PUSH_LOCKED=1
   if [ "$helper" = 1 ]; then exec lockf "$W/lock" "$SELF" --helper; fi
   cd "$root"
-  exec lockf "$W/lock" "$SELF" "$sha" $([ "$release" = 1 ] && echo --release) $([ "$deliver" = 0 ] && echo --no-deliver)
+  exec lockf "$W/lock" "$SELF" "$sha" $([ "$release" = 1 ] || echo --debug) $([ "$deliver" = 0 ] && echo --no-deliver)
 fi
 started=$SECONDS
 
@@ -177,7 +178,7 @@ PY
   serving() { [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$HTTP_PORT/build.json")" = 200 ]; }
   if ! serving; then
     IOS_PHONE_HTTPS_PORT=$HTTPS_PORT nohup python3 -I "$HERE/ios-phone-push-serve.py" "$ota" "$HTTP_PORT" \
-      "${IOS_PHONE_SERVE_HOURS:-3}" >>"$W/serve.log" 2>&1 </dev/null &
+      "${IOS_PHONE_SERVE_HOURS:-72}" >>"$W/serve.log" 2>&1 </dev/null &
     for _ in 1 2 3 4 5 6 7 8 9 10; do serving && break; sleep 0.5; done
     serving || die "the install page server did not start on port $HTTP_PORT; see $W/serve.log"
   fi
