@@ -27,6 +27,10 @@ the finish check bounced it. Prove a manager action from code or a real session 
   `PG_ALLOW_PRODUCTION=1 NODE_OPTIONS=--conditions=react-server npx tsx`. The PG mirror logs
   "unmapped field talentManagerOnly": harmless, talent code reads it from Firestore (`users.data.ts` FIELDS).
   No email is sent; the person signs in with their existing login.
+  Once monorepo #11803 and dashboard #325 merge, staff do this themselves in the internal dashboard tab
+  "Talent Managers" (Admin Growth): it lists every manager with its creators and has "Make talent manager".
+  Every manager login carries `creatorKind: 'manager'` (the 51 older ones were backfilled on 2026-11-23);
+  the list reads `creators.creator_kind`, so a hand conversion must set it too.
   An active creator contract on the login does not block it when the teammate asked for this email
   (gill job 2026-11-23): the creator layout still draws for a manager login
   (`__tests__/app/creator-layout-manager-only-login.test.tsx`) and nothing reads the flag on existing
