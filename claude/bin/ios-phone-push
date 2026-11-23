@@ -152,8 +152,11 @@ info = plistlib.loads((Path(app) / "Info.plist").read_bytes())
 stamp = str(int(time.time()))
 (ota / f"{name}-manifest.plist.new").write_bytes(plistlib.dumps({"items": [{
     "assets": [{"kind": "software-package", "url": f"{base}/{name}.ipa?b={stamp}"}],
+    # iOS decides "already installed" from this version alone, before it downloads the package: with
+    # the marketing version (2.39, the same as the TestFlight copy on the phone) it refused the
+    # install on 2026-11-23. The build number comes from the clock, so it is new on every push.
     "metadata": {"bundle-identifier": info["CFBundleIdentifier"], "kind": "software",
-                 "bundle-version": info["CFBundleShortVersionString"], "title": title}}]}))
+                 "bundle-version": info["CFBundleVersion"], "title": title}}]}))
 link = "itms-services://?action=download-manifest&url=" + urllib.parse.quote(f"{base}/{name}-manifest.plist?b={stamp}", safe="")
 (ota / f"{name}.html.new").write_text(f"""<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
