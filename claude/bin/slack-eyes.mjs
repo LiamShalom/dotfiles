@@ -969,7 +969,7 @@ export function rememberAccounts(channel, accounts, file = ACCOUNTS_FILE, foreig
   const ids = [...new Set((accounts ?? []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim()))]
   if (!channel || !ids.length) return null
   const map = loadAccounts(file)
-  const terms = foreign !== undefined ? foreign : ids.length === 1 && ids[0] !== 'internal' ? computeForeign(ids[0]) : null
+  const terms = foreign !== undefined ? foreign : ids.length === 1 && !SPECIAL_SCOPES.includes(ids[0]) ? computeForeign(ids[0]) : null
   map[channel] = { accounts: ids, setAt: new Date().toISOString(), foreign: terms }
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`)
@@ -980,7 +980,7 @@ export function refreshForeign(channel, file = ACCOUNTS_FILE) {
   let map
   try { map = loadAccounts(file) } catch { return }
   const entry = map[channel]
-  if (!entry || entry.accounts?.length !== 1 || entry.accounts[0] === 'internal') return
+  if (!entry || entry.accounts?.length !== 1 || SPECIAL_SCOPES.includes(entry.accounts[0])) return
   if (entry.foreign?.at && Date.now() - Date.parse(entry.foreign.at) < 86_400_000) return
   const foreign = computeForeign(entry.accounts[0])
   if (!foreign) return
@@ -1002,10 +1002,12 @@ export function foreignHits(text, foreign) {
   if (OTHER_ACCOUNT.test(norm)) hits.push('"other account" / "managed account" wording')
   return hits
 }
+// Scope values that are not company ids: "internal" (a team channel) and "none" (an outside party with no SideShift company).
+export const SPECIAL_SCOPES = ['internal', 'none']
 const listOf = (value) => (Array.isArray(value) ? value : []).filter((a) => typeof a === 'string' && a.trim()).map((a) => a.trim())
 // A run may save only one account as a new channel's scope. "internal" or several accounts are set
 // with `--accounts`, and "internal" never for a channel shared with another company.
-export const autoSavable = (accounts) => { const ids = listOf(accounts); return ids.length === 1 && ids[0] !== 'internal' ? ids : null }
+export const autoSavable = (accounts) => { const ids = listOf(accounts); return ids.length === 1 && !SPECIAL_SCOPES.includes(ids[0]) ? ids : null }
 // Whether the channel is shared with another company (Slack Connect). Unknown counts as shared.
 export async function extShared(channel) {
   if (String(channel).startsWith('D')) return false
@@ -1019,7 +1021,10 @@ export async function extShared(channel) {
 export function accountProblems(out, channel, saved, shared = true, foreign = null) {
   if (!String(out?.reply ?? '').trim() || String(channel).startsWith('D')) return []
   if (saved === undefined) return ['the channel scope file cannot be read, so the reply cannot be checked: tell Liam']
+  // "none": the channel's outside party has no SideShift company (a solo talent manager). Its replies state no account data.
+  if (saved?.includes('none')) return listOf(out?.accounts?.used).map((id) => `the reply states data from account ${id}, but this channel has no SideShift company: drop it`)
   const scope = saved ?? listOf(out?.accounts?.channel)
+  if (scope.includes('none')) return ['"none" is not a saved scope for this channel: Liam sets it with `slack-eyes.mjs --accounts <channel> none`']
   if (saved && !saved.includes('internal') && !foreign) return ['this channel\'s scope has no lookup of same-named accounts, so the reply cannot be checked: tell Liam']
   const named = scope.includes('internal') ? [] : foreignHits(out.reply, foreign)
   if (named.length) return named.map((hit) => `the reply names ${hit}, which is not this channel's account`)
@@ -1037,6 +1042,7 @@ This channel belongs to ${saved ? `account(s) ${saved.join(', ')} (saved scope)`
 export const accountsNote = (channel) => {
   if (String(channel).startsWith('D')) return ''
   const { saved = null } = scopeFor(channel)
+  if (saved?.includes('none')) return '\n\nAccount scope: this channel\'s outside party has no SideShift company account (for example a solo talent manager). State only their own data (their user, the creators they manage), no company account\'s data; return `accounts.channel` ["none"] and `accounts.used` [].'
   return saved
     ? `\n\nAccount scope: this channel belongs to SideShift company account(s) ${saved.join(', ')}. Read and state only their data. Same-named accounts (another agency's, SideShift's managed one) are other customers: never post their campaigns, settings or creators here.`
     : `\n\nAccount scope: none saved for this channel yet. Before your first query, find the one SideShift company account this channel's brand uses, by team membership (users/<companyId>/members emails of the reporter), not by name: brands often have several accounts with the same name. Return it in \`accounts.channel\`; it is saved as this channel's scope.`
@@ -1548,7 +1554,7 @@ async function runInterim(file) {
     // The notes it read may hold another same-named account's data: the text is checked, not trusted.
     if (!String(job.hit.channel).startsWith('D')) {
       const scope = scopeFor(job.hit.channel)
-      const hits = scope.error ? [scope.error] : scope.saved?.includes('internal') ? [] : scope.saved && !scope.foreign ? ['no lookup of same-named accounts']
+      const hits = scope.error ? [scope.error] : scope.saved?.some((a) => SPECIAL_SCOPES.includes(a)) ? [] : scope.saved && !scope.foreign ? ['no lookup of same-named accounts']
         : !scope.saved && await extShared(job.hit.channel) ? ['a shared channel with no saved account scope'] : foreignHits(reply, scope.foreign)
       if (hits.length) {
         log('interim_done', { key: job.hit.key, ok: true, posted: false, cost_usd: cost, why: `names another account: ${hits.join('; ').slice(0, 200)}` })
@@ -2176,9 +2182,9 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
     : args.has('--accounts') ? (async () => {
       const [channel, ...raw] = argv.slice(argv.indexOf('--accounts') + 1)
       const ids = [...new Set(raw.flatMap((a) => a.split(',')).map((a) => a.trim()).filter(Boolean))]
-      if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal]')
-      if (ids.some((id) => !/^(internal|[A-Za-z0-9_-]{8,64})$/.test(id))) throw new Error('an account id is letters, digits, _ or - (8 to 64), or "internal"')
-      if (ids.includes('internal') && ids.length > 1) throw new Error('"internal" stands alone')
+      if (!/^[CG][A-Z0-9]{6,}$/.test(channel ?? '')) throw new Error('usage: --accounts <channel id C…/G…> [companyId ... | internal | none]')
+      if (ids.some((id) => !/^(internal|none|[A-Za-z0-9_-]{8,64})$/.test(id))) throw new Error('an account id is letters, digits, _ or - (8 to 64), "internal" or "none"')
+      for (const special of SPECIAL_SCOPES) if (ids.includes(special) && ids.length > 1) throw new Error(`"${special}" stands alone`)
       if (ids.includes('internal') && await extShared(channel)) throw new Error(`${channel} is shared with another company (or Slack did not say), so it cannot be "internal"`)
       // A first, single-account scope may be saved by anyone. Replacing one, "internal" and several accounts
       // are Liam's call: never from an agent session, and only after he clicks Allow in a macOS dialog.

@@ -82,6 +82,11 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
         echo "slack-as-liam: name the SideShift company accounts whose data this text states: ACCOUNTS=<companyId,...> (ACCOUNTS=none if it states none).${saved:+ This channel belongs to: $saved.} Find a channel's account by team membership, never by brand name: same-named accounts are other customers." >&2
         exit 2
       fi
+      # "none" (Liam's `slack-eyes.mjs --accounts <channel> none`): the outside party has no SideShift company, so a post states no account data.
+      if [ "$saved" = none ] && [ "$ACCOUNTS" != none ]; then
+        echo "slack-as-liam: $channel has no SideShift company (scope \"none\"), so a post states no account's data: use ACCOUNTS=none and drop the account data." >&2
+        exit 2
+      fi
       # "internal" holds only while the channel is not shared with another company; unknown counts as shared.
       if [ "$saved" = internal ] && [ "$ACCOUNTS" != none ]; then
         itoken=$(security find-generic-password -s claude-slack-user-token -w 2>/dev/null || true)
@@ -133,7 +138,7 @@ if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
       fi
       # The text itself, whatever ACCOUNTS says: another same-named account's campaign names, company
       # ids, or "the other <brand> account" (foreign terms saved with the scope by account-foreign-terms.mjs).
-      if [ -n "$saved" ] && [ "$saved" != internal ] && ! jq -e --arg c "$channel" '.[$c].foreign | type == "object"' "$scope_file" >/dev/null 2>&1; then
+      if [ -n "$saved" ] && [ "$saved" != internal ] && [ "$saved" != none ] && ! jq -e --arg c "$channel" '.[$c].foreign | type == "object"' "$scope_file" >/dev/null 2>&1; then
         echo "slack-as-liam: $channel's scope has no lookup of same-named accounts, so this post cannot be checked. Tell Liam." >&2
         exit 2
       fi

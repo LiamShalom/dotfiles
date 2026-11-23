@@ -870,6 +870,14 @@ test('a reply with only the channel\'s account, no account data, an internal cha
   assert.deepEqual(accountProblems({ ...leaked, reply: '' }, 'C0BRMEZRHKP', [J2], true, MELAXIN), [])
 })
 
+test('a "none" scope (outside party with no company) passes replies with no account data, and only Liam saves it', () => {
+  const solo = { reply: 'all 11 are set up under you', accounts: { channel: ['none'], used: [] } }
+  assert.deepEqual(accountProblems(solo, 'C0SOLO', ['none'], true, null), [])
+  assert.equal(accountProblems({ ...solo, accounts: { channel: ['none'], used: [J2] } }, 'C0SOLO', ['none'], true, null).length, 1)
+  assert.equal(accountProblems(solo, 'C0SOLO', null, true).length, 1, 'a run cannot claim "none" itself')
+  assert.equal(autoSavable(['none']), null)
+})
+
 test('a reply in a channel with no account named is refused', () => {
   assert.equal(accountProblems({ ...leaked, accounts: { channel: [], used: [] } }, 'C0NEW', null).length, 1)
   assert.equal(accountProblems({ ...leaked, accounts: undefined }, 'C0NEW', null).length, 1)
