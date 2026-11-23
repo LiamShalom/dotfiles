@@ -223,3 +223,15 @@ while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: 
 - Turning it on for a live campaign: the campaign page then shows a country verification banner with "Review creators" (`campaigns/[id]/page.tsx:3826`, shown whenever the requirement is on). It lists current creators by verified-country status. Existing contracts stay as they are (`docs/features/campaign-country-requests.md`). The automatic verify request to existing creators needs `CAMPAIGN_COUNTRY_REQUESTS_ENABLED=1`, which was not set on production `sideshift-web` on 2026-11-20 (`vercel env ls production --project sideshift-web --cwd /tmp`).
 - Stay on the channel's account. Several companies can share a brand name (one per agency, plus SideShift's managed one), and each is a separate customer. Find the channel's account by team membership (`users/<companyId>/members` holds the reporter's email), then query by that `company_id` only, never by `company_name`. `campaign_manager_campaigns` misses some campaigns: list the account's campaigns from Postgres `campaigns` where `company_id` = the account, and confirm a "done" with `updated_at` there. Never post another same-named account's campaigns, settings or creators in the channel (melaxin 11-20: a run did, and Liam had the posts removed).
 - Turn the country gate on from a script (melaxin, 2026-11-20): in a fresh origin/main worktree, call `updateCampaign` (`lib/api/campaigns/campaigns-leftovers-update.usecase.ts`) with ctx `{mode:'admin', userId:<staff uid>, companyId}` and input `{companyId, requirements:{verifiedResidenceCountries:['US'], verifiedResidenceTargeting:{mode:'include',includedCountries:['US'],excludedCountries:[]}}}`, run with `PG_ALLOW_PRODUCTION=1 npx tsx --conditions=react-server --env-file=.env.local`. It returned `updateKind:null` and empty `regenerate`: residence fields are non-material (`lib/campaign-change-summary.ts` NON_MATERIAL_REQUIREMENT_FIELDS), so no contract regenerates and no creator is asked to re-accept. The main checkout was 2,888 commits behind: use a worktree.
+
+## A brand asks to remove (kick) a creator from its roster
+
+Proved 2026-11-19 and 2026-11-23 (`afina: remove creator`). Do it the way the brand's own Remove
+button does: a throwaway `scripts/tmp-*.ts` in a `sideshift-setup` worktree that calls
+`removeCreatorFromCompanyCampaigns` (`lib/api/creators/creators-remove.usecase.ts`) with a payload for
+the company owner uid (`users/<companyId>`), `mode: 'keepPosts'`, `endReason: 'creator_content_issue'`
+(for quality or missed-deadline kicks). Import `db` from `@/utils/firebase/admin`. Run with
+`env PG_ALLOW_PRODUCTION=1 npx tsx --conditions=react-server --env-file=.env.local <script>` without
+`--apply` first (prints the creator's active campaigns), then with it. Check on the replica: the
+`contracts` row is `expired`, `ended_by company`, `expire_reason` "Creator removed - posts kept for
+payouts", its `contract_posts` stay. The creator gets one summary DM. Delete the script after.
