@@ -37,6 +37,12 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   execute=false -f company=<id>`, read the log, then `execute=true`). Run log greps: `clears:`,
   `started=`. On 11-21 it had run for one company only; couponbirds: creators stuck invited found 380
   more held contracts and ran it for everyone.
+- **"No option to add Facebook anymore" (plutus, 2026-11-23):** since #11502, under rule `any` the Get
+  ready popup (`get-ready.usecase.ts` `shownPlatforms`) lists only linked platforms plus `needed`, so once
+  one account is linked the others drop off. PostHog `open_campaign_get_ready_shown.providers` shows it
+  per open. The invite page's "Add other handles" still offers every listed platform. A brand that wants
+  every account sets Requirements > "Creators need an account on" > Every platform; held creators then
+  wait for all of them and the accounts sweep ends the hold on day 7 (`accounts-reminders.usecase.ts`).
 - **Required platforms** are the campaign's `requirements.platforms`, or the contract's own list when
   Customize set `platformsOverride` (`resolveRequirements`, `lib/payment-structure-utils.ts`). A
   creator can add only listed platforms: others fail with "Platform X is not required for this
