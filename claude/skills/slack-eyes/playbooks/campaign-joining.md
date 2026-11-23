@@ -147,6 +147,7 @@ while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: 
 | Removed handle still tracked, "already on this campaign" | Approved removal not applied (before #10602), or a re-add | Check 4 |
 | One connect appears on 3 or 4 campaigns | `/connect/select` sent no campaign | Check 3 by handle: one row per contract, seconds apart, `reviewed_by` empty |
 | Cannot invite a creator to an ended campaign | Email invites stop after the end date | Check 6 |
+| Invite link sign step: "The contract document could not be loaded." (canyon: invite contract won't load, 11-23) | `preview-pdf` answers 200 with no URL; the reason is only in its log line `[previewContractPdf] Contract preview is unavailable { reason }`. 11-23: Snapchat in an ad-spend-share rule tripped the Snapchat attribution check (fixed #11831) | `logs_search_webapp` route `/api/contracts/<contractId>` (contract from `contractsv2` where `contractorId` + `programId`); a search by invite token never shows it |
 | iOS: contract link in a chat flashes a "Preparing your contract" skeleton and closes, held contract | iOS 2.30 (`creator-release-polish`, not `main`) closes the sign sheet and opens the campaign page on the Home tab without switching tabs (`showGetReady` → `.openCampaignFromActivity`); fixed in mobile #382 | Webapp logs per tap: `GET contracts/{id}` 200, then `GET jobs/{programId}` 404 from the hidden page. Workaround: creator taps the Home tab |
 
 ### Checks (read replica)
