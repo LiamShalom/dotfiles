@@ -1765,6 +1765,16 @@ async function setFromSession(key, status, note) {
     return
   }
   if (status === 'done') {
+    // A board session has no watcher to post its reply: done with only the ack in the thread
+    // leaves the reporter hanging (gill request, 11-23). NO_REPLY_OK=1 when nothing should be posted.
+    const job = readJob(file)
+    if (process.env.NO_REPLY_OK !== '1') {
+      const thread = await threadOf(job).catch(() => null)
+      if (thread && !liamReplies(thread, job, knownAcks()).length) {
+        console.error(`slack-eyes: ${key} has no reply from Liam in its thread yet, only the ack. Post the result with slack-as-liam first (skill step 5), then set done. Nothing to post? NO_REPLY_OK=1.`)
+        process.exit(2)
+      }
+    }
     updateJob(file, { status: 'done', requestRow: 'done' })
     await listRemove(file)
   } else if (status === 'waiting') {
