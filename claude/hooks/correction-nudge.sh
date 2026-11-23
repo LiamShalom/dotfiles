@@ -18,8 +18,11 @@ signal="(^|[^a-z])(wdym|heads up|you already|no need to|i (said|told you|already
 
 if { [[ $prompt =~ $lead ]] && ! [[ $prompt =~ $benign ]]; } || [[ $prompt =~ $signal ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/corrections-flagged.log"
-  echo "This message may correct something you did earlier. If it does: fix the thing first, then run the in-session step of the \`correct\` skill (was this already a rule? if so it is a repeat, so move it up a level). If it is a new request or a product bug report, ignore this note."
+  echo "This message may correct something you did earlier. If it does: fix the thing first, then run the in-session step of the \`correct\` skill (was this already a rule? if so it is a repeat, so move it up a level). The fix changes only what the message's words cover: every earlier decision they do not name (who can see it, a gate, a hidden or unlisted setting, a case such as signed-out) stays as it was, and your reply says in one line what you kept. If it is a new request or a product bug report, ignore this note."
 fi
+# 2026-11-22 SideShift School bootcamp: "No I want bootcamp to be an actual job that they open and
+# apply to like a normal job" → I also dropped the spec's "hidden from the job feed" as a
+# consequence → "But its not a public job you can only join if you have the link".
 
 # Bringing one platform's design to another: the first build of #7581 (2026-10-27) cloned the
 # iOS chrome onto the creator web instead of moving its design choices onto the web's own kit.
