@@ -18,8 +18,16 @@ the finish check bounced it. Prove a manager action from code or a real session 
   used as the manager test in `requests.usecase.ts:107` and `switch.usecase.ts:95`). A manager account
   cannot itself be a creator on a contract (`representations.usecase.ts:275` refuses it as the creator).
 - **An email that already has a creator login cannot self-serve this.** Staff convert the user in place
-  (earlier run, repair via the users write path; first apply needs `PG_ALLOW_PRODUCTION=1`; the main
-  checkout can be far behind `origin/main`, so use a fresh worktree).
+  (sign-up as a manager only sets the flags on a first onboarding, `onboarding.usecase.ts` `becomesManager`).
+  Proven recipe (2026-11-23, request: talent manager account): first check `contracts` where
+  `contractor_id = <uid>` are all cancelled/ended and the doc is `type: 'Student'`. Then from a fresh
+  worktree (`sideshift-setup`), a throwaway script calls
+  `authAccountData.updateUser(uid, { talentManagerOnly: true, excludeFromRecruit: true, creatorKind: 'manager' })`
+  (`lib/api/auth/account/data.ts`; plus `hasUGCExperience: USERS_REMOVE_FIELD` if set), run with
+  `PG_ALLOW_PRODUCTION=1 NODE_OPTIONS=--conditions=react-server npx tsx`. The PG mirror logs
+  "unmapped field talentManagerOnly": harmless, talent code reads it from Firestore (`users.data.ts` FIELDS).
+  No email is sent; the person signs in with their existing login. A brand login (Employer/Member) needs
+  the longer reset in memory `talent-at-sideshift-is-a-manager`.
 - **The contract belongs to one of the manager's creators**, never the manager. The manager opens the
   campaign invite link signed in, picks or adds the creator it is for, and signs.
 - **A managed creator can have no email.** `find_account` by that creator's name returned nothing; find
