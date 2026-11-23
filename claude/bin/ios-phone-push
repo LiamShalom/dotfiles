@@ -195,7 +195,7 @@ if [ "$helper" = 1 ]; then
   step "built and signed the helper in $((SECONDS - build_started)) s"
   publish "$app" helper "SideShift Dev Mode" "A helper for the first development install on this iPhone." \
     "It does not touch SideShift. Install it, open it once, then turn on Developer Mode when iOS asks." \
-    "After the phone restarts with Developer Mode on, you can delete this app."
+    "Safari shows nothing after you tap Install in the pop-up. The app lands on the last Home Screen page or in the App Library; search for Dev Mode. After the phone restarts with Developer Mode on, you can delete it."
   exit 0
 fi
 
@@ -256,4 +256,4 @@ fi
 
 publish "$app" index "SideShift $version ($number)" \
   "$label at ${sha:0:9}, $config build, $(date '+%b %-d, %-I:%M %p')" "$subject" \
-  "The app appears on the Home Screen when the download ends. It replaces the SideShift that is installed and keeps its data."
+  "Safari shows nothing after you tap Install in the pop-up. Go to the Home Screen: the SideShift icon shows the download, then the new build. It replaces the SideShift that is installed and keeps its data."
