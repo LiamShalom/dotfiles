@@ -244,17 +244,19 @@ my phone is the latest one. Do it without asking. Tests-only and docs-only chang
 
 - **How:** commit, then from the mobile worktree run `~/.claude/bin/ios-phone-push` (it builds
   the current commit; pass a ref for another one; the commit does not need to be pushed). It
-  builds a Release build signed for my phone on this Mac and puts it on the install page
-  `https://liams-macbook-pro-3.taile3f7ef.ts.net:8443/`. About 2 minutes after a small change,
-  4 to 5 for the first build of a branch far from the last one. It builds a commit, never the
-  working tree, and it runs only on this Mac (the signing key is here).
+  builds a Release build signed for my phone on this Mac. My phone is paired with this Mac over
+  Wi-Fi, so when it is on the same Wi-Fi the build installs itself, no tap ("installed on the
+  iPhone" in the output). When the phone is out of reach it goes to the install page
+  `https://liams-macbook-pro-3.taile3f7ef.ts.net:8443/` instead. About 2 minutes after a small
+  change, 4 to 5 for the first build of a branch far from the last one. It builds a commit, never
+  the working tree, and it runs only on this Mac (the signing key is here).
 - **Check your work first.** Your own verification still runs in the simulator (the mobile
   repo's `ios-harness` skill). The phone build is for my look, so push when the change works,
   once per round, not after every edit.
-- **Then tell me in chat:** which branch and build number is on the page (from the command's
-  output), what changed, and which screen to open. I open the page on the phone with Tailscale
-  on and tap Install. This is how you put an iOS change in front of me for approval; do not show
-  me the simulator unless I ask for it.
+- **Then tell me in chat:** which branch and build number is on my phone or the page (from the
+  command's output), what changed, and which screen to open. If it went to the page, I open it on
+  the phone with Tailscale on and tap Install. This is how you put an iOS change in front of me
+  for approval; do not show me the simulator unless I ask for it.
 - **One build at a time.** The page holds one build and my phone one SideShift, so a later push
   from any chat replaces yours. Keep your branch current with `main` before you push, so
   installing it never takes my phone back. If I ask about a build that is no longer on the page,

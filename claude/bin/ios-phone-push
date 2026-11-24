@@ -10,8 +10,8 @@
 # is a Release build with file-by-file Swift: it behaves like the build that ships, though it is
 # not compiled the way the App Store build is. --debug builds Debug (debug-only code paths on).
 #
-# Delivery: when the iPhone is paired with this Mac and reachable, the app is installed and opened
-# with devicectl. Otherwise an install page goes up on this Mac's Tailscale address and the person
+# Delivery: when the iPhone is paired with this Mac and reachable (same Wi-Fi), the app is installed
+# with devicectl, no tap. Otherwise an install page goes up on this Mac's Tailscale address and the person
 # taps Install there (the page stops serving 72 hours after the last build; IOS_PHONE_SERVE_HOURS
 # changes that when the page is first started). --no-deliver stops after the signed build.
 #
@@ -256,8 +256,13 @@ print(ok[0]["hardwareProperties"]["udid"] if ok else "")
 PY
 )
 # lockState is the lightest call (about 20 s over Wi-Fi here); "info details" gathers everything and
-# can pass 30 s even with the phone in reach.
-if [ -n "$udid" ] && ! "${dctl[@]}" device info lockState --device "$udid" --timeout 60 --quiet >/dev/null 2>&1; then
+# can pass 30 s even with the phone in reach. Two tries: after the phone sleeps, the first call can
+# land on the old tunnel while it is torn down (RSD heartbeat timeout); the second opens a new one.
+phone_answers() {
+  "${dctl[@]}" device info lockState --device "$udid" --timeout 60 --quiet >/dev/null 2>&1 ||
+    "${dctl[@]}" device info lockState --device "$udid" --timeout 60 --quiet >/dev/null 2>&1
+}
+if [ -n "$udid" ] && ! phone_answers; then
   echo "ios-phone-push: the paired iPhone did not answer (off this Wi-Fi or asleep); using the install page" >&2
   udid=""
 fi
