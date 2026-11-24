@@ -32,15 +32,20 @@ PIN_SLOTS="${HEAVY_PINNED_SLOTS:-1}"
 # Percent of RAM that is not wired, app memory or the compressor's own pages.
 # kern.memorystatus_level is not used: it counts compressed memory as free, and
 # on 2026-11-11 read 48 while 227 MB was unused and swap was 91% full.
+# Swapped-out memory counts as used too: on 2026-11-23 this read 16 with swap
+# 92% full and load ~250, and iOS tests it let start hung on app install.
 mem_free_pct() {
-	vm_stat 2>/dev/null | awk -v total="$(sysctl -n hw.memsize 2>/dev/null)" '
+	vm_stat 2>/dev/null | awk -v total="$(sysctl -n hw.memsize 2>/dev/null)" -v swap="$(sysctl -n vm.swapusage 2>/dev/null)" '
 		/page size of/ { for (i = 1; i < NF; i++) if ($i == "of") ps = $(i + 1) }
 		/^Pages wired down/ { w = $NF }
 		/^Anonymous pages/ { a = $NF }
 		/^Pages occupied by compressor/ { c = $NF }
 		END {
 			if (!ps || !total || !a) exit 1
-			f = 100 - (w + a + c) * ps * 100 / total
+			# vm.swapusage: "total = 12288.00M  used = 11313.38M  free = ..."
+			s = 0
+			if (match(swap, /used = [0-9.]+M/)) s = substr(swap, RSTART + 7, RLENGTH - 8) * 1048576
+			f = 100 - ((w + a + c) * ps + s) * 100 / total
 			printf "%d", (f < 0 ? 0 : f)
 		}'
 }
