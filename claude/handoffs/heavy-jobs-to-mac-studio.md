@@ -54,7 +54,7 @@ The MacBook no longer runs the NordVPN desktop tunnel (Nord app open but disconn
 `connectOnDemand = 0`; traffic exits via the office line 38.104.167.240/31). With that:
 Tailscale is online, the Studio is online on a direct LAN path, SSH works
 (`ssh -i ~/.config/sideshift-pool/macbook_ed25519 -o IdentitiesOnly=yes -o UseKeychain=yes
--o BatchMode=yes -o UserKnownHostsFile=~/.config/sideshift-pool/known_hosts sideshift@100.118.88.90`),
+-o BatchMode=yes -o UserKnownHostsFile=~/.config/sideshift-pool/known_hosts sideshift@100.87.245.47`),
 the Studio reaches Session Board's tailnet URL (401 sign-in gate), and the relay's
 `check-nordvpn` still verifies 6 distinct IPs. Studio disk is 26% used, so the 10-26 "97% full"
 note is stale. Items 1 and 2 below are resolved; the Design section can start.
@@ -91,7 +91,7 @@ note is stale. Items 1 and 2 below are resolved; the Design section can start.
    NordVPN does not block the internet: through it, Tailscale's relay servers answer
    (`tailscale netcheck`: Ashburn 28 ms) and `curl https://controlplane.tailscale.com/key?v=71`
    returns 200 in 0.37 s. But Tailscale's own app cannot connect while both VPNs run. SSH to
-   `100.118.88.90:22` times out. NordVPN has no command-line control.
+   `100.87.245.47:22` times out. NordVPN has no command-line control.
    - Options given to Liam (he hasn't picked yet):
      1. **Recommended:** replace NordVPN with Tailscale's Mullvad exit-node add-on (about $5 a
         month for 5 devices). This costs real money, so it needs Liam's OK.
@@ -111,7 +111,7 @@ touch it.
 
 ## Studio facts (from memory `mac-studio-host-facts`, as of 10-26 unless noted)
 
-- `ssh -o UserKnownHostsFile=~/.config/sideshift-pool/known_hosts -o BatchMode=yes sideshift@100.118.88.90`
+- `ssh -o UserKnownHostsFile=~/.config/sideshift-pool/known_hosts -o BatchMode=yes sideshift@100.87.245.47`
   (connection file `~/.config/sideshift-pool/connection`). Non-interactive SSH has no Homebrew
   on PATH: run `export PATH=/opt/homebrew/bin:$PATH` first.
 - 36 GB RAM, 14 cores, 460 GB disk. **The disk was 97% full on 10-26.** Check and clear it first.

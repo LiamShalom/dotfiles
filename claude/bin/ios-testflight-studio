@@ -15,7 +15,7 @@
 set -euo pipefail
 
 KEY="$HOME/.config/sideshift-pool/macbook_ed25519"
-HOST="sideshift@100.118.88.90"
+HOST="sideshift@100.87.245.47"
 SSH=(ssh -i "$KEY" -o UserKnownHostsFile="$HOME/.config/sideshift-pool/known_hosts" -o IdentitiesOnly=yes
      -o UseKeychain=yes -o AddKeysToAgent=yes -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
 HERE=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
