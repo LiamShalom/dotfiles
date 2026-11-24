@@ -58,6 +58,15 @@ line here no longer matches, fix this file (step 7 of the skill).
   `vercel logs --project sideshift-web --scope side-shift --environment production --status-code 500 --query filtered-v2 --since <iso> --until <iso> --json --expand`
   (run outside the repo; the MCP log tool cuts messages at about 500 chars).
 
+- **Applicants tab badge says N but the page shows "No Applications Yet" (2026-11-24, spacexsi):** the
+  badge (`CampaignPageTabs.tsx`, `usePendingInviteLinkSignupsCount`) counts invite-link sign-ups waiting for
+  Accept. They are listed only under the job picker's "Signed invites (N)" entry, and the page used to open
+  on the remembered job (the tab link carries `?jobId=`). Proof: `job_applications` has 0 rows for the job
+  shown, and Firestore `contractsv2` for the company has `status: pending` + `brandReviewsSignup: true`.
+  Fixed in #11917: the page opens on Signed invites when the opened job is empty and a sign-up waits.
+  Prove on a preview as the Dev Testing Liam brand (it has 3 real signed invites): open
+  `?tab=applicants&jobId=<an empty job>` and read the `Job role` button text.
+
 ## Checks
 
 1. Read the reporter's clip. Ergo links (`share.joinergo.com/c/<id>`) need an email code:
