@@ -87,3 +87,15 @@ test('a failed start rejects instead of crashing, and a daemon that is missing o
   assert.match(await unclampDaemon(80, io({ daemon: async () => undefined })), /^WARNING .*no daemon runs/)
   assert.match(await unclampDaemon(80, io({ daemon: async () => ({ pid: 91, pri: 4 }) })), /^WARNING .*background priority/)
 })
+
+test('a job sent to the Mac Studio runs its staging and copy-back at normal priority', () => {
+  const remote = [
+    rows[0],
+    { pid: 80, ppid: 10, name: 'bash', args: '/bin/bash /Users/x/.claude/bin/heavy --pool xcode xcodebuild test' },
+    { pid: 81, ppid: 80, name: 'node', args: 'node /Users/x/dotfiles/claude/bin/heavy-remote.mjs --pool xcode --started /tmp/agent-heavy-501/started.80 -- xcodebuild test' },
+    { pid: 82, ppid: 81, name: 'sh', args: "sh -c ssh studio helper collect 1 | tar -xf - -C /tmp/back" },
+    { pid: 83, ppid: 82, name: 'tar', args: 'tar -xf - -C /tmp/back' },
+  ]
+  assert.deepEqual(pids(toPromote(remote)), [81, 82, 83])
+  assert.deepEqual(pids(toDemote(remote)), [80])
+})

@@ -80,6 +80,13 @@ export function isSlotHolder(row) {
   return row.name === 'lockf' && /\/agent-heavy-\d+\/\w+\.\d+ /.test(row.args)
 }
 
+// A heavy job sent to the Mac Studio (heavy-remote.mjs) holds no local slot, but its staging (git
+// diff, file clones) and copy-back (tar of the job's files) run here. In the background band they
+// took 11 min each for an iOS test that ran 1 min on the Studio (11-23; 6 s at normal priority).
+export function isRemoteJob(row) {
+  return row.name === 'node' && /\/heavy-remote\.mjs --pool /.test(row.args)
+}
+
 // A test run or type check. Targeted runs skip the heavy queue on purpose, so the slot exemption
 // above never reached them, and in the background band the disk throttle stretched them the same
 // way (11-18: one small test file took 18 s at normal priority and was still running after 52 min
@@ -111,7 +118,7 @@ function inPinned(chain, pinned) {
 }
 
 function inSlot(row, chain) {
-  return isSlotHolder(row) || chain.some(isSlotHolder) || isTestRun(row) || chain.some(isTestRun)
+  return isSlotHolder(row) || chain.some(isSlotHolder) || isRemoteJob(row) || chain.some(isRemoteJob) || isTestRun(row) || chain.some(isTestRun)
 }
 
 // Which processes to move back to normal priority. `pinned`: pids of pinned sessions.
