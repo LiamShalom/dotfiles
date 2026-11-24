@@ -257,6 +257,15 @@ test('a DerivedData path followed by a shell separator stops at the separator', 
   assert.deepEqual(r.outputs, []);
 });
 
+test('a result bundle inside the worktree runs on the Studio and maps into its worktree', () => {
+  const r = iosPlan(
+    `xcodebuild test -quiet -project ${mob}/SideShift.xcodeproj -scheme SideShiftTests -destination id=${UDID} -derivedDataPath ${mob}/.build/DerivedData -resultBundlePath ${mob}/.build/agent/results/unit-20261123-221500.xcresult -parallel-testing-enabled NO -only-testing:SideShiftTests`,
+  );
+  assert.equal(r.ok, true, r.reason);
+  assert.match(r.script, /-resultBundlePath \/Users\/s\/hr\/work\/k\/\.build\/agent\/results\/unit-20261123-221500\.xcresult/);
+  assert.deepEqual(r.caches, [[`${mob}/.build/DerivedData`, '/Users/s/hr/dd/k']]);
+});
+
 test('the same simulator in two destinations is still one simulator', () => {
   const d = `-destination 'platform=iOS Simulator,id=${UDID}'`;
   const r = iosPlan(`xcodebuild build-for-testing -scheme S ${d} && xcodebuild test-without-building -scheme S ${d}`);
@@ -268,6 +277,7 @@ for (const [script, reason] of [
   [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}' -derivedDataPath build/dd`, /relative build folder/],
   [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}' -allowProvisioningDeviceRegistration`, /signs/],
   [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'; codesign -s X a.app`, /signs/],
+  [`xcodebuild test -scheme S -destination id=${UDID} -resultBundlePath ${home}/.cache/r.xcresult`, /outside its worktree/],
 ]) {
   test(`iOS stays local: ${script.slice(-45)}`, () => {
     const r = iosPlan(script);

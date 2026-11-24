@@ -91,8 +91,12 @@ export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = s
   let sims = [];
   if (pool === 'xcode') {
     if (!/\bxcodebuild\b/.test(script)) return { ok: false, reason: 'not an xcodebuild job' };
-    if (/\barchive\b|-exportArchive|-allowProvisioning\w*|-resultBundlePath|\binstall\b|\bcodesign\b/.test(script)) {
-      return { ok: false, reason: 'archives, signs or writes a result bundle' };
+    if (/\barchive\b|-exportArchive|-allowProvisioning\w*|\binstall\b|\bcodesign\b/.test(script)) {
+      return { ok: false, reason: 'archives or signs' };
+    }
+    // A result bundle inside the worktree comes back with the worktree's other new files.
+    for (const [, bundle] of script.matchAll(/-resultBundlePath\s+['"]?([^\s'";&|<>()]+)/g)) {
+      if (!bundle.startsWith(root + '/')) return { ok: false, reason: 'writes a result bundle outside its worktree' };
     }
     const platforms = [...script.matchAll(/platform=([^,'"]*)/g)].map((m) => m[1]);
     const ids = [...script.matchAll(/\bid=([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/g)].map((m) => m[1]);
