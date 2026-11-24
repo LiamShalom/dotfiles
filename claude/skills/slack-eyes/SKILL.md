@@ -107,6 +107,9 @@ you were.
 
 Read every screenshot and video first: the error is often only there. Read a Loom link with
 `~/.claude/bin/loom-read <url>` (title, summary, transcript), never WebFetch, which sees no video.
+The Slack MCP read tools show no files of a forwarded message. Use the "Attached file:" lines in the
+watcher's prompt: download each with its `--file` command into `$CLAUDE_JOB_DIR/tmp` or your
+scratch folder, then open it. Never tell anyone a file "did not come through" before you try that.
 
 **Start from what earlier runs learned.** The watcher's prompt lists the playbooks in
 `~/.claude/skills/slack-eyes/playbooks/` and the recent lessons from earlier runs. If a playbook fits

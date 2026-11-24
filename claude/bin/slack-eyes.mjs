@@ -131,8 +131,9 @@ let token
 // One Slack Web API call, tried up to 3 times. A runner sits in a minutes-long claude run between
 // calls, and the first POST after that goes out on a keep-alive socket Slack already closed, which
 // fetch does not retry ("fetch failed"). A 429 waits for its Retry-After.
+const slackToken = () => (token ??= execFileSync('security', ['find-generic-password', '-s', 'claude-slack-user-token', '-w'], { encoding: 'utf8', timeout: 10_000 }).trim())
 async function slackCall(method, contentType, body) {
-  token ??= execFileSync('security', ['find-generic-password', '-s', 'claude-slack-user-token', '-w'], { encoding: 'utf8', timeout: 10_000 }).trim()
+  slackToken()
   for (let attempt = 1; ; attempt++) {
     let response
     try {
@@ -186,10 +187,31 @@ export const asData = (text) => String(text)
 // A message's own text plus any message forwarded or shared into it. Slack keeps a forward in an
 // attachment, not in `text` ("Bruh" + Kai's three questions came through as just "Bruh"), and
 // the Slack MCP read tools clip that attachment, so the watcher passes the whole forward on.
+// Files (screenshots) are listed too, the forward's included: Slack keeps a forward's files on the
+// attachment, the MCP read tools show none of them, and a run once told the reporter the screenshots
+// "did not come through". They go before the forwarded text, which prompts clip.
 export function messageText(m) {
-  const shared = (m?.attachments ?? []).filter((a) => (a.is_share || a.is_msg_unfurl) && (a.text || a.fallback))
-  return [m?.text ?? '', ...shared.map((a) => `Forwarded message${a.author_name ? ` from ${a.author_name}` : ''}:\n${a.text || a.fallback}`)]
+  const shared = (m?.attachments ?? []).filter((a) => (a.is_share || a.is_msg_unfurl) && (a.text || a.fallback || a.files?.length))
+  const files = [...(m?.files ?? []), ...shared.flatMap((a) => a.files ?? [])].filter((f) => SLACK_FILE_RE.test(f?.url_private_download ?? f?.url_private ?? ''))
+  const fileLines = files.map((f) => `Attached file: ${String(f.name || f.title || 'file').replace(/[^\w. -]/g, '_').slice(0, 80)} (${String(f.mimetype ?? '').replace(/[^\w./+-]/g, '')}). Download it to look at it: ${SCRIPT_CLI} --file ${f.url_private_download ?? f.url_private} <out path>`)
+  return [m?.text ?? '', fileLines.join('\n'), ...shared.filter((a) => a.text || a.fallback).map((a) => `Forwarded message${a.author_name ? ` from ${a.author_name}` : ''}:\n${a.text || a.fallback}`)]
     .filter(Boolean).join('\n\n')
+}
+
+// Only Slack's own file host gets the token.
+const SLACK_FILE_RE = /^https:\/\/files\.slack\.com\/files-pri\/[A-Za-z0-9_-]+\/[^\s<>"'`$\\]+$/
+const SCRIPT_CLI = '~/.claude/bin/slack-eyes.mjs'
+
+// `slack-eyes.mjs --file <files.slack.com url> <out path>`: save a Slack file with the watcher's token.
+export async function downloadFile(url, out) {
+  if (!SLACK_FILE_RE.test(url ?? '') || !out) throw new Error('usage: --file <https://files.slack.com/files-pri/… url> <out path>')
+  const response = await fetch(url, { headers: { authorization: `Bearer ${slackToken()}` }, signal: AbortSignal.timeout(60_000) })
+  const type = response.headers.get('content-type') ?? ''
+  // Without access Slack answers 200 with its HTML sign-in page.
+  if (!response.ok || type.startsWith('text/html')) throw new Error(`Slack refused the file (${response.status} ${type})`)
+  const body = Buffer.from(await response.arrayBuffer())
+  writeFileSync(out, body)
+  console.log(`${out} (${type}, ${body.length} bytes)`)
 }
 
 const repliesOf = async (channel, threadTs) => (await slack('conversations.replies', { channel, ts: threadTs, limit: 200 })).messages ?? []
@@ -2187,6 +2209,7 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
     : args.has('--thread') ? threadFromCli(argv[argv.indexOf('--thread') + 1], argv[argv.indexOf('--thread') + 2])
     : args.has('--posted') ? postedFromCli(...argv.slice(argv.indexOf('--posted') + 1, argv.indexOf('--posted') + 4))
     : args.has('--list') ? Promise.resolve(listJobs())
+    : args.has('--file') ? downloadFile(argv[argv.indexOf('--file') + 1], argv[argv.indexOf('--file') + 2])
     // `--accounts <channel> [id ...]`: print or set the channel's account scope (ids, or "internal").
     : args.has('--accounts') ? (async () => {
       const [channel, ...raw] = argv.slice(argv.indexOf('--accounts') + 1)
@@ -2210,7 +2233,7 @@ if (process.argv[1]?.endsWith('slack-eyes.mjs')) {
     : main()
   work.catch((error) => {
     log(args.has('--run') ? 'job_failed' : args.has('--set') ? 'set_failed' : args.has('--open') ? 'open_failed' : args.has('--headless') ? 'headless_failed' : args.has('--thread') || args.has('--posted') ? 'thread_add_failed' : 'run_failed', { job, error: String(error.message ?? error) })
-    if (['--set', '--open', '--headless', '--list', '--thread', '--accounts'].some((flag) => args.has(flag))) console.error(`slack-eyes: ${error.message ?? error}`)
+    if (['--set', '--open', '--headless', '--list', '--thread', '--accounts', '--file'].some((flag) => args.has(flag))) console.error(`slack-eyes: ${error.message ?? error}`)
     process.exitCode = 1
   })
 }

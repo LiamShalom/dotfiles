@@ -964,3 +964,16 @@ test('a forwarded message reaches the run whole, not only the comment on it', ()
   assert.equal(messageText({ text: 'see https://x.com', attachments: [{ text: 'X preview', from_url: 'https://x.com' }] }), 'see https://x.com')
   assert.equal(messageText({}), '')
 })
+
+test("a forward's screenshots reach the run, ahead of the clipped forward text", () => {
+  const png = (id) => ({ id, name: 'image.png', mimetype: 'image/png', url_private_download: `https://files.slack.com/files-pri/T0B29H38675-${id}/download/image.png` })
+  const forward = { text: 'Omg', attachments: [{ is_share: true, is_msg_unfurl: true, author_name: 'Kai Park', text: 'x'.repeat(3000), files: [png('F0CLENSS2RY'), png('F0CL8MK5403')] }] }
+  const text = messageText(forward)
+  assert.equal(text.match(/Attached file: image\.png \(image\/png\)/g)?.length, 2)
+  assert.ok(text.slice(0, 1500).includes('--file https://files.slack.com/files-pri/T0B29H38675-F0CL8MK5403/download/image.png'))
+  // A forward with only files still counts; a file off Slack's host is never offered (the token would go with it).
+  assert.ok(messageText({ text: '', attachments: [{ is_share: true, files: [png('F1')] }] }).includes('F1'))
+  assert.ok(messageText({ text: 'hi', files: [png('F2')] }).includes('F2'))
+  assert.equal(messageText({ text: 'hi', files: [{ name: 'a', url_private_download: 'https://evil.example/x.png' }] }), 'hi')
+  assert.equal(messageText({ text: 'hi', files: [{ name: 'a', url_private_download: 'https://files.slack.com/files-pri/T1/x.png; rm -rf ~' }] }), 'hi')
+})
