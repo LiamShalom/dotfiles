@@ -55,6 +55,17 @@ route missing from `CAMPAIGN_AWARE_ROUTES` (lib/api/core/campaign-limit-routes.t
 the route's scope (`teamRouteScope`) before you blame missing permissions. Logs carry no user id, so prove it with a
 `team-request-access.test.ts` case on the seat's shape.
 
+## A campaign-limited seat on an AGENCY account gets "Couldn't load the review queue"
+
+On an agency root (`isAgency`, no `parentCompanyId`) the video review page sends `agencyId=` reads
+(`use-video-review-queue.ts` scope memo): `/api/video-submissions`, `review-programs?scope=agency`,
+`posts/awaiting-approval?agencyId=`. Each checked the agency with `memberAllowsAgencyRequest`, which refuses every
+seat with `campaignIds` (`filterMemberCompanyIdsForRequest` keeps only `limit === null`), so all three 403'd even
+though the routes are campaign-aware. spacexsi (11-24): Kai's seat limited to 3 campaigns. Fixed in #11934
+(`memberAllowsLimitedAgencyRead`, opt-in `validateRequestedAgency(..., { narrowsToCampaignLimit })`). Unit tests
+that mock the agency check as `true` hid it: check the real `team-request-access` behaviour. Request logs carry no
+user id; find the person's own requests with `vercel logs --query <uid>` (pgwrite lines name the uid) for the timeline.
+
 ## Owner / Admin requests
 
 An internal teammate asking for Owner on a customer account is held for Liam (`suspicious_request`).
