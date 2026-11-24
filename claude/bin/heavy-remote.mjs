@@ -96,7 +96,7 @@ export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = s
     }
     // A result bundle inside the worktree comes back with the worktree's other new files.
     for (const [, bundle] of script.matchAll(/-resultBundlePath\s+['"]?([^\s'";&|<>()]+)/g)) {
-      if (!bundle.startsWith(root + '/')) return { ok: false, reason: 'writes a result bundle outside its worktree' };
+      if (path.posix.normalize(bundle) !== bundle || !bundle.startsWith(root + '/')) return { ok: false, reason: 'writes a result bundle outside its worktree' };
     }
     const platforms = [...script.matchAll(/platform=([^,'"]*)/g)].map((m) => m[1]);
     const ids = [...script.matchAll(/\bid=([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/g)].map((m) => m[1]);
@@ -136,7 +136,14 @@ export function planJob(argv, { cwd, root, home, remote, pool = 'slot', stat = s
     if (!first || !rootDirExists(first)) return p;
     const clean = p.length > 1 ? p.replace(/\/+$/, '') : p;
     for (const [local, there] of caches) if (clean === local || clean.startsWith(local + '/')) return there + clean.slice(local.length);
-    if (clean === root || clean.startsWith(root + '/')) return remote.wd + clean.slice(root.length);
+    if (clean === root || clean.startsWith(root + '/')) {
+      // <root>/../x would reach outside the Studio worktree.
+      if (path.posix.normalize(clean) !== clean) {
+        reason = `names a path with .. (${clean})`;
+        return p;
+      }
+      return remote.wd + clean.slice(root.length);
+    }
     if (p.startsWith(NODE24)) return remote.node + '/' + p.slice(NODE24.length);
     if (SYSTEM_PATHS.some((s) => p === s.replace(/\/$/, '') || p.startsWith(s))) return p;
     if (outRoots.some((r) => clean.startsWith(r))) {

@@ -278,6 +278,10 @@ for (const [script, reason] of [
   [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}' -allowProvisioningDeviceRegistration`, /signs/],
   [`xcodebuild test -scheme S -destination 'platform=iOS Simulator,id=${UDID}'; codesign -s X a.app`, /signs/],
   [`xcodebuild test -scheme S -destination id=${UDID} -resultBundlePath ${home}/.cache/r.xcresult`, /outside its worktree/],
+  [`xcodebuild test -scheme S -destination id=${UDID} -resultBundlePath ${mob}/../x.xcresult`, /outside its worktree/],
+  [`xcodebuild test -scheme S -destination id=${UDID} -resultBundlePath ${mob}/a/../../x.xcresult`, /outside its worktree/],
+  [`xcodebuild test -scheme S -destination id=${UDID} -resultBundlePath ${mob}-other/x.xcresult`, /outside its worktree/],
+  [`xcodebuild test -scheme S -destination id=${UDID} > ${mob}/../escape.log`, /path with \.\./],
 ]) {
   test(`iOS stays local: ${script.slice(-45)}`, () => {
     const r = iosPlan(script);
