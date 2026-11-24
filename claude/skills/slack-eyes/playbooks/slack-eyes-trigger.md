@@ -58,3 +58,8 @@ be there" as the cause.
   sub-account whose parent has the same name (inner circle: sidechat access, 2026-11-21).
 - `canAccessFeature` caches per process: an "after" read in the same run still says false. Check with a second run
   or `feature_grants` on the replica (hardlaunch: sidechat setup, 2026-11-19).
+- An agency asking for SideChat: the grant is company-only, so grant the agency AND each sub-account
+  (`companies.parent_company_id = <agencyId>`), one `grant-feature.ts` run per id (vireal: sidechat beta, 2026-11-24).
+- `grant-feature.ts` sometimes hangs at the Cloud SQL connect with nothing written (2 of 17 runs on 2026-11-24).
+  Kill a run that is still going after 2 minutes and run it again; confirm on the replica with
+  `feature_grants where feature_key='campaign_comment_dm' and subject_id in (...)`.
