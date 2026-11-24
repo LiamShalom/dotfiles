@@ -53,7 +53,7 @@ redesign_ask='(^|[^a-z])(redesign[a-z]*|re-?design[a-z]*|revamp[a-z]*|rework the
 redesign_undo='(^|[^a-z])(revert|go back to|undo|roll back)([^a-z]|$)'
 if [[ $prompt =~ $redesign_ask ]] && ! [[ $prompt =~ $redesign_undo ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/redesign-ask-nudge.log"
-  echo "If this asks you to redesign a screen or flow: before building it, show two or three different directions (real screens on the canvas or in the pane, side by side, your pick named) and wait for Liam to choose one. Building one direction and asking for approval afterwards is the failure this note exists for (ledger 10-22, 10-23, 11-08, 11-21). Bug fixes inside the redesign request (taps, keyboard, a missing screen) can go ahead."
+  echo "If this asks you to redesign a screen or flow: before building it, show two or three different directions (real screens on the canvas or in the pane, side by side, your pick named) and wait for Liam to choose one. Building one direction and asking for approval afterwards is the failure this note exists for (ledger 10-22, 10-23, 11-08, 11-21). Bug fixes inside the redesign request (taps, keyboard, a missing screen) can go ahead. Keep the scope he named: \"iterate on\", \"improve\" or a redesign of an existing flow keeps its steps, order and shell; the directions change what is on the pages, one page at a time, unless he says new flow or rebuild. A pattern he points to (\"like payouts\") is a reference for how a page behaves, not a new structure (ledger 11-24)."
 fi
 
 # Short design feedback read one way without asking: on 2026-11-19 (brand v4 navbar) "the sort
