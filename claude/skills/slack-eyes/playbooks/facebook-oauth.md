@@ -119,6 +119,12 @@ Never fill the gap with a guess in the reply.
    the start sent; a plain connect asks for basic, manage_insights, manage_comments, manage_messages. A
    personal test account gets "Change to professional profile?" (not this error), and after switching it
    reaches SideShift's consent screen with all four. Ask for the full error line: its end names the refused scope.
+   **iPhone: "Instagram app opens and errors" instead of the consent screen** (ditch: sidechat instagram
+   connect errors, 2026-11-23/24): `oauth_start` rows with no callback (PostHog `creator_social_oauth_*`
+   by distinct_id = creator id shows only starts and `oauth_struggling`). Successful returns carry
+   `referrerHost` `l.instagram.com`. Not caused by the authorize path (closed #11827, slash did not help);
+   the iPhone trigger is unproven and needs a real iPhone with Web Inspector. Proven workaround: the same
+   link in a desktop browser lands on Instagram's login for app 2292866167786027 with all four scopes.
    Read a screen recording with ffmpeg: frames at `fps=1/2`, tiled `5x2` into one image.
    **A screenshot can be hours old.** Its time may be a reshared one (a screenshot of a screenshot shows
    an inner clock). When a 10-minute window around the Slack post finds nothing, search the requested
