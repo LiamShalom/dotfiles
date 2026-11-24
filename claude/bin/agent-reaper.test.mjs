@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { carryNudged, chatStatuses, nudgeText, paneTabIds, stalledChats } from './agent-reaper.mjs'
+import { carryNudged, chatStatuses, nudgeText, orphans, paneTabIds, stalledChats } from './agent-reaper.mjs'
 
 const MIN = 60e3
 const now = Date.parse('2026-11-19T22:30:00Z')
@@ -71,4 +71,16 @@ test('the pane tabs are read from Session Board pane.json; a missing or broken f
 	writeFileSync(file, 'not json')
 	assert.equal(paneTabIds(file).size, 0)
 	assert.equal(paneTabIds(join(dir, 'missing.json')).size, 0)
+})
+
+test('a read-only Vercel CLI call left under launchd is an orphan; one with a live parent or vercel dev is not', () => {
+	const native = '/opt/homebrew/lib/node_modules/vercel/node_modules/@vercel/vc-native-darwin-arm64/bin/vercel'
+	const procs = [
+		{ pid: 999901, ppid: 1, ageSec: 7200, cmd: `${native} inspect sideshift-web-git-x-side-shift.vercel.app --scope side-shift` },
+		{ pid: 999902, ppid: 1, ageSec: 7200, cmd: 'node /opt/homebrew/bin/vercel logs https://x.vercel.app' },
+		{ pid: 999903, ppid: 4242, ageSec: 7200, cmd: `${native} inspect x.vercel.app` },
+		{ pid: 999904, ppid: 1, ageSec: 7200, cmd: 'node /opt/homebrew/bin/vercel dev' },
+	]
+	const found = orphans(procs)
+	assert.deepEqual(found.map((o) => [o.pid, o.kind]), [[999901, 'vercel'], [999902, 'vercel']])
 })

@@ -30,6 +30,10 @@
 //                whose app is gone, once seen orphaned for ORPHAN_MIN (30)
 //                minutes. Nothing can read their output any more. One with a
 //                dev server or a connected client inside is left alone.
+//                A read-only Vercel CLI call (inspect, logs, ls) whose parent
+//                is launchd goes after VERCEL_ORPHAN_MIN (5): a timeout or a
+//                `| head` kills only the node wrapper, and the native binary
+//                kept running for hours at ~2 GB each (2026-11-23, 13 of them).
 //   xcodebuild   Stop an xcodebuild whose process tree gained under 5 CPU s in
 //                XCODE_HUNG_MIN (60): it is hung and holds an iOS queue slot.
 //   containers   Stop (never remove) a container in the default Colima VM that
@@ -76,6 +80,7 @@ const EMU_IDLE_MS = env("EMU_IDLE_MIN", 10) * 60e3;
 // at least every 2 h; it reached 7 GB after 18 h (2026-11-13).
 const KOTLIN_MAX_KB = env("KOTLIN_MAX_GB", 5) * 1024 * 1024;
 const ORPHAN_MS = env("ORPHAN_MIN", 30) * 60e3;
+const VERCEL_ORPHAN_MS = env("VERCEL_ORPHAN_MIN", 5) * 60e3;
 const XCODE_HUNG_MS = env("XCODE_HUNG_MIN", 60) * 60e3;
 const CONTAINER_IDLE_MS = env("CONTAINER_IDLE_HOURS", 24) * 3600e3;
 const CONTAINER_ACTIVE_BYTES = 16 * 1024;
@@ -419,6 +424,7 @@ function inCheckout(dir) {
 // Claude Code runs each Bash tool call, background tasks included, in this shell.
 const TASK_SHELL = /^\/bin\/(zsh|bash) -c source \S*\/\.claude\/shell-snapshots\/snapshot-/;
 const PTY_HELPER = /\/node-pty\/build\/Release\/spawn-helper(\s|$)/;
+const VERCEL_READ = /(^|\/)vercel (inspect|logs|ls|list)(\s|$)/;
 
 // Task shells and pty helpers whose parent is gone, each with its process tree.
 export function orphans(procs = processes()) {
@@ -430,7 +436,7 @@ export function orphans(procs = processes()) {
 	const out = [];
 	for (const p of procs) {
 		if (p.ppid !== 1) continue;
-		const kind = TASK_SHELL.test(p.cmd) ? "task" : PTY_HELPER.test(p.cmd) ? "pty" : null;
+		const kind = TASK_SHELL.test(p.cmd) ? "task" : PTY_HELPER.test(p.cmd) ? "pty" : VERCEL_READ.test(p.cmd) ? "vercel" : null;
 		if (!kind) continue;
 		const tree = [];
 		for (const stack = [p]; stack.length; ) {
@@ -834,13 +840,15 @@ async function main() {
 		const label =
 			o.kind === "task"
 				? `orphaned background task (pid ${o.pid}, running: ${o.running}, up ${ago(o.ageSec * 1000)})`
+				: o.kind === "vercel"
+				? `orphaned Vercel CLI call (pid ${o.pid}, ${o.cmd.match(VERCEL_READ)[2]}, up ${ago(o.ageSec * 1000)})`
 				: `orphaned pty helper (pid ${o.pid}) from ${o.cmd.split("/node_modules/")[0].replace(HOME, "~")}`;
 		const orphaned = now - st.seen;
 		const keep = o.devServer
 			? "runs a dev server (the dev-server rule decides)"
 			: o.clients
 				? `${o.clients} client(s) connected`
-				: orphaned < ORPHAN_MS && `orphaned for ${ago(orphaned)}`;
+				: orphaned < (o.kind === "vercel" ? VERCEL_ORPHAN_MS : ORPHAN_MS) && `orphaned for ${ago(orphaned)}`;
 		if (!keep) {
 			act(`KILL ${label}: its session is gone, so nothing can read its output`, () => killTree(o.tree.map((q) => q.pid)));
 			delete next.orphans[o.pid];
