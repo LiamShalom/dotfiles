@@ -29,14 +29,14 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   `components/campaign-details/contract-lifecycle.ts`) until each required platform that has a
   sign-in has a live account (`resolveAccountsRequirement`, `lib/campaign-join/accounts-gate.ts`,
   #10411, live 2026-11-16).
-- **Any one platform or every platform** (#11502, live 2026-11-20 20:03 ET): `requirements.accountPlatformsRule`,
-  unset = `any` (one approved account on a listed sign-in platform clears the hold). Between #10411 and
-  #11502 the gate needed every listed platform. A held contract is re-checked only on an account link
-  or handle approval, so contracts held under the old rule stay "Adding accounts" / Invited even with
-  approved accounts. Release: workflow `release-accounts-holds.yml` (`gh workflow run ... -f
-  execute=false -f company=<id>`, read the log, then `execute=true`). Run log greps: `clears:`,
-  `started=`. On 11-21 it had run for one company only; couponbirds: creators stuck invited found 380
-  more held contracts and ran it for everyone.
+- **Any one platform or every platform** (checked on origin/main 2026-11-24, `resolveAccountsRequirement`):
+  the rule is `every` for each listed sign-in platform whose post target (contract `postsByPlatform`
+  over the campaign's) is above 0. `any` applies only when every listed platform asks 0 posts, or the
+  campaign was saved with `requirements.accountPlatformsRule: 'any'` (editor offered it 11-21 to 11-23).
+  Read the contract's `payment_structure.postsByPlatform` before saying how many accounts it needs
+  (spacexsi 11-24: a first draft said "one is enough"; tiktok 2 / instagram 2 needs both). A held
+  contract is re-checked only on an account link or handle approval; release old holds with workflow
+  `release-accounts-holds.yml` (`gh workflow run ... -f execute=false -f company=<id>`, then `execute=true`).
 - **"No option to add Facebook anymore" (plutus, 2026-11-23):** since #11502, under rule `any` the Get
   ready popup (`get-ready.usecase.ts` `shownPlatforms`) lists only linked platforms plus `needed`, so once
   one account is linked the others drop off. PostHog `open_campaign_get_ready_shown.providers` shows it

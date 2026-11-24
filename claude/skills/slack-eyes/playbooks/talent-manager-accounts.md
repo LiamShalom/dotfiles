@@ -53,6 +53,15 @@ the finish check bounced it. Prove a manager action from code or a real session 
   everything else is `open`, including handle submit and `internal/creator/social-oauth/connect/*`
   (lines 248, 262-274). Not tested in a live manager session.
 
+- **Find a manager's creators on a campaign:** since #11926 (11-24) the Creators tab search matches the
+  "represented by" label under the creator's name (manager name, or agency name for an agency-run
+  creator). A manager's email is never sent to brands (`representedByOf` fallback `brand`), so email
+  search is not offered. The replica role and dashboard `postgres_query` cannot read
+  `talent_representations`; the read-replica MCP could (11-24).
+- **"Can't send the second invite" for a manager's next creator:** first list the campaign's pending
+  contracts with `contractor_name`; spacexsi 11-24: the second creator's contract already existed (made
+  ~90 min after the first), held on accounts too.
+
 ## Symptom → cause → proof
 
 | What they report | Cause | Proof |
