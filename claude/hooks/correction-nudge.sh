@@ -71,6 +71,6 @@ fi
 logo_ask='(^|[^a-z])(logo|logos|brand ?mark|app icon|workspace icon|org icon|avatar)([^a-z]|$)'
 if [[ $prompt =~ $logo_ask ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/logo-ask-nudge.log"
-  echo "If this asks for 'the SideShift logo' or 'our current logo': SideShift has several (the black paper-plane mark used on the brand side, SideshiftMarkLogo / public/logo.svg; the black SideShift wordmark; the light-blue iOS/PWA app icon). Default to the black brand-side mark unless the words name another one, and say which one you used in one line."
+  echo "If this asks for 'the SideShift logo' or 'our current logo': SideShift has several (the black paper-plane mark used on the brand side, SideshiftMarkLogo / public/logo.svg; the black SideShift wordmark; the light-blue iOS/PWA app icon). Default to the brand-side mark as a square icon: white plane on a solid black (#000) background, unless the words name another one, and say which one you used in one line."
 fi
 exit 0
