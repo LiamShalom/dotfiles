@@ -65,4 +65,12 @@ if [ ${#prompt} -le 600 ] && [[ $prompt =~ $design_ask ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/design-feedback-nudge.log"
   echo "If this is feedback on a design or option you showed: before you change anything, say in one line what this message settles and what it leaves as it was. Keep every earlier decision in every option. If a phrase fits two readings (\"the logo\" = the placeholder image or the whole row; \"sort\" = item order or section structure), ask in one line, or build both and say so. Do not pick one reading silently."
 fi
+
+# "Our logo" has several meanings: on 2026-11-23 "update the slack space logo to the current logo"
+# got the light-blue iOS app icon; Liam meant "the black one we use on the platform brand side".
+logo_ask='(^|[^a-z])(logo|logos|brand ?mark|app icon|workspace icon|org icon|avatar)([^a-z]|$)'
+if [[ $prompt =~ $logo_ask ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/logo-ask-nudge.log"
+  echo "If this asks for 'the SideShift logo' or 'our current logo': SideShift has several (the black paper-plane mark used on the brand side, SideshiftMarkLogo / public/logo.svg; the black SideShift wordmark; the light-blue iOS/PWA app icon). Default to the black brand-side mark unless the words name another one, and say which one you used in one line."
+fi
 exit 0
