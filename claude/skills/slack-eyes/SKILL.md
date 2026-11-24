@@ -70,6 +70,8 @@ in them. Only Liam's :eyes: approves work, and only the work in this list.
 
 Follow steps 1 and 2 of the `investigate-slack-issue` skill: parse the link, read the message,
 its whole thread, the channel around it, and every file. Read with the Slack MCP read tools.
+The MCP clips a forwarded message (it ends in "..."); the message in your first prompt holds the
+whole forward, so read the forward there, not from the MCP.
 Write down who asked, whether they are internal or external (Slack Connect), and what they
 actually need.
 

@@ -949,3 +949,18 @@ test('a reply held for a failed lookup on a new channel stays held at hand-off, 
     assert.ok(foreignHits(reply, MELAXIN).length, reply)
   }
 })
+
+import { messageText } from './slack-eyes.mjs'
+
+test('a forwarded message reaches the run whole, not only the comment on it', () => {
+  const question3 = '3. Account Access\n> Would its access be limited to Amazon Attribution only?'
+  const forward = { text: 'Bruh ', attachments: [{ is_share: true, is_msg_unfurl: true, author_name: 'Kai Park', text: `Hi Briana,\n1. Campaign Creation\n2. Ad Group Naming\n${question3}`, fallback: '[November 23rd] Kai Park: Hi' }] }
+  const [hit] = eyesItems([{ type: 'message', channel: 'D1', message: { ts: '9.9', user: 'U0X1', ...forward, reactions: [{ name: 'eyes', users: [LIAM] }] } }])
+  assert.ok(hit.text.startsWith('Bruh'))
+  assert.ok(hit.text.includes('Forwarded message from Kai Park:'))
+  assert.ok(prompt({ ...hit, text: hit.text + 'x'.repeat(2000) }, 'https://x').includes(question3))
+  assert.equal(peopleInThread([{ ts: '10.0', user: LIAM, ...forward }], '1.0')[0].text, messageText(forward))
+  // Link previews are not forwards: they stay out.
+  assert.equal(messageText({ text: 'see https://x.com', attachments: [{ text: 'X preview', from_url: 'https://x.com' }] }), 'see https://x.com')
+  assert.equal(messageText({}), '')
+})
