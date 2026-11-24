@@ -151,6 +151,7 @@ secondary link over a second full button; a deep link over a "check" button.
 **9. Prompt or queue, don't error.** If the user can fix it, open the fix.
 - 09-30 "I wish it just opened a popup that prompted user to connect that specific account"
 - 10-22 "it should just queue it instead of showing an error"
+- 11-24 creator You're in sheet, after a cancelled TikTok sign-in the row showed a red "TikTok authorization was cancelled. You can try again." over a grey "Add your handle instead" link: "dont need an error. just show the enter handle manually although rn its not very clear". A failed step that has a way forward shows only the way forward, as a clear control (not grey link text)
 
 **10. Balanced layouts, every width.** No gaps, no stretched web layout, no half-empty pages;
 platforms inline, not wrapped to two rows; on mobile the action stays in view.
