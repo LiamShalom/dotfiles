@@ -232,10 +232,15 @@ number=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")
 step "built and signed $config $version ($number) in $((SECONDS - build_started)) s, $(du -sh "$app" | cut -f1)"
 [ "$deliver" = 1 ] || { echo "ios-phone-push: not delivered (--no-deliver); app at $app"; exit 0; }
 
-# A paired iPhone that this Mac can reach gets the app directly.
+# A paired iPhone that this Mac can reach gets the app directly. The phone pairs over Wi-Fi with
+# Xcode 27 (Device Hub > File > Pair Nearby Device), so use its devicectl when it is installed.
+# Over Wi-Fi devicectl lists the phone with no "reality" field and its tunnel down until a command
+# opens it, so pick any paired iPhone that is not a simulator and probe it before installing.
+dctl=(xcrun devicectl)
+[ -d /Applications/Xcode-27.app ] && dctl=(env DEVELOPER_DIR=/Applications/Xcode-27.app/Contents/Developer xcrun devicectl)
 devices=$(mktemp)
 trap 'rm -f "$devices"' EXIT
-xcrun devicectl list devices --json-output "$devices" >/dev/null 2>&1 || true
+"${dctl[@]}" list devices --json-output "$devices" >/dev/null 2>&1 || true
 udid=$(python3 -I - "$devices" <<'PY'
 import json, sys
 try:
@@ -243,17 +248,25 @@ try:
 except Exception:
     rows = []
 ok = [d for d in rows
-      if d.get("hardwareProperties", {}).get("reality") == "physical"
+      if d.get("hardwareProperties", {}).get("reality") != "simulated"
       and d.get("hardwareProperties", {}).get("deviceType") == "iPhone"
-      and d.get("connectionProperties", {}).get("tunnelState") == "connected"]
+      and d.get("connectionProperties", {}).get("pairingState") == "paired"
+      and d.get("connectionProperties", {}).get("transportType") in ("wired", "localNetwork")]
 print(ok[0]["hardwareProperties"]["udid"] if ok else "")
 PY
 )
+# lockState is the lightest call (about 20 s over Wi-Fi here); "info details" gathers everything and
+# can pass 30 s even with the phone in reach.
+if [ -n "$udid" ] && ! "${dctl[@]}" device info lockState --device "$udid" --timeout 60 --quiet >/dev/null 2>&1; then
+  echo "ios-phone-push: the paired iPhone did not answer (off this Wi-Fi or asleep); using the install page" >&2
+  udid=""
+fi
 if [ -n "$udid" ]; then
   install_started=$SECONDS
-  if xcrun devicectl device install app --device "$udid" "$app" --quiet; then
-    xcrun devicectl device process launch --device "$udid" --terminate-existing com.SideShift --quiet || true
-    step "installed and opened on the iPhone in $((SECONDS - install_started)) s; $((SECONDS - started)) s in total"
+  if "${dctl[@]}" device install app --device "$udid" "$app" --quiet; then
+    # Not opened: several chats push builds, and opening would pull the person out of whatever app
+    # they are in each time.
+    step "installed on the iPhone in $((SECONDS - install_started)) s; $((SECONDS - started)) s in total"
     exit 0
   fi
   echo "ios-phone-push: the direct install failed; putting the build on the install page instead" >&2
