@@ -45,6 +45,16 @@ total grant, not an addition to the current one. The view it returns shows `maxS
 when the invite is limited to selected campaigns, so account-level scopes such as Payments & billing are
 not offered. Working as designed: tell them to pick "All campaigns" for those scopes.
 
+## A new route 403s "Access denied for this company" for some teammates
+
+`canAccessCompany` (lib/jwt.ts `resolveCompanyAccess`) runs the team request gate first
+(`memberAllowsTargetRequest`, lib/api/core/team-request-access.ts). A seat with `campaignIds` set is refused on any
+route missing from `CAMPAIGN_AWARE_ROUTES` (lib/api/core/campaign-limit-routes.ts), even when the use case filters by
+`campaignLimitFor` itself. The refusal reads as the generic company 403, not `campaign_limited`. hivescales (11-24):
+`recruit/invite-campaigns` from #11743 was not on the list; fixed in #11888. Check the seat's `campaignIds` and
+the route's scope (`teamRouteScope`) before you blame missing permissions. Logs carry no user id, so prove it with a
+`team-request-access.test.ts` case on the seat's shape.
+
 ## Owner / Admin requests
 
 An internal teammate asking for Owner on a customer account is held for Liam (`suspicious_request`).
