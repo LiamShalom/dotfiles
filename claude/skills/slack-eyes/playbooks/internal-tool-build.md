@@ -96,3 +96,15 @@ someone else will do, and do not say a fix "works" without a query on real signu
 - Dashboard CI fails without a `## Prod change` section in the PR body.
 - Merge with `gh-approve -R SideShiftApp/sideshift-internal-dashboard <pr> --merge`, then check the
   Production deployment's `ref` equals the merge commit.
+
+## Internal dashboard route fails ("Could not load the identity image", other 502s) (internal dashboard: id images, 11-24)
+
+- The dashboard is repo `SideShiftApp/sideshift-internal-dashboard` (checkout `~/sideshift-internal-dashboard`), Vercel
+  project `sideshift-internal-dashboard-lnab` (domain sideshifters.vercel.app), team slug `side-shift` (the Vercel MCP's
+  `sideshift` scope is 403). Logs: `vercel logs --project sideshift-internal-dashboard-lnab --since 3h --query <log tag> --json`.
+- Its `WHOP_API_KEY` is a sensitive env var (`vercel env pull` gives it blank) and differs from the monorepo's key. Without an
+  `Api-Version-Date` header, Whop answers 400 to `GET /api/v1/verifications` for it, while the monorepo key gets 200. Every
+  dashboard Whop call needs a pinned version (#337 fixed identity-document).
+- Prove a route on prod or a preview: mint liam@'s token (memory `internal-dashboard-url`), write `Authorization: Bearer …`
+  to a 0600 header file from a script, link a temp dir to the project, then
+  `vercel curl "<path>" --deployment <url> --yes -- -s -H @<header file>` (it handles preview protection).
