@@ -65,3 +65,13 @@ be there" as the cause.
   short kill (parallel runs time out more). A cloud-sql-proxy with the `.env.local` key does not work
   (Invalid JWT Signature). Confirm on the replica with
   `feature_grants where feature_key='campaign_comment_dm' and subject_id in (...)` (vireal: sidechat beta, 2026-11-24).
+
+## "How does SideChat work / which platforms?" (vs ManyChat)
+
+- It sends a private reply (DM) with the campaign link when someone comments a set keyword on a creator's
+  campaign post, through Instagram's official API (creator connects Instagram and opts in per campaign).
+  How it works: `services/instagram-comment-dm/README.md`.
+- Platform status on 2026-11-24: Instagram live (`instagram_comment_dm_deliveries` 9,040 sent in 14 days);
+  TikTok is built but off in prod (`gcloud run jobs describe instagram-comment-dm --region us-central1`
+  shows `TIKTOK_COMMENT_DM_ENABLED=0`). Re-check both before you state them (mode mobile: sidechat info).
+- Answer the question and grant the beta in the same job (agency + each sub-account, section above).
