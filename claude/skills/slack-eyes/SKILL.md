@@ -215,6 +215,11 @@ review", "held for Liam's decision", "still looking", and the watcher's "taking 
 interim updates. Never tag Liam (in his self-DM there is nobody to tag), Slackbot, or a bot: a
 message with a `bot_id` or the subtype `bot_message` came from an app, so tag nobody.
 
+**Which run is this? Decide before you write the reply.** If the first prompt says "This session is on
+Liam's Session Board" (the watcher log shows `to_board`), it is NOT headless: post the reply yourself
+with the command below and check `"ok":true`. A returned `reply` there is never posted (mode mobile:
+sidechat info, 11-24, the customer got no answer).
+
 **In a headless run, do not post the reply yourself.** Return it in `reply` (step 7), with the tag
 first when it needs one. The watcher checks `unproven_claims` and posts it as Liam after you return;
 new thread messages that arrive first come back to you with the unposted reply to revise. This
