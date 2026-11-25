@@ -177,6 +177,18 @@ Never fill the gap with a guess in the reply.
    creator who only sees "submit that one" has missed the +. An Instagram linked before the campaign
    turned on comment-to-DM fails submit with `missing_comment_dm_scope` (`campaign-requirement.ts`).
 
+10. **Instagram ad authorization ("Werbezugriff", "Authorize for ads", "We couldn't prepare the Instagram
+   request") on a Professional account:** this is not OAuth. Read `ad_creator_authorizations` by
+   `creator_id` (`last_error_code`, `last_error_message`, `metadata->'partnershipRequest'`). The row's
+   brand may borrow another account's Meta connection: `ad_workspace_sources` (source_company_id = brand →
+   company_id = workspace), then `ad_connections` of that workspace. Group every row on that connection by
+   `partnershipRequest.state` and hour: if nothing was `sent` since a date, the connection is broken, not the
+   creator. dr. melaxin: instagram ad authorization fails (2026-11-25): the managed connection
+   `8105bf46…` (workspace `5dVaH8c7gty7nhDoxczU`, owner Canyon) sent 0 since 11-20; Meta answered `(#3)
+   granular permission` on requests and "select the Instagram account that's connected to the Facebook Page"
+   on probes for ~100 creators in 7 accounts. Only the connection owner can fix it (Page↔IG link in Meta,
+   then reconnect). PR #12238 shows code 3 as the brand's setup instead of the creator copy.
+
 ### What to reply
 
 - `facebook_page_required`, and they have a Page: sign in with the Facebook account that manages the
