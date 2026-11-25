@@ -67,6 +67,19 @@ line here no longer matches, fix this file (step 7 of the skill).
   Prove on a preview as the Dev Testing Liam brand (it has 3 real signed invites): open
   `?tab=applicants&jobId=<an empty job>` and read the `Job role` button text.
 
+- **Messaged or hired creators still in Unreviewed (2026-11-25, saas2cash):** Unreviewed (`open`) =
+  New/Reviewed, minus Contacted (`lib/api/applicants/contacted.sql.ts`: the company room carries a
+  `chat.business_references` support_context with `context_domain='job'` and a brand message after the
+  apply), minus contracted (skipped on open-application jobs). Until #12108 only THIS job's stamp counted,
+  so a brand with two listings of one name kept creators messaged on the other listing in Unreviewed.
+  Proof: the chat schemas are readable with `mcp__cloud-sql-postgres-read-replica__execute_sql` (not the
+  dashboard postgres tool): read the room's `business_references` and `chat.messages` for the creator.
+  Which job the screenshot shows: `vercel logs ... --query <jobId>` for `/api/applicants/tiered` at the
+  screenshot time (two jobs can share a title). The fit tabs (Great/Good/Fair) count only the current
+  Status bucket with the brand's filters, so they add up to the "Unreviewed (N)" in the filter panel.
+- **Name search returns nothing (since #11538, 2026-11-20):** plain text + Enter runs a TOPIC search. A
+  name needs `@name` (or the "Search @name" hint), and it searches only the current Status bucket and filters.
+
 ## Checks
 
 1. Read the reporter's clip. Ergo links (`share.joinergo.com/c/<id>`) need an email code:
