@@ -43,6 +43,13 @@ refused some of these tables and joins in three runs, and Firestore paths in fiv
   per open. The invite page's "Add other handles" still offers every listed platform. A brand that wants
   every account sets Requirements > "Creators need an account on" > Every platform; held creators then
   wait for all of them and the accounts sweep ends the hold on day 7 (`accounts-reminders.usecase.ts`).
+- **Live with fewer accounts than listed** (`x ads: prompt for remaining handles`, 11-25): a contract
+  went live the second its first (proven) account was approved (`contracts.activated_at` = the
+  `handle_requests.reviewed_at` of that account) while the campaign listed two more. A live contract is
+  never re-held. Since PR #12209 the web creator campaign popup (Overview) shows "Add your other accounts"
+  for listed platforms with no live account, with an Add accounts button, and the Add accounts window
+  starts on a missing platform. iOS/Android show nothing. Run `resolveAccountsRequirement` in a
+  `scripts/tmp-*.ts` with the contract and campaign fields to see the rule it gets today.
 - **Required platforms** are the campaign's `requirements.platforms`, or the contract's own list when
   Customize set `platformsOverride` (`resolveRequirements`, `lib/payment-structure-utils.ts`). A
   creator can add only listed platforms: others fail with "Platform X is not required for this
