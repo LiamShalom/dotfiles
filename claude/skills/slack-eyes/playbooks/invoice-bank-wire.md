@@ -74,3 +74,14 @@ could not either time. Run check 1 first.
 
 The create-invoice modal (`components/modals/create-invoice-modal.tsx`, "Bank wire (account & routing)")
 offers bank_wire even when check 1 is null. The payer page then shows no wire details and no error.
+
+## Stripe "[Action required] Refund for $X from SideShift" emails (livfresh, 11-25)
+
+A brand gets near-daily Stripe emails asking for bank details to complete a small refund. Cause:
+an ACH into the customer's Stripe **cash balance** that no invoice absorbed. After 75 days unapplied,
+Stripe auto-returns it (`return_initiated`, event `request.id` null = not us); after 45 days with no
+bank details it cancels (`return_canceled`) and later tries again. Prove it with
+`GET /v1/customers/<cus>/cash_balance_transactions` (agents-billing key from
+`~/.config/sideshift/env.local`; dashboard tools cannot read it). No Refund object shows in
+`/v1/refunds`, and the key cannot cancel refunds. Reply: the payer clicks "Complete refund" once and
+adds the bank; that ends it.
