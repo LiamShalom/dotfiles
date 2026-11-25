@@ -223,6 +223,10 @@ while `main` said 2.39). `~/sideshift-mobile`'s working tree can be months old: 
   account with `withdrawalApprovalProfileStatus` approved when two users share a name. The invite
   modal then shows "Manually approved", and the send (`send-campaign-invite`, `create-batch`) and the
   creator's accept modal honor it. It is per campaign: a wrong campaign id was an earlier mistake here.
+  When the creator is already on the campaign, `--contract=<contract id>` alone resolves company, campaign
+  and creator (find it with `contracts.contractor_name ilike` on the brand's `company_id`; `find_account`
+  by a creator's name returns nothing). Proof it took: `evaluateCampaignResidenceEligibility` returns
+  `bypassed: true` (dealseek: kyc bypass camila, 11-25).
 
 ## Join requests in Messages (elevenlabs: handle approval missing in chat, 2026-11-19)
 
