@@ -73,4 +73,13 @@ if [[ $prompt =~ $logo_ask ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/logo-ask-nudge.log"
   echo "If this asks for 'the SideShift logo' or 'our current logo': SideShift has several (the brand sidebar tile SideshiftTileLogo: white plane on a black-to-graphite gradient with a sheen; the flat mark SideshiftMarkLogo; the black wordmark; the light-blue iOS/PWA app icon). For an app, workspace or avatar icon, default to SideshiftTileLogo, rendered from components/ui/icons/logos/sideshift-tile-logo.tsx (never a lookalike), unless the words name another one, and say which one you used in one line."
 fi
+
+# One example of a class: on 2026-11-25 "what about examples like this" + one screenshot got a fix for that
+# one creator's spelling dupe; Liam meant every creator ("theirs creators with dupe campaigns and some without
+# icons": 10,347 dupes and 93,547 missing logos). The CLAUDE.md "stop the class" line was loaded and missed.
+example_ask='(^|[^a-z])(examples? like (this|these)|cases? like (this|these)|(creators|brands|users|accounts|ones) like (this|these|her|him|them)|like this one|stuff like this|this kind of|these kinds? of|for example|e\.g\.|some (creators|brands|users|accounts)|other (creators|brands|users|accounts)|theirs? (creators|brands|users))([^a-z]|$)'
+if [[ $prompt =~ $example_ask ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/example-class-nudge.log"
+  echo "This message shows one example of a class. Before you fix anything, measure the class across all live data (how many accounts, which shapes of the problem, sampled rows), and fix every shape you find, not only the example shown. Say the counts in your reply."
+fi
 exit 0
