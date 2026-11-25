@@ -81,3 +81,17 @@ check `users/{uid}.companyId` and `multipleCompanies`.
 
 Short, one fact: the number (members + pending invites), what frees a seat, and where (cancel the invite from
 the row menu on the Members list). Do not promise an ops seat grant: that is Liam's call.
+
+## "Give X access to see an old campaign" (attention studio: lynn decentraland, 2026-11-25)
+
+Check `campaigns.company_id` first: an agency's old campaign often sits on the agency ROOT while the teammate
+has seats only on sub-accounts, so it never shows in their switcher. `invites` by email shows which seats
+they were ever given ("restore" can mean a seat they never had). For view-only access to one campaign, add a
+campaign-limited Employee seat with `addTeamMember` (`lib/api/team/add-member.usecase.ts`) from a throwaway
+root script: payload `{ userId: <companyId>, email: 'support@sideshift.app', emailVerified: true }`, deps with
+`canAccessCompany: async () => true`, body `role: 'Employee'`, `campaignIds: [<id>]` (archived campaigns count),
+`permissions: { scopes: [...read scopes] }`. `performance:read` is not requestable and fails the whole call.
+It writes the member doc, the Postgres `memberships` row (campaign_ids, capability_scopes) and adds only that
+company to `multipleCompanies`. Prove it by calling `getCampaignsData` with `verifyFirebaseTokenCached`
+stubbed to the member's payload: it returns only the limited campaign. The internal-dashboard team tool
+gives full agency-wide default access, so do not use it for a view-only ask.
