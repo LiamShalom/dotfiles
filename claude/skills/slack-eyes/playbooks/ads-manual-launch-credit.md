@@ -39,6 +39,17 @@ Facts below were proven on 2026-11-19 (pudgy penguins: manual meta ads not credi
    A contract the brand ended is converted to a ghost handle (`contractorId: ghost-<id>`,
    `convertedFromCreator`, `endedBy: company`): those ads are not credited, by design.
 
+5. Linked (`ad_launches.source_contract_id` null, `source_submission_id` set) but 0 `adPerformanceAccruals` docs
+   (query by `launchId in [...]`, doc id `<launchId>_<YYYY-MM-DD>`): the creator chip reads accruals, so it says
+   "Not running as an ad yet". Check when the contract last booked (`contractId ==`, look at `updatedAt`). A whole
+   contract stuck means the cron throws for it: the cron logs only error counts, so run
+   `syncCompanyAdPerformanceAccruals({ companyId, campaignsById })` from a script (`readAccrualCampaigns` +
+   `accrualCampaignsByCompany`, `PG_ALLOW_PRODUCTION=1`) and read `errors`. 2026-11-25 (pudgy): "Meta omitted the
+   requested attribution buckets" = one view-through-only day under a `7d_click` rule (Meta drops a bucket whose
+   value is 0); the read covers the ad's whole life, so the contract failed every run. Fixed by #12244.
+6. `/api/cron/meta-ads-accruals` timed out (504 at 300 s) on every run on 2026-11-25: check
+   `logs_search_webapp route=/api/cron/meta-ads-accruals` before blaming one contract.
+
 ## Repair after a fix deploys
 
 - Failed link jobs block the automatic retry for 24 h (`externalAdLinkJobState/<companyId>`, `jobs` and
