@@ -60,6 +60,10 @@ be there" as the cause.
   or `feature_grants` on the replica (hardlaunch: sidechat setup, 2026-11-19).
 - An agency asking for SideChat: the grant is company-only, so grant the agency AND each sub-account
   (`companies.parent_company_id = <agencyId>`), one `grant-feature.ts` run per id (vireal: sidechat beta, 2026-11-24).
+- A sub-account made AFTER the agency was granted starts with no grant, so "activate for my new sub account" = one
+  more grant on that id. Find it with `companies where name ilike '%<name>%'`, then the grant join on
+  `parent_company_id` above (consumer club: creators inner circle, 2026-11-25). A teammate's agency may sit under a
+  personal email, so `find_account` on their @sideshift.app email can find nothing.
 - Under heavy Mac load (load average 150+), `grant-feature.ts` runs take 5-10 min and often fail with
   `pg connection init timed out after 8000ms` (nothing written). Run them one at a time with retries and no
   short kill (parallel runs time out more). A cloud-sql-proxy with the `.env.local` key does not work
