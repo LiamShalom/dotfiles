@@ -120,3 +120,14 @@ To re-send one contract's update: queue a one-job run with `enqueueContractUpdat
 contract as regenerate.usecase.ts does (`pendingCreatorContractUpdate` etc. via
 `defaultContractsDocsPorts.commitContractUpdates`), run with `PG_ALLOW_PRODUCTION=1`. The every-minute
 cron renders and DMs; check the job's `status='done'` and `notified_at`.
+
+## "I changed the crosspost setting but the past didn't recalculate" (checked 2026-11-26)
+
+- The stored rule is `programs/<id>.paymentStructure.crosspost` (`basis` `post` = each platform copy pays
+  on its own, `group` = one video pays once); PG `campaigns.payment_structure->'crosspost'` mirrors it.
+  `resolveCrosspostPayment` (`lib/payments/content-terms.ts`) reads it, so nothing flips it later by itself.
+- Read it again after the brand says they changed it. Then check the write in the logs: the web editor saves
+  with `PUT /api/programs/<id>` (`use-save-campaign-edit.ts`); `PATCH /api/oauth/v1/campaigns/<id>` is an
+  API or AI-connector call (MCP `update_campaign`), whose body the logs do not show.
+- A save to `group` triggers bulk crosspost detection (`campaigns-leftovers-update.usecase.ts` ~L669).
+  Off statements, unpaid posts reprice under the stored rule; paid line items stay.
