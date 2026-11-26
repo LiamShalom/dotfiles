@@ -108,3 +108,23 @@ someone else will do, and do not say a fix "works" without a query on real signu
 - Prove a route on prod or a preview: mint liam@'s token (memory `internal-dashboard-url`), write `Authorization: Bearer …`
   to a 0600 header file from a script, link a temp dir to the project, then
   `vercel curl "<path>" --deployment <url> --yes -- -s -H @<header file>` (it handles preview protection).
+
+## A new tool on the dashboard MCP connector (owed lookup, 11-26)
+
+- The connector is `src/lib/mcp/server.ts` in the dashboard repo. A tool that needs webapp logic calls a monorepo
+  dashboard capability through `callWebappCapability` (`src/lib/server/admin-capability-client.ts`; add the capability to
+  `WEBAPP_CAPABILITIES`) with a Request built from `identityIdToken(identity)`. Proven: `owed_to_creators` (dashboard #343)
+  on monorepo `company-owed` (#12260).
+- A tool registered under `sources.database` must be added to `DATABASE_TOOLS` and to the registered list in
+  `tests/mcp-sources-core.test.mjs`. Keep its logic in a pure module (no `server-only`) so `node --test` can drive it.
+- The webapp capability admits admins, or the tabs it passes to `runDashboardCapability(…, { tabs })`. A non-admin's
+  tabs are `dashboard_users/<uid>.allowedTabs` (sideshift-firestore MCP; the dashboard MCP cannot read that collection).
+  The dashboard's own tab check answers a bare 401 `{"error":"Unauthorized"}`; the webapp's refusals are 403 or a 401 with a reason.
+- The webapp accepts only the PRODUCTION dashboard's OIDC token, so the end-to-end call is provable only after both
+  merge. Prove it from a fresh `claude -p "call mcp__internal-dashboard__<tool> …" --allowedTools <tool>`: the running
+  session does not list a tool added after it connected.
+- Monorepo CI guards a new company read: use `companyReads.getCompany(id, 'identity')`, not `db.collection('users')`, and list
+  it in `DISPLAY_READS` in `__tests__/companies-read/users-reads-write-basis-gate.test.ts`.
+- Owed math: the Payouts pill is `getPayoutContractsSummary` (single-company or agency-scope cache envelope, cold compute up
+  to ~120 s, route maxDuration 300). An agency root's page shows the agency scope; a staff read must return both.
+  The dashboard MCP route allows 30 tool calls a minute per user.
