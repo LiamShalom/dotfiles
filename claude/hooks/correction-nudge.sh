@@ -82,4 +82,14 @@ if [[ $prompt =~ $example_ask ]]; then
   printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/example-class-nudge.log"
   echo "This message shows one example of a class. Before you fix anything, measure the class across all live data (how many accounts, which shapes of the problem, sampled rows), and fix every shape you find, not only the example shown. Say the counts in your reply."
 fi
+
+# "Is this a bug?" answered from a reading: on 2026-11-26 "ensure that this isnt a bug" (Messages
+# showed "Move to the new chat" on a preview) got "not a bug" from a subagent's code + DB reading.
+# It was a bug (the branch's /chat-api rewrite hit a retired host's HTML 404, read as "no record").
+# CLAUDE.md's "prove it, reproduce it" line was loaded and missed.
+bug_ask='(^|[^a-z])(is (this|that|it) a bug|isn.?t a bug|is not a bug|not a bug|a bug\?|bug or|expected behavio|working as (intended|designed)|why (is|does|do|did|are) |still (shows|showing|happens|broken)|keeps? (showing|happening))([^a-z]|$)'
+if [[ $prompt =~ $bug_ask ]]; then
+  printf '%s\t%s\n' "$(date -u +%FT%TZ)" "${prompt:0:300}" >>"$HOME/.claude/logs/bug-ask-nudge.log"
+  echo "This asks whether something is a bug or why it happens. Reproduce it where the operator saw it (the same preview or page, a test account in the same state) and read the real evidence there: the network response with its status and body, the log line, the row. Only then answer. A subagent's code or data reading is a lead, not the answer: do not say \"not a bug\" or \"expected\" until you have seen the actual response."
+fi
 exit 0
