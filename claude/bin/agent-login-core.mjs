@@ -109,6 +109,9 @@ export function saveTestLogin({ title, url, username, password }, request) {
   if (same.length > 1) fail(`Several Agent-Test logins are called "${title}"; rename one first`, 2);
   if (same.length) {
     const item = JSON.parse(op(["item", "get", same[0].id, "--vault", vault.id, "--format", "json"]));
+    // Reusing a title must not repoint a saved login at another site (agent-login would then type it there).
+    if (!savedFor(item, normalHost(site.hostname)))
+      fail(`"${item.title}" is saved for ${itemHosts(item).join(", ") || "no website"}, not ${site.hostname}; use a new title`, 2);
     const fields = item.fields || [];
     const set = (purpose, value, type) => {
       const f = fields.find(x => x.purpose === purpose);

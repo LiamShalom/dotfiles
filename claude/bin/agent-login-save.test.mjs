@@ -40,6 +40,17 @@ test('updates an existing login by title and keeps its other fields', () => {
   assert.equal(sent.urls.length, 1);
 });
 
+test('refuses to update an existing title for a different website', () => {
+  const op = (args) => {
+    if (args[0] === 'vault') return vaults;
+    if (args[1] === 'list') return JSON.stringify([{id:'old1', title:'X QA'}]);
+    if (args[1] === 'get') return JSON.stringify({id:'old1', title:'X QA', urls:[{href:'https://x.com/'}], fields:[]});
+    throw new Error(`write must not run: ${args}`);
+  };
+  assert.throws(() => saveTestLogin({title:'X QA', url:'https://evil.example/login', username:'u', password:'p'}, op), /new title/);
+  assert.throws(() => saveTestLogin({title:'X QA', url:'https://notx.com/', username:'u', password:'p'}, op), /new title/);
+});
+
 test('refuses non-https sites and missing values before calling 1Password', () => {
   const op = () => { throw new Error('should not run'); };
   assert.throws(() => saveTestLogin({title:'a', url:'http://x.com', username:'u', password:'p'}, op), /https/);
