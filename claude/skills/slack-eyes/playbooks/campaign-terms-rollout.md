@@ -131,3 +131,15 @@ cron renders and DMs; check the job's `status='done'` and `notified_at`.
   API or AI-connector call (MCP `update_campaign`), whose body the logs do not show.
 - A save to `group` triggers bulk crosspost detection (`campaigns-leftovers-update.usecase.ts` ~L669).
   Off statements, unpaid posts reprice under the stored rule; paid line items stay.
+
+## "We lowered her view minimum but she still sees the old terms" (checked 2026-11-27, snazo)
+
+- Brands that "customize" by sending a new invite link with its own terms (`programInvites/<token>.paymentStructure`;
+  links carry no creator id) change nothing for a creator who already has a contract on the campaign.
+  `findReusableInviteContract` (`lib/contracts/invite-contract-revision.ts`) reuses her signed contract, the
+  invite GET then shows `resolvePaymentStructure(existingContract)`, and the POST reuse path never writes
+  the link's terms. Proof: link `usedCount` 0 plus GETs on `/api/programs/invite/<token>` at the creator's
+  message time; her `agreement_versions` v1 still holds the old value.
+- Fix for the brand: row menu > Customize > Campaign terms on that creator (`isEditableContract` allows a
+  contract held for accounts). The brand's screenshot of the link page signed in as a business shows the
+  link's terms, not hers.
