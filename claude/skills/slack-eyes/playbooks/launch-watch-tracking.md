@@ -29,6 +29,15 @@ here no longer matches, fix this file.
 |---|---|---|
 | N rows still lack a value after a backfill's mark | read the watch's check SQL and run its count on the read replica, with the row times against the mark's `cursor_at` | rows all written after the one-shot mark, so the sweep had stopped before they came (workflow runs, 11-26: 279 summaries, 05:54–16:08 UTC, mark 05:50 UTC). A new mark key makes the sweep run again |
 | a fix is "saved on the watch runner" | `cat <run dir>/fix.patch`, then `open-fix` | the diff in the PR |
+| an app watch (`mobile--<slug>`) "day 0 looks wrong", 0 production users fired the event | `~/.local/state/sideshift-watches/state.json` → `launch.platformDay0`; versions per day in PostHog 202481 (`$app_version`, `$os`) | Android shipped 2.39 on 11-11, then the shared version went back to 2.31, so `release: android 2.32.0` matched 2.39. Fixed in #12369: a higher version counts only if first seen on or after the first day 3 users ran the release version |
+
+Mobile watches live in `SideShiftApp/sideshift-mobile` `ops/watches/` (cached in `remote-watches/`). Launch
+code is `scripts/lib/launches.mjs` + `launch-runner.mjs` on `origin/main`; the main checkout is stale. To re-run a
+launch from day 0: `node scripts/watches.mjs reopen <slug>` (clears state), delete the old PostHog dashboard, its 4
+insights and the annotation (the runner reuses a dashboard by name, with the old dates), then
+`node scripts/watches.mjs run --here --only <slug> --no-agent`: it should print "waiting for release". The
+day-0 query must stay one grouped scan of app opens with a LIMIT: every iOS event over 60 days returns 504
+after about 10 s, and HogQL returns 100 rows without a LIMIT.
 
 Before you trust a fix that re-runs a sweep, check that the stuck rows can be rebuilt. For workflow
 summaries: each has a `workflow_engine_runs` row with `outcome = 'fired'`.
