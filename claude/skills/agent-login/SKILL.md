@@ -6,10 +6,25 @@ description: "Sign in to websites with saved 1Password credentials without promp
 # Agent login
 
 Liam's logins and two-step codes are in 1Password. This tool signs you in as Liam without
-showing you either: it reads the login through a read-only 1Password service account (token in
-the login Keychain) and types it straight into your tab. Liam is not asked. The account reads two
-vaults: **Agent Logins** (Liam's own logins with two-step codes) and **Agent-Test** (SideShift test
-accounts). A login in any other vault is out of reach; only Liam decides what goes into Agent Logins.
+showing you either: it reads the login through a 1Password service account (token in the login
+Keychain) and types it straight into your tab. Liam is not asked. The account reads two vaults:
+**Agent Logins** (Liam's own logins with two-step codes, read-only) and **Agent-Test** (SideShift
+test accounts, read and write). A login in any other vault is out of reach; only Liam decides what
+goes into Agent Logins.
+
+## Save a test account's login
+
+After you create a test account, save its login to Agent-Test (the only vault it writes to).
+The password goes on stdin, never as an argument:
+
+```bash
+printf %s "$PASSWORD" | node ~/.claude/bin/agent-login-save.mjs "<title>" https://<site>/login <username>
+```
+
+It prints only the item id, title and `created` or `updated`. The same title (case ignored)
+updates that item and keeps its other fields, such as a two-step code. Name items like the
+existing ones ("SideShift X Test Creator"). Verified 2026-11-26: create, update, lookup with
+`agent-login-discover.mjs`, and a refused write to Agent Logins.
 
 When the operator names an existing brand profile, keep that profile as the identity target.
 Check its existing grants and saved login before considering signup. A missing or rejected
@@ -185,7 +200,8 @@ first real use, confirm the page signed in, then tell Liam it worked and delete 
   For SideShift testing, use the Agent-Test vault's test accounts. "SideShift User" is a
   platform admin: use it only when the task needs an admin.
 - Never read a filled field back, print it or save it, and never pull values out of 1Password
-  with `op` yourself. The tool is the only path.
+  with `op` yourself. The tool is the only path, and `agent-login-save.mjs` is the only way to
+  write. Never overwrite a login another agent or Liam saved unless the task is about that account.
 - Most of Liam's 1Password logins hold a username and a two-step code but no password. When the
   tool reports "password (none saved in 1Password)", hand that step to Liam.
 - A passkey prompt is not a dead end: click "Try another way" and pick the authenticator option
