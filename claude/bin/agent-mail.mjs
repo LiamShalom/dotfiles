@@ -140,6 +140,15 @@ export function extractCode(subject, text, length) {
       if (length && code.length !== length) score -= 3;
       candidates.push({ code, score });
     }
+    // Letters-only codes (TikTok Shop Partner Center sends "…code in … : ZXQWRT") count only right
+    // after "code" and a colon, so ordinary capitalised words never match.
+    for (const m of hay.matchAll(/\bcode\b[^:\n]{0,60}:\s*([A-Z]{6,8})(?![\w@-])/gi)) {
+      if (!/^[A-Z]+$/.test(m[1])) continue;
+      let score = 3 + (where === "subject" ? 2 : 0);
+      if (length && m[1].length === length) score += 2;
+      if (length && m[1].length !== length) score -= 3;
+      candidates.push({ code: m[1], score });
+    }
   }
   candidates.sort((a, b) => b.score - a.score);
   return candidates[0]?.score >= 3 ? candidates[0].code : "";
