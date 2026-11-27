@@ -20,7 +20,8 @@ design feedback), choose where to show it and say your choice in one line:
 Canvas steps:
 
 1. Screenshot the real UI: the preview route (`design` skill) at 1280 and 390 wide, and the
-   reference screen. Never draw product UI by hand.
+   reference screen. Never draw product UI by hand. Each option has passed the width sweep
+   (`node scripts/responsive-sweep.mjs` in the monorepo) first.
 2. Write the round to `$CLAUDE_JOB_DIR/tmp/<feature>-round-<n>.json`. Image paths are relative
    to that file. Give each option a letter, and put your pick and why in `note`:
 

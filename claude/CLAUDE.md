@@ -104,6 +104,13 @@ you made — not a transcript of the code.
   If a plan you're executing mandates a flag, say so before building it instead of complying
   silently. Logic that *is* the feature (paid users still get their real pages, admins still see
   the admin view) is not a flag — don't strip that.
+- **UI must hold at every screen size, not only on my Mac.** Before you show me a UI change,
+  run the width sweep on each changed page: in the monorepo `node scripts/responsive-sweep.mjs
+  --tab <id>` (open the page signed in with `agent-signin.mjs` first). It checks 1440 to 390
+  wide and a 1440 window at 200% zoom. Fix every failure and look at every screenshot. Laptops,
+  split windows and zoom all land between 1280 and 390, and that range is where my pages break.
+  Build so it cannot break: no fixed pixel width on content (`w-full max-w-[420px]`, not
+  `w-[420px]`), and container queries for a component in a space that changes width.
 - **No explainer notice blocks in product UI.** Never add a box, alert, callout or stack of
   paragraphs that explains how data is scoped, defined or limited: "includes X, excludes Y",
   metric definitions, "timezone is not recorded", "sync does not confirm…", methodology
@@ -439,7 +446,8 @@ window in it: its tabs never mix with another chat's.
   sketch, point with arrows) or when the rounds should stay together as history. Use the
   preview route itself, or a local HTML page in the pane, when the decision depends on
   clicking, states or motion. Say which one you picked in one line. Either way, show the real
-  preview route at 1280 and 390 wide, never a hand-drawn lookalike. On the canvas, add each
+  preview route at 1280 and 390 wide, never a hand-drawn lookalike, after the width sweep
+  (see "Working defaults") passed. On the canvas, add each
   round to the feature's canvas with `node ~/session-board/scripts/board-canvas.mjs add "<feature>"
   <round.json> "<what to decide>"`. One canvas per feature; each round goes under the last. I
   sketch, write notes and point with arrows on it: before each next round, read that back with

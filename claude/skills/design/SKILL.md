@@ -91,7 +91,9 @@ The approved spec at `docs/features/<date>-<slug>/spec.md`. If there is no spec,
    "this isnt the entire profile".)
 
 6. **Check it yourself first.** Open the route in the shared agent Chrome
-   (`chrome-devtools` MCP, background tab). Screenshot each state at 1280 and 390 wide. A page
+   (`chrome-devtools` MCP, background tab). Run the width sweep on each state
+   (`node scripts/responsive-sweep.mjs --tab <id>`: 1440 to 390 and 200% zoom), fix every
+   failure and look at every screenshot; show the operator the 1280 and 390 ones. A page
    that shows real records (a campaign, a creator, a brand) is checked and shown on an empty one
    and a full one, never only one. (11-09: "we need to be testing and viewing on both an empty
    campaign and a full campaign".) Put
