@@ -28,6 +28,7 @@ here no longer matches, fix this file.
 | Alert says | Check | Proof |
 |---|---|---|
 | N rows still lack a value after a backfill's mark | read the watch's check SQL and run its count on the read replica, with the row times against the mark's `cursor_at` | rows all written after the one-shot mark, so the sweep had stopped before they came (workflow runs, 11-26: 279 summaries, 05:54–16:08 UTC, mark 05:50 UTC). A new mark key makes the sweep run again |
+| "fix withheld: … touches scripts/ci/…, which only a person changes" | the run dir has no `fix.patch`; the change is described in `result.json` `details`. Write it yourself in a worktree | mintlify docs automerge (11-27): the main ruleset has `required_review_thread_resolution: true` (`gh api repos/SideShiftApp/sideshift-monorepo/rules/branches/main`), and `mergeable=true` does not show it. Fixed in #12437 |
 | a fix is "saved on the watch runner" | `cat <run dir>/fix.patch`, then `open-fix` | the diff in the PR |
 | an app watch (`mobile--<slug>`) "day 0 looks wrong", 0 production users fired the event | `~/.local/state/sideshift-watches/state.json` → `launch.platformDay0`; versions per day in PostHog 202481 (`$app_version`, `$os`) | Android shipped 2.39 on 11-11, then the shared version went back to 2.31, so `release: android 2.32.0` matched 2.39. Fixed in #12369: a higher version counts only if first seen on or after the first day 3 users ran the release version |
 
