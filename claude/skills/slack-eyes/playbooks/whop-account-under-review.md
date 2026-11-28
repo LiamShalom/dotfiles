@@ -92,3 +92,16 @@ a money and risk call: prepare the facts, then `needs_liam` with `only_liam_can`
   eat the amounts (11-17: "$16,550" posted as ",550"; the post had to be deleted with `chat.delete` and sent
   again).
 - `logs_search_webapp` rejects windows over 60 minutes.
+
+## "Purchases are paused" on a brand's own Whop checkout (ugc world agency, 11-27)
+
+- To reproduce, open `https://whop.com/checkout/<plan_id>` in an isolated agent Chrome context, then read the response of
+  `POST /api/v1/checkout_sessions`. A blocked seller returns `blocking_error: {code: "purchases_disabled"}`. A free plan on the same seller
+  is not blocked.
+- Find the product first. `GET /api/v1/products?account_id=<biz>&visibilities[]=hidden&...` (repo `.env.local` `WHOP_API_KEY`)
+  lists hidden products. Here the product was on the agency's main business, not on the client sub-account it was named after.
+- No switch turns it back on: not in the public API (`PATCH /accounts/{id}`, preferences), not in SideShift's Whop dashboard
+  (Settings → Payments/Checkout/Risk), and not on the subaccount page (only "View dashboard" and "Remove account"). Capabilities
+  show `accept_card_payments: active` even while purchases are blocked.
+- What we offer instead: the client sub-account funds its own SideShift wallet (Wallet → Add funds: card, ACH or bank wire).
+  Sub-account card and ACH top-ups were confirmed in `wallet_ledger` that week.
