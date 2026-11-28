@@ -13,6 +13,7 @@ principle it supports, or a new principle. Approvals count too.
 5. Does any error appear where a prompt, a queue or a link would do the job?
 6. Is it one weak pattern copied, or two or three real directions?
 7. Is a screenshot attached with "remove that row"? It is the row his sentence just named, never something he asked for earlier (10-29: removed "Profile complete" when he meant the handle).
+8. Did a fix for cramped or cut-off text hide something that showed before (the search bar, a labelled button, a column)? Keep it and let the text truncate with its tooltip; hiding it is his call (11-27: hid the header search bar at 1280 to stop subtitles truncating, "the search bar is gone").
 
 ## Principles (strongest first)
 
