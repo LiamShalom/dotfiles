@@ -32,6 +32,14 @@ here no longer matches, fix this file.
 | a fix is "saved on the watch runner" | `cat <run dir>/fix.patch`, then `open-fix` | the diff in the PR |
 | an app watch (`mobile--<slug>`) "day 0 looks wrong", 0 production users fired the event | `~/.local/state/sideshift-watches/state.json` → `launch.platformDay0`; versions per day in PostHog 202481 (`$app_version`, `$os`) | Android shipped 2.39 on 11-11, then the shared version went back to 2.31, so `release: android 2.32.0` matched 2.39. Fixed in #12369: a higher version counts only if first seen on or after the first day 3 users ran the release version |
 
+A launch readout ("Day N · At risk") comes from `~/.local/state/sideshift-watches/runs/<slug>-<ts>/`: `evidence.md`
+has the guardrail SQL and `result.json` `details` has the daily numbers and the agent's question. Its
+"recommendation" can reverse the approved spec. Before you build it, split the guardrail into its parts by day
+(numerator and denominator), and split the numerator by listing, for example pool job ids from `spotlight_served`
+against all others. Spotlight pool (11-28): applies to listings outside the pool already fell on 11-20 and 11-21,
+before the 11-22 launch, and that week had Thanksgiving. So the readout did not prove the cause, and the fill stays
+Liam's product call.
+
 Mobile watches live in `SideShiftApp/sideshift-mobile` `ops/watches/` (cached in `remote-watches/`). Launch
 code is `scripts/lib/launches.mjs` + `launch-runner.mjs` on `origin/main`; the main checkout is stale. To re-run a
 launch from day 0: `node scripts/watches.mjs reopen <slug>` (clears state), delete the old PostHog dashboard, its 4
