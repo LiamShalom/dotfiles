@@ -74,6 +74,11 @@
           },
           {
             "type": "command",
+            "command": "bash ~/.claude/hooks/prod-change-none-check.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "bash ~/.claude/hooks/heavy-gate.sh",
             "timeout": 10
           },
