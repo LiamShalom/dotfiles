@@ -95,3 +95,15 @@ It writes the member doc, the Postgres `memberships` row (campaign_ids, capabili
 company to `multipleCompanies`. Prove it by calling `getCampaignsData` with `verifyFirebaseTokenCached`
 stubbed to the member's payload: it returns only the limited campaign. The internal-dashboard team tool
 gives full agency-wide default access, so do not use it for a view-only ask.
+
+## "Invite <email> to the account" when the team already lists them (nick: datacamp reinvite, 2026-11-27)
+
+The Members list can show an active Admin row whose login is gone. Check `persons` by email:
+`removed_reason = 'user_doc_deleted'` plus Firebase Auth `getUserByEmail` → `auth/user-not-found` means the
+person's own brand account was deleted, and that also removed their login. `deletedBrandAccounts/<uid>` holds
+`_deletedBy` (a teammate's uid). The fix is a fresh pending invite: from a worktree on `origin/main`
+(`sideshift-setup`), a throwaway script calls `createTeamInvite` then `sendTeamInvite`
+(`lib/api/team/*.usecase.ts`) with payload `{ userId: <staff Owner uid>, email, emailVerified: true }`, a
+64-hex code, `subaccountOnly: true` (the company's parent can be SideShift's own agency), and link base
+`https://app.sideshift.app`. Run it with `PG_ALLOW_PRODUCTION=1` on the command line. Check `invites/<id>`:
+`status pending`, `emailDeliveryStatus sent`.
